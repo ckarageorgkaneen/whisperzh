@@ -1,0 +1,3287 @@
+start	end	text
+0	4380	Hello, my name is Andre and I've been training deep neural networks for a bit more than a decade
+4380	9120	and in this lecture I'd like to show you what neural network training looks like under the hood.
+9840	14080	So in particular we are going to start with a blank Jupyter notebook and by the end of this
+14080	18640	lecture we will define and train a neural net and you'll get to see everything that goes on
+18640	23680	under the hood and exactly sort of how that works on an intuitive level. Now specifically what I
+23680	29240	would like to do is I would like to take you through building of micrograd. Now micrograd
+29240	34080	is this library that I released on github about two years ago but at the time I only uploaded the
+34080	39940	source code and you'd have to go in by yourself and really figure out how it works. So in this
+39940	43740	lecture I will take you through it step by step and kind of comment on all the pieces of it.
+44140	51520	So what is micrograd and why is it interesting? Thank you. Micrograd is basically an autograd
+51520	56580	engine. Autograd is short for automatic gradient and really what it does is it implements back
+56580	59120	propagation. Now back propagation is this algorithm
+59120	59220	that you can use to create a neural network and you can use it to create a neural network
+59220	59240	and you can use it to create a neural network and you can use it to create a neural network.
+59240	65320	That allows you to efficiently evaluate the gradient of some kind of a loss function with
+65320	70160	respect to the weights of a neural network and what that allows us to do then is we can
+70160	74100	iteratively tune the weights of that neural network to minimize the loss function and
+74100	78820	therefore improve the accuracy of the network. So back propagation would be at the mathematical
+78820	84720	core of any modern deep neural network library like say PyTorch or JAX. So the functionality
+84720	88780	of micrograd is I think best illustrated by an example. So if we just scroll down here
+88780	93460	you'll see that micrograd basically allows you to build out mathematical expressions
+93460	98580	and here what we are doing is we have an expression that we're building out where you have two
+98580	105780	inputs a and b and you'll see that a and b are negative four and two but we are wrapping those
+105780	111820	values into this value object that we are going to build out as part of micrograd. So this value
+111820	117160	object will wrap the numbers themselves and then we are going to build out a mathematical expression
+117160	118760	here where a and b are the values that we are going to build out as part of micrograd.
+118760	123300	are transformed into C, D, and eventually E, F, and G.
+123940	127040	And I'm showing some of the functionality of micrograph
+127040	128460	and the operations that it supports.
+128820	130680	So you can add two value objects.
+130880	131780	You can multiply them.
+132160	134160	You can raise them to a constant power.
+134600	137460	You can offset by one, negate, squash at zero,
+138200	142000	square, divide by constant, divide by it, et cetera.
+142820	144680	And so we're building out an expression graph
+144680	146980	with these two inputs, A and B,
+146980	149520	and we're creating an output value of G.
+150580	152420	And micrograph will, in the background,
+152820	154640	build out this entire mathematical expression.
+155200	158020	So it will, for example, know that C is also a value.
+158840	160800	C was a result of an addition operation.
+161500	165860	And the child nodes of C are A and B
+165860	169620	because it will maintain pointers to A and B value objects.
+169940	172580	So we'll basically know exactly how all of this is laid out.
+173100	176320	And then not only can we do what we call the forward pass,
+176320	176900	where we actually,
+176980	178360	if we look at the value of G, of course,
+178440	179380	that's pretty straightforward,
+179960	182680	we will access that using the dot data attribute.
+182920	185320	And so the output of the forward pass,
+185760	188580	the value of G, is 24.7, it turns out.
+188860	192620	But the big deal is that we can also take this G value object
+192620	194220	and we can call dot backward.
+194760	198600	And this will basically initialize backpropagation at the node G.
+199980	201360	And what backpropagation is going to do
+201360	202580	is it's going to start at G
+202580	206040	and it's going to go backwards through that expression graph
+206040	206880	and it's going to recurve.
+206980	209640	So we're going to recursively apply the chain rule from Calculus.
+210280	211920	And what that allows us to do then
+212280	215480	is we're going to evaluate basically the derivative of G
+215760	219900	with respect to all the internal nodes like E, D, and C,
+220260	222760	but also with respect to the inputs A and B.
+223400	226900	And then we can actually query this derivative of G
+226900	229600	with respect to A, for example, that's A dot grad.
+229960	231540	In this case, it happens to be 138.
+232040	234040	And the derivative of G with respect to B,
+234440	236940	which also happens to be here, 645.
+237520	239240	And this derivative, we'll see soon,
+239340	240540	is very important information
+240540	244660	because it's telling us how A and B are affecting G
+244660	246200	through this mathematical expression.
+246820	249940	So in particular, A dot grad is 138.
+250060	253980	So if we slightly nudge A and make it slightly larger,
+254960	257480	138 is telling us that G will grow
+257480	260140	and the slope of that growth is going to be 138.
+260880	263700	And the slope of growth of B is going to be 645.
+264320	266780	So that's going to tell us about how G will respond,
+266980	269160	if A and B get tweaked a tiny amount
+269160	271400	in a positive direction, okay?
+273300	276220	Now, you might be confused about what this expression is
+276220	277060	that we built out here.
+277200	279360	And this expression, by the way, is completely meaningless.
+279640	280720	I just made it up.
+280820	282760	I'm just flexing about the kinds of operations
+282760	284360	that are supported by micrograd.
+284960	287000	What we actually really care about are neural networks.
+287460	288700	But it turns out that neural networks
+288700	291520	are just mathematical expressions, just like this one,
+291780	293720	but actually a slightly bit less crazy even.
+294820	296720	Neural networks are just a mathematical expression,
+297100	299500	they take the input data as an input,
+299800	301980	and they take the weights of a neural network as an input,
+302340	303500	and it's a mathematical expression,
+303860	306300	and the output are your predictions of your neural net
+306300	307480	or the loss function.
+307620	308400	We'll see this in a bit.
+309000	311260	But basically, neural networks just happen to be
+311260	313200	a certain class of mathematical expressions.
+313860	316540	But backpropagation is actually significantly more general.
+316840	319040	It doesn't actually care about neural networks at all.
+319180	321620	It only cares about arbitrary mathematical expressions.
+322040	324140	And then we happen to use that machinery
+324140	325980	for training of neural networks.
+326500	326920	Now, one more.
+326980	328480	Another note I would like to make at this stage
+328480	329420	is that, as you see here,
+329540	331920	micrograd is a scalar-valued autograd engine.
+332340	335220	So it's working on the level of individual scalars,
+335300	336440	like negative four and two.
+336820	337740	And we're taking neural nets
+337740	338600	and we're breaking them down
+338600	341220	all the way to these atoms of individual scalars
+341220	342760	and all the little pluses and times,
+342920	344200	and it's just excessive.
+344900	345540	And so, obviously,
+345660	347580	you would never be doing any of this in production.
+347920	349840	It's really just done for pedagogical reasons
+349840	351740	because it allows us to not have to deal
+351740	353640	with these n-dimensional tensors
+353640	356400	that you would use in a modern deep neural network library.
+356980	359520	So this is really done so that you understand
+359520	361300	and refactor out the background application
+361300	364280	and chain rule and understanding of neural training.
+364960	367360	And then, if you actually want to train bigger networks,
+367540	368800	you have to be using these tensors,
+369080	370240	but none of the math changes.
+370380	371760	This is done purely for efficiency.
+372360	375200	We are basically taking all the scalar values,
+375520	376980	we're packaging them up into tensors,
+377260	379020	which are just arrays of these scalars.
+379440	381720	And then, because we have these large arrays,
+381720	383860	we're making operations on those large arrays
+383860	386700	that allows us to take advantage of the parallelism
+386700	387200	in a computer.
+387840	390000	And all those operations can be done in parallel,
+390280	391880	and then the whole thing runs faster.
+392320	393580	But really, none of the math changes,
+393740	394980	and they're done purely for efficiency.
+395400	397220	So I don't think that it's pedagogically useful
+397220	399080	to be dealing with tensors from scratch.
+399680	402040	And that's why I fundamentally wrote micrograd,
+402360	403920	because you can understand how things work
+403920	405360	at the fundamental level,
+405720	407240	and then you can speed it up later.
+408160	409160	Okay, so here's the fun part.
+409500	411580	My claim is that micrograd is what you need
+411580	412600	to train neural networks,
+412600	414300	and everything else is just efficiency.
+414920	416280	So you'd think that micrograd would be
+416700	418240	a very complex piece of code.
+418500	420960	And that turns out to not be the case.
+421420	423040	So if we just go to micrograd,
+423540	427040	and you'll see that there's only two files here in micrograd.
+427340	428540	This is the actual engine.
+428780	430280	It doesn't know anything about neural nets.
+430580	432580	And this is the entire neural nets library
+433160	434160	on top of micrograd.
+434360	437080	So engine and nn.py.
+437620	440760	So the actual backpropagation autograd engine
+441660	443320	that gives you the power of neural networks
+443760	444760	is literally
+444840	445840	100 lines of code.
+445840	446400	100 lines of code.
+446400	448400	Of, like, very simple Python,
+448400	450400	which we'll understand by the end of this lecture.
+450400	452400	And then nn.py,
+452400	454400	this neural network library
+454400	456400	built on top of the autograd engine,
+456400	458400	is like a joke.
+458400	460400	It's like, we have to define what is a neuron,
+460400	462400	and then we have to define what is a layer of neurons,
+462400	464400	and then we define what is a multilayer perceptron,
+464400	466400	which is just a sequence of layers of neurons.
+466400	468400	And so it's just a total joke.
+468400	470400	So basically,
+470400	472400	there's a lot of power
+472400	474400	that comes from only 150 lines of code.
+474400	476200	And then we have to define what is a multilayer perceptron,
+476200	478200	which is 150 lines of code.
+478200	480200	And that's all you need to understand
+480200	482200	to understand neural network training.
+482200	484200	And everything else is just efficiency.
+484200	486200	And of course, there's a lot to efficiency.
+486200	488200	But fundamentally, that's all that's happening.
+488200	490200	Okay, so now let's dive right in
+490200	492200	and implement micrograd step by step.
+492200	494200	The first thing I'd like to do is I'd like to make sure
+494200	496200	that you have a very good understanding, intuitively,
+496200	498200	of what a derivative is
+498200	500200	and exactly what information it gives you.
+500200	502200	So let's start with some basic imports
+502200	504200	that I copy-paste in every Jupyter Notebook, always.
+504200	506200	And let's define a derivative.
+506200	508200	So let's define a function,
+508200	510200	a scalar-valued function,
+510200	512200	f of x, as follows.
+512200	514200	So I just made this up randomly.
+514200	516200	I just wanted a scalar-valued function
+516200	518200	that takes a single scalar x
+518200	520200	and returns a single scalar y.
+520200	522200	And we can call this function, of course,
+522200	524200	so we can pass in, say, 3.0
+524200	526200	and get 20 back.
+526200	528200	Now, we can also plot this function
+528200	530200	to get a sense of its shape.
+530200	532200	You can tell from the mathematical expression
+532200	534200	that this is probably a parabola.
+534200	536200	It's a quadratic.
+536200	538200	It's a scalar-value that we can feed in
+538200	540200	using, for example, a range
+540200	542200	from negative 5 to 5
+542200	544200	in steps of 0.25.
+544200	546200	So x is just
+546200	548200	from negative 5 to 5
+548200	550200	not including 5
+550200	552200	in steps of 0.25.
+552200	554200	And we can actually call this function
+554200	556200	on this numpy array as well.
+556200	558200	So we get a set of y's
+558200	560200	if we call f on x.
+560200	562200	And these y's are basically
+562200	564200	also applying the function
+564200	566200	on every one of these elements independently.
+566200	568200	Let's talk about this using Mathplotlib.
+568200	570200	So plt.plot, x's and y's
+570200	572200	and we get a nice parabola.
+572200	574200	So previously here we fed in 3.0
+574200	576200	somewhere here, and we received
+576200	578200	20 back, which is here
+578200	580200	the y coordinate.
+580200	582200	So now I'd like to think through
+582200	584200	what is the derivative of this function
+584200	586200	at any single input point x?
+586200	588200	So what is the derivative at different points x
+588200	590200	of this function?
+590200	592200	Now if you remember back to your calculus class
+592200	594200	you've probably derived derivatives.
+594200	596200	So we take this mathematical expression
+596200	598200	for x plus 5, and you would write it out
+598200	600200	on a piece of paper and you would
+600200	602200	apply the product rule and all the other rules
+602200	604200	and derive the mathematical expression
+604200	606200	of the great derivative of the original function.
+606200	608200	And then you could plug in different x's
+608200	610200	and see what the derivative is.
+610200	612200	We're not going to actually do that
+612200	614200	because no one in neural networks
+614200	616200	actually writes out the expression for the neural net.
+616200	618200	It would be a massive expression.
+618200	620200	It would be thousands, tens of thousands of terms.
+620200	622200	No one actually derives the derivative
+622200	624200	of course.
+624200	626200	And so we're not going to take this kind of symbolic approach
+626200	628200	instead what I'd like to do is I'd like to look at the
+628200	630200	definition of derivative and just make sure
+630200	632200	that we really understand what the derivative is measuring
+632200	634200	what it's telling you about the function.
+634200	636200	And so if we just look up
+636200	638200	derivative
+642200	644200	we see that
+644200	646200	this is not a very good definition of derivative
+646200	648200	this is a definition of what it means to be differentiable
+648200	650200	but if you remember from your calculus
+650200	652200	it is the limit as h goes to 0
+652200	654200	of f of x plus h minus f of x
+654200	656200	over h.
+656200	658200	And basically what it's saying is
+658200	660200	if you slightly bump up
+660200	662200	at some point x that you're interested in
+662200	664200	or a, and if you slightly bump up
+664200	666200	you slightly increase it by
+666200	668200	a small number h
+668200	670200	how does the function respond?
+670200	672200	With what sensitivity does it respond?
+672200	674200	What is the slope at that point?
+674200	676200	Does the function go up or does it go down?
+676200	678200	And by how much?
+678200	680200	And that's the slope of that function
+680200	682200	the slope of that response at that point.
+682200	684200	And so we can basically evaluate
+684200	686200	the derivative here numerically
+686200	688200	by taking a very small h
+688200	690200	of course the definition would ask us to take h to 0
+690200	692200	we're just going to pick a very small h
+692200	694200	0.001
+694200	696200	and let's say we're interested in point 3.0
+696200	698200	so we can look at f of x of course as 20
+698200	700200	and now f of x plus h
+700200	702200	so if we slightly nudge
+702200	704200	x in a positive direction
+704200	706200	how is the function going to respond?
+706200	708200	And just looking at this
+708200	710200	do you expect f of x plus h to be slightly greater
+710200	712200	than 20?
+712200	714200	Or do you expect it to be slightly lower than 20?
+714200	716200	And so since 3 is here
+716200	718200	and this is 20
+718200	720200	if we slightly go positively
+720200	722200	the function will respond positively
+722200	724200	so you'd expect this to be slightly greater than 20
+724200	726200	and now by how much
+726200	728200	is telling you the
+728200	730200	strength of that slope
+730200	732200	the size of that slope
+732200	734200	so f of x plus h minus f of x
+734200	736200	this is how much the function responded
+736200	738200	in a positive direction
+738200	740200	and we have to normalize by the run
+740200	742200	so we have the rise over run
+742200	744200	to get the slope
+744200	746200	so this of course is just a numerical approximation
+746200	748200	of the slope
+748200	750200	because we have to make h very very small
+750200	752200	to converge to the exact amount
+752200	754200	now if I'm doing too many zeros
+754200	756200	at some point
+756200	758200	I'm going to get an incorrect answer
+758200	760200	because we're using floating point arithmetic
+760200	762200	and the representations of all these numbers
+762200	764200	in computer memory is finite
+764200	766200	and at some point we get into trouble
+766200	768200	so we can converge towards the right answer
+768200	770200	with this approach
+770200	772200	but basically
+772200	774200	at 3 the slope is 14
+774200	776200	and you can see that by taking
+776200	778200	x squared minus 4x plus 5
+778200	780200	and differentiating it in our head
+780200	782200	so 3x squared would be
+782200	784200	6x minus 4
+784200	786200	and then we plug in x equals 3
+786200	788200	so that's 18 minus 4 is 14
+788200	790200	so this is correct
+790200	792200	so that's at 3
+792200	794200	now how about
+794200	796200	the slope at say negative 3
+796200	798200	would you expect
+798200	800200	what would you expect for the slope
+800200	802200	now telling the exact value is really hard
+802200	804200	but what is the sign of that slope
+804200	806200	so at negative 3
+806200	808200	if we slightly go in the positive direction
+808200	810200	at x
+810200	812200	the function would actually go down
+812200	814200	and so that tells you that the slope would be negative
+814200	816200	so we'll get a slight number below
+816200	818200	below 20
+818200	820200	and so if we take the slope
+820200	822200	we expect something negative
+822200	824200	negative 22
+824200	826200	and at some point here of course
+826200	828200	the slope would be 0
+828200	830200	now for this specific function
+830200	832200	I looked it up previously
+832200	834200	and it's at point 2 over 3
+834200	836200	so at roughly 2 over 3
+836200	838200	this derivative would be 0
+838200	840200	so basically
+840200	842200	at that precise point
+844200	846200	at that precise point
+846200	848200	if we nudge in a positive direction
+848200	850200	the function doesn't respond
+850200	852200	this stays the same almost
+852200	854200	and so that's why the slope is 0
+854200	856200	ok now let's look at a bit more complex case
+856200	858200	so we're going to start complexifying a bit
+858200	860200	so now we have a function
+860200	862200	here
+862200	864200	with output variable b
+864200	866200	that is a function of 3 scalar inputs
+866200	868200	so a, b and c are some specific values
+868200	870200	3 inputs into our expression graph
+870200	872200	and a single output d
+872200	874200	and so if we just print d
+874200	876200	we get 4
+876200	878200	and now what I'd like to do is
+878200	880200	I'd like to again look at the derivatives of d
+880200	882200	with respect to a, b and c
+882200	884200	and think through
+884200	886200	again just the intuition of what this derivative
+886200	888200	is telling us
+888200	890200	so in order to evaluate this derivative
+890200	892200	we're going to get a bit hacky here
+892200	894200	we're going to again have a very small
+894200	896200	value of h and then we're going to
+896200	898200	fix the inputs at some
+898200	900200	values that we're interested in
+900200	902200	so these are the
+902200	904200	this is the point a, b, c at which we're going to be evaluating
+904200	906200	the derivative of d
+906200	908200	with respect to all a, b and c
+908200	910200	at that point
+910200	912200	so there's the inputs and now we have d1
+912200	914200	is that expression
+914200	916200	and then we're going to for example look at the derivative of d
+916200	918200	with respect to a
+918200	920200	so we'll take a and we'll bump it by h
+920200	922200	and then we'll get d2 to be the exact same
+922200	924200	function
+924200	926200	and now we're going to print
+926200	928200	you know
+928200	930200	d1 is d1
+930200	932200	d2 is d2
+932200	934200	and print slope
+934200	936200	so the derivative
+936200	938200	or slope here
+938200	940200	will be of course
+940200	942200	d2
+942200	944200	minus d1 divided by h
+944200	946200	so d2 minus d1 is how
+946200	948200	much the function increased
+948200	950200	when we bumped
+950200	952200	the specific
+952200	954200	input that we're interested in
+954200	956200	by a tiny amount
+956200	958200	and this is then normalized by
+958200	960200	h to get the slope
+962200	964200	so
+964200	966200	yeah
+966200	968200	so this
+968200	970200	so I just run this
+970200	972200	we're going to print d1
+972200	974200	which we know is
+974200	976200	4
+976200	978200	now d2 will be bumped
+978200	980200	a will be bumped by h
+980200	982200	so let's just think through
+982200	984200	a little bit
+984200	986200	what d2 will be
+986200	988200	printed out here in particular
+988200	990200	d1 will be 4
+990200	992200	will d2 be
+992200	994200	a number slightly greater than 4
+994200	996200	or slightly lower than 4
+996200	998200	and that's going to tell us the
+998200	1000200	sign of the derivative
+1000200	1002200	so
+1002200	1004200	we're bumping a by h
+1004200	1006200	b is minus 3
+1006200	1008200	c is 10
+1008200	1010200	so you can just intuitively think through
+1010200	1012200	this derivative and what it's doing
+1012200	1014200	a will be slightly more positive
+1014200	1016200	and but b is a negative
+1016200	1018200	number so if a is
+1018200	1020200	slightly more positive
+1020200	1022200	because b is negative 3
+1022200	1024200	we're actually going to be
+1024200	1026200	adding less to
+1026200	1028200	d
+1028200	1030200	so you'd actually expect that
+1030200	1032200	the value of the function will go
+1032200	1034200	down so let's
+1034200	1036200	just see this
+1036200	1038200	yeah and so we went from 4
+1038200	1040200	to 3.996
+1040200	1042200	and that tells you that the slope will
+1042200	1044200	be negative and then
+1044200	1046200	will be a negative number
+1046200	1048200	because we went down and
+1048200	1050200	then the exact number of slope
+1050200	1052200	will be the exact amount of slope
+1052200	1054200	is negative 3 and you can
+1054200	1056200	also convince yourself that negative 3 is the right
+1056200	1058200	answer mathematically and analytically
+1058200	1060200	because if you have a times b plus
+1060200	1062200	c and you are you know you have
+1062200	1064200	calculus then
+1064200	1066200	differentiating a times b plus c with
+1066200	1068200	respect to a gives you just b
+1068200	1070200	and indeed the value of b
+1070200	1072200	is negative 3 which is the derivative that we have
+1072200	1074200	so you can tell that that's correct
+1074200	1076200	so now if we do this
+1076200	1078200	with b so if we
+1078200	1080200	bump b by a little bit in a positive
+1080200	1082200	direction we'd get different
+1082200	1084200	slopes so what is the influence of b
+1084200	1086200	on the output d
+1086200	1088200	so if we bump b by a tiny amount
+1088200	1090200	in a positive direction then because a
+1090200	1092200	is positive we'll be
+1092200	1094200	adding more to d right
+1094200	1096200	so and now
+1096200	1098200	what is the sensitivity what is the
+1098200	1100200	slope of that addition and
+1100200	1102200	it might not surprise you that this should be
+1102200	1104200	2
+1104200	1106200	and why is it 2 because
+1106200	1108200	d of d by db
+1108200	1110200	differentiating with respect to b
+1110200	1112200	would be would give us a and
+1112200	1114200	the value of a is 2 so that's also
+1114200	1116200	working well and then if c
+1116200	1118200	gets bumped a tiny amount in h
+1118200	1120200	by h then
+1120200	1122200	of course a times b is unaffected and
+1122200	1124200	now c becomes slightly bit higher
+1124200	1126200	what does that do to the function it
+1126200	1128200	makes it slightly bit higher because we're simply adding
+1128200	1130200	c and it makes it slightly bit
+1130200	1132200	higher by the exact same amount that we
+1132200	1134200	added to c and so that tells you
+1134200	1136200	that the slope is 1
+1136200	1138200	that will be the
+1138200	1140200	the rate at which
+1140200	1142200	d will increase
+1142200	1144200	as we scale
+1144200	1146200	c okay so we now have some
+1146200	1148200	intuitive sense of what this derivative is telling you
+1148200	1150200	about the function and we'd like to move to
+1150200	1152200	neural networks now as i mentioned neural networks
+1152200	1154200	will be pretty massive expressions mathematical
+1154200	1156200	expressions so we need some data structures
+1156200	1158200	that maintain these expressions and that's what
+1158200	1160200	we're going to start to build out now
+1160200	1162200	so we're going to
+1162200	1164200	build out this value object that i
+1164200	1166200	showed you in the readme page
+1166200	1168200	of micrograd so let me
+1168200	1170200	copy paste a skeleton
+1170200	1172200	of the first very simple value
+1172200	1174200	object so class
+1174200	1176200	value takes a single
+1176200	1178200	scalar value that it wraps and
+1178200	1180200	keeps track of and that's
+1180200	1182200	it so we can for example
+1182200	1184200	do value of 2.0 and then we can
+1184200	1186200	get
+1186200	1188200	we can look at its content and
+1188200	1190200	python will internally
+1190200	1192200	use the wrapper function
+1192200	1194200	to return
+1194200	1196200	this string
+1196200	1198200	like that
+1198200	1200200	so this is a value object with
+1200200	1202200	data equals two that we're creating
+1202200	1204200	here now what we'd like to do is
+1204200	1206200	like we'd like to be able to
+1206200	1208200	have not just like
+1208200	1210200	two values but
+1210200	1212200	we'd like to do a plus b right we'd like
+1212200	1214200	to add them so currently
+1214200	1216200	you would get an error because python
+1216200	1218200	doesn't know how to add two value
+1218200	1220200	objects so we have to tell it
+1220200	1222200	so here's
+1222200	1224200	addition
+1224200	1226200	so
+1226200	1228200	you have to basically use these special
+1228200	1230200	double underscore methods in python to
+1230200	1232200	define these operators for these
+1232200	1234200	objects so if we call
+1234200	1236200	the
+1236200	1238200	if we use this plus
+1238200	1240200	operator python will internally
+1240200	1242200	call a dot
+1242200	1244200	add of b that's
+1244200	1246200	what will happen internally and so
+1246200	1248200	b will be the other
+1248200	1250200	and self will be
+1250200	1252200	a and so we see that what we're going
+1252200	1254200	to return is a new value object and
+1254200	1256200	it's just it's going to be wrapping
+1256200	1258200	the plus of
+1258200	1260200	their data but remember
+1260200	1262200	now because data is the actual
+1262200	1264200	like numbered python number so
+1264200	1266200	this operator here is just the
+1266200	1268200	typical floating point plus
+1268200	1270200	addition now it's not an addition of value
+1270200	1272200	objects and we'll return
+1272200	1274200	a new value so now a
+1274200	1276200	plus b should work and it should print value
+1276200	1278200	of negative one
+1278200	1280200	because that's two plus minus three
+1280200	1282200	there we go okay let's
+1282200	1284200	now implement multiply
+1284200	1286200	just so we can recreate this expression here
+1286200	1288200	so multiply i think it won't
+1288200	1290200	surprise you will be fairly similar
+1290200	1292200	so instead
+1292200	1294200	of add we're going to be using mul
+1294200	1296200	and then here of course we want to do times
+1296200	1298200	and so now we can create a
+1298200	1300200	c value object which will be 10.0
+1300200	1302200	and now we should be able to do
+1302200	1304200	a times b
+1304200	1306200	well let's just do a times b first
+1306200	1308200	um
+1308200	1310200	that's value of negative six now
+1310200	1312200	and by the way i skipped over this a little
+1312200	1314200	bit suppose that i didn't have the wrapper
+1314200	1316200	function here then
+1316200	1318200	it's just that you'll get some kind of an ugly expression
+1318200	1320200	so what wrapper is doing
+1320200	1322200	is it's providing us a way to
+1322200	1324200	print out like a nicer looking expression in
+1324200	1326200	python so we
+1326200	1328200	don't just have something cryptic we
+1328200	1330200	actually are you know it's value of
+1330200	1332200	negative six
+1332200	1334200	so this gives us a times
+1334200	1336200	and then this we should now be able
+1336200	1338200	to add c to it because we've defined and
+1338200	1340200	told the python how to do mul and add
+1340200	1342200	and so this will call
+1342200	1344200	this will basically be equivalent to a dot
+1344200	1346200	mul
+1346200	1348200	of b and then
+1348200	1350200	this new value object will be dot
+1350200	1352200	add of c
+1352200	1354200	and so let's see if that worked
+1354200	1356200	yep so that worked well that gave
+1356200	1358200	us four which is what we expect from before
+1358200	1360200	and i
+1360200	1362200	believe we can just call them manually as well
+1362200	1364200	there we go so
+1364200	1366200	yeah okay so now what we are
+1366200	1368200	missing is the connected tissue of this
+1368200	1370200	expression as i mentioned we want to keep
+1370200	1372200	these expression graphs so we need to
+1372200	1374200	know and keep pointers about
+1374200	1376200	what values produce what other values
+1376200	1378200	produce so here for example we are
+1378200	1380200	going to introduce a new variable which
+1380200	1382200	we'll call children and by default it
+1382200	1384200	will be an empty tuple and then we're
+1384200	1386200	actually going to keep a slightly
+1386200	1388200	different variable in the class which
+1388200	1390200	we'll call underscore prev which will be
+1390200	1392200	the set of children
+1392200	1394200	this is how i done i did it in the
+1394200	1396200	original micrograd looking at my code
+1396200	1398200	here i can't remember exactly the reason
+1398200	1400200	i believe it was efficiency but this
+1400200	1402200	underscore children will be a tuple for
+1402200	1404200	convenience but then when we actually
+1404200	1406200	maintain it in the class it will be just
+1406200	1408200	efficiency
+1408200	1410200	so now when
+1410200	1412200	we are creating a value like this with a
+1412200	1414200	constructor children will be empty and
+1414200	1416200	prev will be the empty set but when we
+1416200	1418200	are creating a value through addition or
+1418200	1420200	multiplication we're going to feed in
+1420200	1422200	the children of this
+1422200	1424200	value which in this case is self
+1424200	1426200	another
+1426200	1428200	so those are the children
+1428200	1430200	here
+1430200	1432200	so now we can do d dot
+1432200	1434200	prev and we'll see that
+1434200	1436200	the children of the we know
+1436200	1438200	now know are this a value of
+1438200	1440200	negative six and value of ten
+1440200	1442200	and this of course is the value resulting
+1442200	1444200	from a times b and the
+1444200	1446200	c value which is ten
+1446200	1448200	now the last piece of information
+1448200	1450200	we don't know so we know now the
+1450200	1452200	children of every single value but we don't know
+1452200	1454200	what operation created this value
+1454200	1456200	so we need one more element
+1456200	1458200	here let's call it underscore pop
+1458200	1460200	and by default this
+1460200	1462200	is the empty set for leaves
+1462200	1464200	and then we'll just maintain it here
+1464200	1466200	and now the
+1466200	1468200	operation will be just a simple string
+1468200	1470200	and in the case of addition it's
+1470200	1472200	plus in the case of multiplication
+1472200	1474200	it's times so
+1474200	1476200	now we not just have d dot
+1476200	1478200	prev we also have a d dot op
+1478200	1480200	and we know that d was produced by
+1480200	1482200	an addition of those two values
+1482200	1484200	and so now we have the full
+1484200	1486200	mathematical expression and we're
+1486200	1488200	building out this data structure and we know exactly
+1488200	1490200	how each value came to be
+1490200	1492200	by what expression and from what other values
+1494200	1496200	now because these expressions are about
+1496200	1498200	to get quite a bit larger we'd like a
+1498200	1500200	way to nicely visualize
+1500200	1502200	these expressions that we're building out
+1502200	1504200	so for that i'm going to copy paste a bunch of
+1504200	1506200	slightly scary code that's
+1506200	1508200	going to visualize this these
+1508200	1510200	expression graphs for us so here's the
+1510200	1512200	code and i'll explain it in a bit
+1512200	1514200	but first let me just show you what this code does
+1514200	1516200	basically what it does is it creates
+1516200	1518200	a new function draw dot
+1518200	1520200	that we can call on some root node
+1520200	1522200	and then it's going to visualize it
+1522200	1524200	so if we call draw dot on d
+1524200	1526200	which is this final value here
+1526200	1528200	that is a times b plus c
+1528200	1530200	it creates
+1530200	1532200	something like this so this is d
+1532200	1534200	and you see that this is a times b
+1534200	1536200	creating an interpret value
+1536200	1538200	plus c gives us this output
+1538200	1540200	node d
+1540200	1542200	so that's draw dot of d
+1542200	1544200	and i'm not going to go through this
+1544200	1546200	in complete detail you can take a look at
+1546200	1548200	graphvis and its api
+1548200	1550200	graphvis is an open source graph visualization
+1550200	1552200	software and what we're doing here
+1552200	1554200	is we're building out this graph in graphvis
+1554200	1556200	api and
+1556200	1558200	you can basically see that
+1558200	1560200	trace is this helper function that
+1560200	1562200	enumerates all the nodes and edges in the graph
+1562200	1564200	so that just builds a set of all
+1564200	1566200	the nodes and edges and then we iterate through
+1566200	1568200	all the nodes and we create special node
+1568200	1570200	objects for them in
+1570200	1572200	using dot
+1572200	1574200	node and then we also
+1574200	1576200	create edges using dot dot edge
+1576200	1578200	and the only thing that's like slightly
+1578200	1580200	tricky here is you'll notice that i
+1580200	1582200	basically add these fake nodes
+1582200	1584200	which are these operation nodes
+1584200	1586200	so for example this node here is just
+1586200	1588200	like a plus node and
+1588200	1590200	i create these
+1590200	1592200	special
+1592200	1594200	op nodes here
+1594200	1596200	and i connect them accordingly
+1596200	1598200	so these nodes of course
+1598200	1600200	are not actual nodes
+1600200	1602200	in the original graph they're not
+1602200	1604200	actually a value object the only
+1604200	1606200	value objects here are the things
+1606200	1608200	in squares those are actual value
+1608200	1610200	objects or representations thereof
+1610200	1612200	and these op nodes are just created in
+1612200	1614200	this draw dot routine so that
+1614200	1616200	it looks nice let's also
+1616200	1618200	add labels to these graphs just so we
+1618200	1620200	know what variables are where
+1620200	1622200	so let's create a special underscore
+1622200	1624200	label
+1624200	1626200	or let's just do label equals
+1626200	1628200	empty by default and save it
+1628200	1630200	in each node
+1630200	1632200	and then here
+1632200	1634200	we're going to do label is a
+1634200	1636200	label is b
+1636200	1638200	label is c
+1642200	1644200	and then
+1644200	1646200	let's create a special
+1646200	1648200	um e equals
+1648200	1650200	a times b
+1650200	1652200	and e dot label will
+1652200	1654200	be e
+1654200	1656200	it's kind of naughty and e
+1656200	1658200	will be e plus c
+1658200	1660200	and a d dot label will be
+1660200	1662200	b
+1662200	1664200	okay so nothing really changes i just
+1664200	1666200	added this new e function
+1666200	1668200	a new e variable
+1668200	1670200	and then here when we are
+1670200	1672200	printing this i'm going
+1672200	1674200	to print the label here
+1674200	1676200	so this will be a percent s
+1676200	1678200	bar and this will be n dot
+1678200	1680200	label
+1680200	1682200	and so now
+1682200	1684200	we have the label
+1684200	1686200	on the left here so it says a b
+1686200	1688200	creating e and then e plus c creates
+1688200	1690200	d just like we have it
+1690200	1692200	here and finally let's make this
+1692200	1694200	expression just one layer deeper
+1694200	1696200	so d will not be the final output
+1696200	1698200	node instead
+1698200	1700200	after d we are going to create a
+1700200	1702200	new value object called
+1702200	1704200	f we're going to start running out of
+1704200	1706200	variables soon f will be negative two
+1706200	1708200	point zero and its label
+1708200	1710200	will of course just be f
+1710200	1712200	and then l
+1712200	1714200	capital l will be the output
+1714200	1716200	of our graph and l will be
+1716200	1718200	d times f
+1718200	1720200	okay so l will be negative eight
+1720200	1722200	is the output
+1722200	1724200	uh so
+1724200	1726200	now we don't just draw a
+1726200	1728200	d we draw l
+1730200	1732200	okay
+1732200	1734200	and somehow the label of
+1734200	1736200	l is undefined oops
+1736200	1738200	the label has to be explicitly
+1738200	1740200	given to it
+1740200	1742200	there we go so l is the output
+1742200	1744200	so let's quickly recap what we've done so far
+1744200	1746200	we are able to build out mathematical
+1746200	1748200	expressions using only plus and times
+1748200	1750200	so far they are scalar
+1750200	1752200	valued along the way and we can
+1752200	1754200	do this forward pass
+1754200	1756200	and build out a mathematical expression
+1756200	1758200	so we have multiple inputs here
+1758200	1760200	a b c and f going into
+1760200	1762200	a mathematical expression that produces
+1762200	1764200	a single output l
+1764200	1766200	and this here is visualizing the
+1766200	1768200	forward pass so the output of the
+1768200	1770200	forward pass is negative eight
+1770200	1772200	that's the value now
+1772200	1774200	what we'd like to do next is we'd like to run
+1774200	1776200	back propagation and in back
+1776200	1778200	propagation we are going to start here at the end
+1778200	1780200	and we're going to reverse
+1780200	1782200	and calculate the gradient
+1782200	1784200	along all these intermediate
+1784200	1786200	values and really what we're
+1786200	1788200	computing for every single value here
+1788200	1790200	um we're going to compute
+1790200	1792200	the derivative of that node
+1792200	1794200	with respect to
+1794200	1796200	l so
+1796200	1798200	the derivative of l with respect to l
+1798200	1800200	is just one
+1800200	1802200	and then we're going to derive what is the
+1802200	1804200	derivative of l with respect to f with
+1804200	1806200	respect to d with respect to c
+1806200	1808200	with respect to e with respect
+1808200	1810200	to b and with respect to a
+1810200	1812200	and in a neural network setting you'd
+1812200	1814200	be very interested in the derivative of basically
+1814200	1816200	this loss function l
+1816200	1818200	with respect to the weights of
+1818200	1820200	a neural network and here of course
+1820200	1822200	we have just these variables a b c and f
+1822200	1824200	but some of these will eventually represent
+1824200	1826200	the weights of a neural net and so
+1826200	1828200	we'll need to know how those weights are impacting
+1828200	1830200	the loss function
+1830200	1832200	so we'll be interested basically in the derivative of
+1832200	1834200	the output with respect to some of its
+1834200	1836200	leaf nodes and those leaf nodes will
+1836200	1838200	be the weights of the neural net
+1838200	1840200	and the other leaf nodes of course will be the data
+1840200	1842200	itself but usually we will not want
+1842200	1844200	or use the derivative of the
+1844200	1846200	loss function with respect to data because
+1846200	1848200	the data is fixed but the weights
+1848200	1850200	will be iterated on
+1850200	1852200	using the gradient information
+1852200	1854200	so next we are going to create a variable inside
+1854200	1856200	the value class that maintains
+1856200	1858200	the derivative of
+1858200	1860200	l with respect to that value
+1860200	1862200	and we will call this variable
+1862200	1864200	grad so there
+1864200	1866200	is a dot data and there is a self.grad
+1866200	1868200	and initially
+1868200	1870200	it will be zero and remember that
+1870200	1872200	zero is basically means no
+1872200	1874200	effect so at initialization
+1874200	1876200	we are assuming that every value does not
+1876200	1878200	impact does not affect the
+1878200	1880200	output right because
+1880200	1882200	if the gradient is zero that means that changing
+1882200	1884200	this variable is not changing the
+1884200	1886200	loss function so by
+1886200	1888200	default we assume that the gradient is zero
+1888200	1890200	and then
+1890200	1892200	now that we have grad
+1892200	1894200	and it's zero point zero
+1896200	1898200	we are going to be able to visualize
+1898200	1900200	it here after data so here
+1900200	1902200	grad is point four f
+1902200	1904200	and this will be end of grad
+1904200	1906200	and now
+1906200	1908200	we are going to be showing both the data
+1908200	1910200	and the grad
+1910200	1912200	initialized at zero
+1912200	1914200	and we are
+1914200	1916200	just about getting ready to calculate the
+1916200	1918200	back propagation and of course this
+1918200	1920200	grad again as i mentioned is representing
+1920200	1922200	the derivative of the output in
+1922200	1924200	this case l with respect to this
+1924200	1926200	value so with respect to
+1926200	1928200	so this is the derivative of l with respect to
+1928200	1930200	f with respect to d and so on
+1930200	1932200	so let's now fill in those gradients
+1932200	1934200	and actually do back propagation manually
+1934200	1936200	so let's start filling in these gradients and
+1936200	1938200	start all the way at the end as i mentioned here
+1938200	1940200	first we are interested to fill in this
+1940200	1942200	gradient here so
+1942200	1944200	what is the derivative of l with respect to
+1944200	1946200	l in other words if i change
+1946200	1948200	l by a tiny amount h
+1948200	1950200	how much does
+1950200	1952200	l change
+1952200	1954200	it changes by h so
+1954200	1956200	it's proportional and therefore the derivative will be
+1956200	1958200	one we can of course
+1958200	1960200	measure these or estimate these numerical
+1960200	1962200	gradients numerically just like
+1962200	1964200	we've seen before so if i take this
+1964200	1966200	expression and i create a
+1966200	1968200	def lol function here
+1968200	1970200	and put this here
+1970200	1972200	now the reason i'm creating a gating function
+1972200	1974200	lol here is because i don't want
+1974200	1976200	to pollute or mess up the global scope
+1976200	1978200	here this is just kind of like a little staging
+1978200	1980200	area and as you know in python all of these
+1980200	1982200	will be local variables to this function
+1982200	1984200	so i'm not changing any of the
+1984200	1986200	global scope here so here
+1986200	1988200	l1 will be l
+1990200	1992200	and then copy pasting this expression
+1992200	1994200	we're going to add a small
+1994200	1996200	amount h
+1996200	1998200	in
+1998200	2000200	for example a
+2000200	2002200	right and this would be measuring
+2002200	2004200	the derivative of l with respect
+2004200	2006200	to a so here
+2006200	2008200	this will be l2
+2008200	2010200	and then we want to print test derivatives
+2010200	2012200	so print l2 minus
+2012200	2014200	l1 which is how much l
+2014200	2016200	changed and then normalize it
+2016200	2018200	by h so this is the rise
+2018200	2020200	over run and we have to be
+2020200	2022200	careful because l is a valid node
+2022200	2024200	so we actually want its data
+2026200	2028200	so that these are floats dividing
+2028200	2030200	by h and this should print
+2030200	2032200	the derivative of l with respect to a
+2032200	2034200	because a is the one that we bumped a
+2034200	2036200	little bit by h so what is
+2036200	2038200	the derivative of l with respect
+2038200	2040200	to a it's six
+2040200	2042200	okay and obviously
+2042200	2044200	if we change
+2044200	2046200	l by h
+2046200	2048200	then that would be
+2048200	2050200	here
+2050200	2052200	effectively
+2052200	2054200	this looks really awkward but
+2054200	2056200	changing l by h
+2056200	2058200	you see the derivative here is one
+2060200	2062200	that's kind of like the base case
+2062200	2064200	of what we are doing here
+2064200	2066200	so basically we can come up here
+2066200	2068200	and we can manually set
+2068200	2070200	l.grad to one this is our
+2070200	2072200	manual backpropagation
+2072200	2074200	l.grad is one and let's redraw
+2074200	2076200	and we'll see
+2076200	2078200	that we filled in grad is one
+2078200	2080200	for l we're now going to continue
+2080200	2082200	the backpropagation so let's here look at
+2082200	2084200	the derivatives of l with respect to
+2084200	2086200	d and f let's do
+2086200	2088200	d first so what
+2088200	2090200	we are interested in if i create a markdown on
+2090200	2092200	here is we'd like to know
+2092200	2094200	basically we have that l is d times f
+2094200	2096200	and we'd like to know what is
+2096200	2098200	d l by
+2098200	2100200	d d
+2100200	2102200	what is that and if you know
+2102200	2104200	your calculus l is d times f
+2104200	2106200	so what is d l by d d
+2106200	2108200	it would be f
+2108200	2110200	and if you don't believe me we can also
+2110200	2112200	just derive it because the proof would be
+2112200	2114200	fairly straightforward we go
+2114200	2116200	to the definition
+2116200	2118200	of the derivative which is
+2118200	2120200	f of x plus h minus f of x
+2120200	2122200	divide h
+2122200	2124200	as a limit of h goes to zero
+2124200	2126200	of this kind of expression so
+2126200	2128200	when we have l is d times f
+2128200	2130200	then increasing
+2130200	2132200	d by h would give us
+2132200	2134200	the output of d plus h times
+2134200	2136200	f that's
+2136200	2138200	basically f of x plus h right
+2138200	2140200	minus d times
+2140200	2142200	f
+2142200	2144200	and then divide h and
+2144200	2146200	symbolically expanding out here we
+2146200	2148200	would have basically d times f
+2148200	2150200	plus h times f minus
+2150200	2152200	d times f divide h
+2152200	2154200	and then you see how the df minus
+2154200	2156200	df cancels so you're left with h times
+2156200	2158200	f divide h
+2158200	2160200	which is f so
+2160200	2162200	in the limit as h goes to zero
+2162200	2164200	of you know
+2164200	2166200	derivative
+2166200	2168200	definition we just
+2168200	2170200	get f in the case of
+2170200	2172200	d times f
+2172200	2174200	so symmetrically
+2174200	2176200	d l by d f
+2176200	2178200	will just be d
+2178200	2180200	so what we have is that
+2180200	2182200	f dot grad we see now
+2182200	2184200	is just the value of d
+2184200	2186200	which is four
+2186200	2190200	and we see that
+2190200	2192200	d dot grad is just
+2192200	2194200	the value of f
+2196200	2198200	and so the value of f
+2198200	2200200	is negative two
+2200200	2202200	so we'll set those
+2202200	2204200	manually
+2204200	2206200	let me erase this markdown
+2206200	2208200	node and then let's redraw what we
+2208200	2210200	have
+2210200	2212200	okay and let's
+2212200	2214200	just make sure that these were correct
+2214200	2216200	so we seem to think that
+2216200	2218200	d l by d d is negative two so let's
+2218200	2220200	double check
+2220200	2222200	let me erase this plus h from before
+2222200	2224200	and now we want the derivative with respect to f
+2224200	2226200	so let's just come here
+2226200	2228200	when i create f and let's do a plus h here
+2228200	2230200	and this should print a derivative of
+2230200	2232200	l with respect to f so we expect
+2232200	2234200	to see four
+2234200	2236200	yeah and this is four up to
+2236200	2238200	floating point funkiness
+2238200	2240200	and then d l
+2240200	2242200	by d d should be
+2242200	2244200	f which is negative two
+2244200	2246200	grad is negative two
+2246200	2248200	so if we again
+2248200	2250200	come here and we change d
+2250200	2252200	d dot
+2252200	2254200	data plus equals h right
+2254200	2256200	here so we expect
+2256200	2258200	so we've added a little h and then we see
+2258200	2260200	how l changed and we
+2260200	2262200	expect to print
+2262200	2264200	negative two
+2264200	2266200	there we go
+2266200	2268200	so we've numerically
+2268200	2270200	verified what we're doing here is
+2270200	2272200	kind of like an inline gradient check
+2272200	2274200	gradient check is when we
+2274200	2276200	are deriving this like back propagation
+2276200	2278200	and getting the derivative with respect to all the
+2278200	2280200	intermediate results and
+2280200	2282200	then numerical gradient is just you know
+2282200	2284200	estimating it using
+2284200	2286200	small step size
+2286200	2288200	now we're getting to the crux of
+2288200	2290200	back propagation so this will be the
+2290200	2292200	most important node to understand
+2292200	2294200	because if you understand the gradient for
+2294200	2296200	this node you understand all of back
+2296200	2298200	propagation and all training of neural nets
+2298200	2300200	basically so we need
+2300200	2302200	to derive d l by
+2302200	2304200	d c in other words the derivative
+2304200	2306200	of l with respect to c
+2306200	2308200	because we've computed all these other
+2308200	2310200	gradients already now we're coming
+2310200	2312200	here and we're continuing the back propagation
+2312200	2314200	manually so we want
+2314200	2316200	d l by d c and then we'll also
+2316200	2318200	derive d l by d e
+2318200	2320200	now here's the problem
+2320200	2322200	how do we derive d l by
+2322200	2324200	d c
+2324200	2326200	we actually know the derivative l
+2326200	2328200	with respect to d so we know how
+2328200	2330200	l is sensitive to d
+2330200	2332200	but how is l sensitive to
+2332200	2334200	c so if we wiggle c how does
+2334200	2336200	that impact l through d
+2336200	2340200	so we know d l by d c
+2340200	2342200	and we
+2342200	2344200	also here know how c impacts d
+2344200	2346200	and so just very intuitively if you
+2346200	2348200	know the impact that c is having
+2348200	2350200	on d and the impact that d is having
+2350200	2352200	on l then you should be able to
+2352200	2354200	somehow put that information together to
+2354200	2356200	figure out how c impacts l
+2356200	2358200	and indeed this is what we can actually
+2358200	2360200	do so in particular we
+2360200	2362200	know just concentrating on d first
+2362200	2364200	let's look at how what is the derivative
+2364200	2366200	basically of d with respect to c
+2366200	2368200	so in other words what is d d by d
+2368200	2370200	c
+2370200	2372200	so here
+2372200	2374200	we know that d is c times
+2374200	2376200	c plus e that's what we
+2376200	2378200	know and now we're interested in d d
+2378200	2380200	by d c if you
+2380200	2382200	just know your calculus again and you remember
+2382200	2384200	then differentiating c plus e with
+2384200	2386200	respect to c you know that that gives you
+2386200	2388200	1.0 and
+2388200	2390200	we can also go back to the basics and derive
+2390200	2392200	this because again we can go to our
+2392200	2394200	f of x plus h minus f of x
+2394200	2396200	divide by h
+2396200	2398200	that's the definition of a derivative
+2398200	2400200	as h goes to zero and
+2400200	2402200	so here focusing on c
+2402200	2404200	and its effect on d
+2404200	2406200	we can basically do the f of x plus h
+2406200	2408200	will be c is
+2408200	2410200	incremented by h plus c
+2410200	2412200	that's the first evaluation of our
+2412200	2414200	function minus
+2414200	2416200	c plus e
+2416200	2418200	and then divide h
+2418200	2420200	and so what is this
+2420200	2422200	just expanding this out this will be c plus
+2422200	2424200	h plus e minus c minus
+2424200	2426200	e divide h
+2426200	2428200	and then you see here how c minus c
+2428200	2430200	cancels e minus e cancels
+2430200	2432200	we're left with h over h which is 1.0
+2432200	2434200	and so
+2434200	2436200	by symmetry also
+2436200	2438200	d d by d
+2438200	2440200	e will be
+2440200	2442200	1.0 as well
+2442200	2444200	so basically the derivative of
+2444200	2446200	a sum expression is very simple
+2446200	2448200	and this is the local derivative
+2448200	2450200	so i call this the local derivative because
+2450200	2452200	we have the final output value all the
+2452200	2454200	way at the end of this graph and we're now
+2454200	2456200	like a small node here and
+2456200	2458200	this is a little plus node and
+2458200	2460200	the little plus node doesn't know
+2460200	2462200	anything about the rest of the graph
+2462200	2464200	that it's embedded in all it knows
+2464200	2466200	is that it did a plus it took a c
+2466200	2468200	and an e added them and created
+2468200	2470200	d and this plus node
+2470200	2472200	also knows the local influence of
+2472200	2474200	c on d or rather
+2474200	2476200	the derivative of d with respect to c
+2476200	2478200	and it also knows the derivative of d
+2478200	2480200	with respect to e but
+2480200	2482200	that's not what we want that's just a local derivative
+2482200	2484200	what we actually want is
+2484200	2486200	dl by dc and
+2486200	2488200	l could l is here just one
+2488200	2490200	step away but in the general case
+2490200	2492200	this little plus node is could be
+2492200	2494200	embedded in like a massive graph
+2494200	2496200	so again
+2496200	2498200	we know how l impacts d and
+2498200	2500200	now we know how c and e impact
+2500200	2502200	d how do we put that information together
+2502200	2504200	to write dl by dc
+2504200	2506200	and the answer of course is the chain rule
+2506200	2508200	in calculus and so
+2510200	2512200	i pulled up chain rule here from wikipedia
+2512200	2514200	and i'm going
+2514200	2516200	to go through this very briefly so chain
+2516200	2518200	rule wikipedia sometimes
+2518200	2520200	can be very confusing and calculus can
+2520200	2522200	can be very confusing like
+2522200	2524200	this is the way i learned
+2524200	2526200	chain rule and it was very
+2526200	2528200	confusing like what is happening
+2528200	2530200	it's just complicated so i like
+2530200	2532200	this expression much better
+2532200	2534200	if a variable z depends
+2534200	2536200	on a variable y which itself depends
+2536200	2538200	on a variable x
+2538200	2540200	then z depends on x as well obviously
+2540200	2542200	through the intermediate variable y
+2542200	2544200	and in this case the chain rule is expressed
+2544200	2546200	as if you want
+2546200	2548200	dz by dx
+2548200	2550200	then you take the dz by dy
+2550200	2552200	and you multiply it by dy
+2552200	2554200	by dx so the chain
+2554200	2556200	rule fundamentally is telling you
+2556200	2558200	how we chain
+2558200	2560200	these derivatives
+2560200	2562200	together correctly
+2562200	2564200	so to differentiate through
+2564200	2566200	a function composition
+2566200	2568200	we have to apply a multiplication
+2568200	2570200	of those derivatives
+2570200	2572200	so that's
+2572200	2574200	really what chain rule is telling us
+2574200	2576200	and there's a nice little
+2576200	2578200	intuitive explanation here which i also think is
+2578200	2580200	kind of cute the chain rule states that
+2580200	2582200	knowing the instantaneous rate of change of z with respect
+2582200	2584200	to y and y relative to x allows
+2584200	2586200	one to calculate the instantaneous rate of change of z
+2586200	2588200	relative to x as a
+2588200	2590200	product of those two rates of change
+2590200	2592200	simply the product of those two
+2592200	2594200	so here's a good one
+2594200	2596200	if a car travels twice as fast as a bicycle
+2596200	2598200	and the bicycle is four times as
+2598200	2600200	fast as a walking man
+2600200	2602200	then the car travels two times four
+2602200	2604200	eight times as fast as a man
+2604200	2606200	and so this makes it
+2606200	2608200	very clear that the correct thing to do
+2608200	2610200	sort of is to multiply
+2610200	2612200	so car is
+2612200	2614200	twice as fast as bicycle and bicycle
+2614200	2616200	is four times as fast as man
+2616200	2618200	so the car will be eight
+2618200	2620200	times as fast as the man
+2620200	2622200	and so we can take these
+2622200	2624200	intermediate rates of change if you will
+2624200	2626200	and multiply them together
+2626200	2628200	and that justifies the
+2628200	2630200	chain rule intuitively
+2630200	2632200	so have a look at chain rule but here
+2632200	2634200	really what it means for us is
+2634200	2636200	there's a very simple recipe for deriving
+2636200	2638200	what we want
+2638200	2640200	which is dl by dc
+2640200	2642200	and what we have so far
+2642200	2644200	is we know
+2644200	2646200	want
+2646200	2648200	and we know
+2648200	2650200	what is the
+2650200	2652200	impact of d on l
+2652200	2654200	so we know dl by dd
+2654200	2656200	the derivative of l with respect to dd
+2656200	2658200	we know that that's negative two
+2658200	2660200	and now because of this local
+2660200	2662200	reasoning that we've done here
+2662200	2664200	we know dd by dc
+2664200	2666200	so how does c impact d
+2666200	2668200	and in particular
+2668200	2670200	this is a plus node so the local derivative
+2670200	2672200	is simply 1.0 it's very simple
+2672200	2674200	and so
+2674200	2676200	the chain rule tells us that dl by dc
+2676200	2678200	going through this intermediate
+2678200	2680200	variable
+2680200	2682200	will just be simply dl by
+2682200	2684200	dd
+2684200	2686200	times
+2688200	2690200	dd
+2690200	2692200	by dc that's chain rule
+2692200	2694200	so this is identical
+2694200	2696200	to what's happening here
+2696200	2698200	except
+2698200	2700200	z is rl
+2700200	2702200	y is rd and x is
+2702200	2704200	rc
+2704200	2706200	so we literally just have to multiply these
+2706200	2708200	and because
+2710200	2712200	these local derivatives like dd by dc
+2712200	2714200	are just one
+2714200	2716200	we basically just copy over
+2716200	2718200	dl by dd because this is just
+2718200	2720200	times one
+2720200	2722200	so because dl by dd
+2722200	2724200	is negative two what is dl
+2724200	2726200	by dc
+2726200	2728200	well it's the local gradient
+2728200	2730200	1.0 times dl by dd
+2730200	2732200	which is negative two so literally
+2732200	2734200	what a plus node does you can look
+2734200	2736200	at it that way is it literally just routes
+2736200	2738200	the gradient because the
+2738200	2740200	plus nodes local derivatives are just
+2740200	2742200	one and so in the chain rule
+2742200	2744200	one times dl by
+2744200	2746200	dd is
+2746200	2748200	is
+2748200	2750200	is just dl by dd
+2750200	2752200	and so that derivative just gets routed
+2752200	2754200	to both c and to e
+2754200	2756200	in this case so basically
+2756200	2758200	we have that e.grad
+2758200	2760200	or let's start with c
+2760200	2762200	since that's the one we looked at
+2762200	2764200	is negative
+2764200	2766200	two times one
+2766200	2768200	negative two
+2768200	2770200	and in the same way by
+2770200	2772200	symmetry e.grad will be negative two
+2772200	2774200	that's the claim
+2774200	2776200	so we can set those
+2776200	2778200	we can redraw
+2778200	2780200	and you see how
+2780200	2782200	we just assigned negative two negative two
+2782200	2784200	so this back propagating signal which is
+2784200	2786200	carrying the information of like what is the derivative
+2786200	2788200	of l with respect to all the intermediate nodes
+2788200	2790200	we can imagine it almost like
+2790200	2792200	flowing backwards through the graph and a
+2792200	2794200	plus node will simply distribute
+2794200	2796200	the derivative to all the leaf nodes
+2796200	2798200	sorry to all the children nodes of it
+2798200	2800200	so this is the claim
+2800200	2802200	and now let's verify it
+2802200	2804200	so let me remove the plus h here from before
+2804200	2806200	and now instead what we want to
+2806200	2808200	do is we want to increment c so
+2808200	2810200	c.data will be incremented by h
+2810200	2812200	and when i run this we expect
+2812200	2814200	to see negative two
+2814200	2816200	negative two
+2816200	2818200	and then of course for e
+2818200	2820200	so e.data plus equals h
+2820200	2822200	and we expect to see negative two
+2822200	2824200	simple
+2826200	2828200	so those are the derivatives
+2828200	2830200	of these internal nodes
+2830200	2832200	and now we're going to
+2832200	2834200	recurse our way backwards
+2834200	2836200	again and we're again
+2836200	2838200	going to apply the chain rule
+2838200	2840200	so here we go our second application of chain rule
+2840200	2842200	and we will apply it all the way through the
+2842200	2844200	graph we just happen to only have one more node
+2844200	2846200	remaining we have that
+2846200	2848200	derivative of l
+2848200	2850200	so we know that
+2850200	2852200	the derivative of l
+2852200	2854200	as we have just calculated
+2854200	2856200	is negative two
+2856200	2858200	so we know that
+2858200	2860200	so we know the derivative of l
+2860200	2862200	with respect to e
+2862200	2864200	and now we want
+2864200	2866200	dL by dA
+2866200	2868200	right
+2868200	2870200	and the chain rule is telling us
+2870200	2872200	that that's just dL by dE
+2872200	2874200	negative two
+2874200	2876200	so that's basically
+2876200	2878200	dE by dA
+2878200	2880200	we have to look at that
+2880200	2882200	so I'm a little times node
+2882200	2884200	inside a massive graph
+2884200	2886200	and I only know that I did
+2886200	2888200	a times b and I produced an e
+2888200	2890200	so now what is
+2890200	2892200	dE by dA
+2892200	2894200	and dE by dB
+2894200	2896200	that's the only thing that I sort of know about
+2896200	2898200	that's my local gradient
+2898200	2900200	so because we have that e is a times b
+2900200	2902200	we're asking what is dE
+2902200	2904200	by dA
+2904200	2906200	and of course we just did that here
+2906200	2908200	we had a times
+2908200	2910200	so I'm not going to re-derive it
+2910200	2912200	but if you want to differentiate this
+2912200	2914200	with respect to a you'll just get b
+2914200	2916200	right the value of b
+2916200	2918200	which in this case is
+2918200	2920200	negative three point zero
+2920200	2922200	so
+2922200	2924200	basically we have that dL by dA
+2924200	2926200	well let me just do it
+2926200	2928200	right here we have that a dot grad
+2928200	2930200	and we are applying chain rule here
+2930200	2932200	is dL by dE
+2932200	2934200	which we see here is
+2934200	2936200	negative two
+2936200	2938200	times
+2938200	2940200	what is dE by dA
+2940200	2942200	it's the value of b
+2942200	2944200	which is negative three
+2944200	2946200	that's it
+2948200	2950200	and then we have b dot grad
+2950200	2952200	is again dL by dE
+2952200	2954200	which is negative two
+2954200	2956200	just the same way
+2956200	2958200	times
+2958200	2960200	what is dE by dB
+2960200	2962200	is the value of a
+2962200	2964200	which is 2.0
+2964200	2966200	so these are
+2966200	2968200	our claimed derivatives
+2968200	2970200	let's
+2970200	2972200	re-draw
+2972200	2974200	and we see here that
+2974200	2976200	a dot grad turns out to be six
+2976200	2978200	because that is negative two times negative three
+2978200	2980200	and b dot grad is negative four
+2980200	2982200	times
+2982200	2984200	sorry is negative two times two
+2984200	2986200	which is negative four
+2986200	2988200	so those are our claims
+2988200	2990200	let's delete this and let's verify them
+2990200	2992200	we have
+2992200	2994200	a here
+2994200	2996200	plus equals h
+2996200	2998200	so
+2998200	3000200	the claim is that
+3000200	3002200	a dot grad is six
+3002200	3004200	let's verify
+3004200	3006200	six
+3006200	3008200	and we have b dot data
+3008200	3010200	plus equals h
+3010200	3012200	so nudging b by h
+3012200	3014200	and looking at what happens
+3014200	3016200	we claim it's negative four
+3016200	3018200	and indeed it's negative four
+3018200	3020200	plus minus again float
+3020200	3022200	oddness
+3022200	3024200	and that's it
+3024200	3026200	that was the manual
+3026200	3028200	back propagation
+3028200	3030200	all the way from here
+3030200	3032200	to all the leaf nodes
+3032200	3034200	and we've done it piece by piece
+3034200	3036200	and really all we've done is
+3036200	3038200	as you saw we iterated through all the nodes
+3038200	3040200	one by one
+3040200	3042200	and locally applied the chain rule
+3042200	3044200	we always know what is the derivative of l
+3044200	3046200	with respect to this little output
+3046200	3048200	and then we look at how this output was produced
+3048200	3050200	this output was produced through some operation
+3050200	3052200	and we have the pointers to the children nodes
+3052200	3054200	and so in this little operation
+3054200	3056200	we know what the local derivatives are
+3056200	3058200	and we just multiply them onto the derivative
+3058200	3060200	always
+3060200	3062200	so we just go through and recursively multiply on
+3062200	3064200	the local derivatives
+3064200	3066200	and that's what back propagation is
+3066200	3068200	it's just a recursive application of chain rule
+3068200	3070200	backwards through the computation graph
+3070200	3072200	let's see this power in action
+3072200	3074200	just very briefly
+3074200	3076200	what we're going to do is we're going to
+3076200	3078200	nudge our inputs to try to make l
+3078200	3080200	go up
+3080200	3082200	so in particular what we're doing is
+3082200	3084200	we're going to take that data
+3084200	3086200	we're going to change it
+3086200	3088200	and if we want l to go up
+3088200	3090200	that means we just have to go in the direction of the gradient
+3090200	3092200	so a should increase
+3092200	3094200	in the direction of gradient
+3094200	3096200	by like some small step amount
+3096200	3098200	this is the step size
+3098200	3100200	and we don't just want this for b
+3100200	3102200	but also for b
+3102200	3104200	also for c
+3104200	3106200	also for f
+3106200	3108200	those are leaf nodes
+3108200	3110200	which we usually have control over
+3110200	3112200	and if we nudge in
+3112200	3114200	the direction of the gradient
+3114200	3116200	we expect a positive influence on l
+3116200	3118200	so we expect l to go up
+3118200	3120200	positively
+3120200	3122200	so it should become less negative
+3122200	3124200	it should go up to say negative 6
+3124200	3126200	or something like that
+3126200	3128200	it's hard to tell exactly
+3128200	3130200	and we have to rerun the forward pass
+3130200	3132200	so let me just
+3132200	3134200	do that here
+3136200	3138200	this would be the forward pass
+3138200	3140200	f would be unchanged
+3140200	3142200	this is effectively the forward pass
+3142200	3144200	but now if we print l.data
+3144200	3146200	we expect
+3146200	3148200	because we nudged all the values
+3148200	3150200	all the inputs in the direction of the gradient
+3150200	3152200	we expected less negative l
+3152200	3154200	we expect it to go up
+3154200	3156200	so maybe it's negative 6 or so
+3156200	3158200	let's see what happens
+3158200	3160200	ok negative 7
+3160200	3162200	and this is basically one step
+3162200	3164200	of an optimization that we'll end up running
+3164200	3166200	and really this gradient
+3166200	3168200	just gives us some power
+3168200	3170200	because we know how to influence the final outcome
+3170200	3172200	and this will be extremely useful for training NOLETs as we'll soon see
+3172200	3174200	so now I would like to do
+3174200	3176200	one more example
+3176200	3178200	of manual backpropagation
+3178200	3180200	using a bit more complex
+3180200	3182200	and useful example
+3182200	3184200	we are going to backpropagate
+3184200	3186200	through a neuron
+3186200	3188200	so we want to
+3188200	3190200	eventually build out neural networks
+3190200	3192200	and in the simplest case these are multilayer
+3192200	3194200	perceptrons as they're called
+3194200	3196200	so this is a two layer neural net
+3196200	3198200	and it's got these hidden layers made up of neurons
+3198200	3200200	and these neurons are fully connected to each other
+3200200	3202200	now biologically neurons are very complicated
+3202200	3204200	devices but we have very simple mathematical models
+3204200	3206200	of them
+3206200	3208200	and so this is a very simple mathematical model
+3208200	3210200	of a neuron
+3210200	3212200	you have some inputs, x's
+3212200	3214200	and then you have these synapses
+3214200	3216200	that have weights on them
+3216200	3218200	so the w's are weights
+3218200	3220200	and then
+3220200	3222200	the synapse interacts with the input
+3222200	3224200	to this neuron multiplicatively
+3224200	3226200	so what flows to the cell body
+3226200	3228200	of this neuron
+3228200	3230200	is w times x
+3230200	3232200	but there's multiple inputs
+3232200	3234200	w times x is flowing to the cell body
+3234200	3236200	the cell body then has
+3236200	3238200	also like some bias
+3238200	3240200	so this is kind of like the
+3240200	3242200	innate sort of trigger happiness
+3242200	3244200	of this neuron
+3244200	3246200	so this bias can make it a bit more trigger happy
+3246200	3248200	or a bit less trigger happy regardless of the input
+3248200	3250200	but basically we're taking all the w times x
+3250200	3252200	of all the inputs
+3252200	3254200	adding the bias
+3254200	3256200	and then we take it through an activation function
+3256200	3258200	and this activation function
+3258200	3260200	is usually some kind of a squashing function
+3260200	3262200	like a sigmoid or 10H
+3262200	3264200	or something like that
+3264200	3266200	so as an example
+3266200	3268200	we're going to use the 10H in this example
+3268200	3270200	numpy has a
+3270200	3272200	np.10H
+3272200	3274200	so we can call it on a range
+3274200	3276200	and we can plot it
+3276200	3278200	this is the 10H function
+3278200	3280200	and you see that the inputs
+3280200	3282200	as they come in
+3282200	3284200	get squashed on the y coordinate here
+3284200	3286200	so right at 0
+3286200	3288200	we're going to get exactly 0
+3288200	3290200	and then as you go more positive in the input
+3290200	3292200	then you'll see that
+3292200	3294200	the activation function will only go up to 1
+3294200	3296200	and then plateau out
+3296200	3298200	and so if you pass in very positive inputs
+3298200	3300200	we're going to cap it smoothly at 1
+3300200	3302200	and on the negative side
+3302200	3304200	we're going to cap it smoothly to negative 1
+3304200	3306200	so that's 10H
+3306200	3308200	and that's the squashing function
+3308200	3310200	or an activation function
+3310200	3312200	and what comes out of this neuron
+3312200	3314200	is just the activation function applied to the
+3314200	3316200	dot product of the weights
+3316200	3318200	and the inputs
+3318200	3320200	so let's write one out
+3320200	3322200	um
+3322200	3324200	I'm going to copy paste
+3324200	3326200	because
+3326200	3328200	I don't want to type too much
+3328200	3330200	but okay so here we have the inputs
+3330200	3332200	x1, x2
+3332200	3334200	so this is a two dimensional neuron
+3334200	3336200	so two inputs are going to come in
+3336200	3338200	these are thought of as the weights of this neuron
+3338200	3340200	weights w1, w2
+3340200	3342200	and these weights again are the
+3342200	3344200	synaptic strengths for each input
+3344200	3346200	and this is the bias
+3346200	3348200	of the neuron B
+3348200	3350200	and now what we want to do
+3350200	3352200	is according to this model
+3352200	3354200	we need to multiply
+3354200	3356200	x1 times w1
+3356200	3358200	and x2 times w2
+3358200	3360200	and then we need to add bias
+3360200	3362200	on top of it
+3362200	3364200	and it gets a little messy here
+3364200	3366200	but all we are trying to do is
+3366200	3368200	x1 w1 plus x2 w2 plus B
+3368200	3370200	and these are multiplied here
+3370200	3372200	except I'm doing it in small steps
+3372200	3374200	so that we actually have pointers
+3374200	3376200	to all these intermediate nodes
+3376200	3378200	so we have x1 w1 variable
+3378200	3380200	x2 w2 variable
+3380200	3382200	and I'm also labeling them
+3382200	3384200	so that we have the
+3384200	3386200	n is now the cell body
+3386200	3388200	raw activation
+3388200	3390200	without the activation function for now
+3390200	3392200	and this should be enough
+3392200	3394200	to basically plot it
+3394200	3396200	so draw dot of n
+3398200	3400200	gives us x1 times w1
+3400200	3402200	x2 times w2
+3402200	3404200	being added
+3404200	3406200	then the bias gets added on top of this
+3406200	3408200	and this n is this sum
+3408200	3410200	so we are now going to take it through
+3410200	3412200	an activation function
+3412200	3414200	And let's say we use the tanh
+3414520	3420980	So that we produce the output. So what we'd like to do here is we'd like to do the output and I'll call it O is
+3422100	3424340	N dot tanh
+3425040	3427520	Okay, but we haven't yet written the tanh
+3428020	3432260	now the reason that we need to implement another tanh function here is that
+3432840	3434720	tanh is a
+3434720	3441220	Hyperbolic function and we've only so far implemented a plus and a times and you can't make a tanh out of just pluses and times
+3441220	3446260	You also need exponentiation. So tanh is this kind of a formula here
+3446940	3450480	You can use either one of these and you see that there are exponentiation involved
+3450480	3454160	Which we have not implemented yet for our little value node here
+3454160	3458260	So we're not going to be able to produce tanh yet and we have to go back up and implement something like it
+3458780	3461200	now one option here is
+3462540	3464540	We could actually implement
+3465360	3471200	Exponentiation right and we could return the exp of the value instead of a tanh
+3471220	3476160	Of a value because if we had exp then we have everything else that we need so
+3476880	3479240	because we know how to add and we know how to
+3481100	3486360	We know how to add and we know how to multiply so we'd be able to create tanh if we knew how to exp
+3486680	3489220	but for the purposes of this example, I specifically wanted to
+3489800	3494920	Show you that we don't necessarily need to have the most atomic pieces in
+3496100	3501220	In this value object we can actually like create functions at arbitrary
+3501920	3505640	Points of abstraction they can be complicated functions
+3505640	3509620	But they can be also very very simple functions like a plus and it's totally up to us
+3509760	3513820	The only thing that matters is that we know how to differentiate through any one function
+3513920	3516280	So we take some inputs and we make an output
+3516420	3520720	The only thing that matters it can be arbitrarily complex function as long as you know
+3520720	3526840	How to create the local derivative if you know the local derivative of how the inputs impact the output then that's all you need
+3527040	3529040	So we're going to cluster up
+3529260	3531100	all of this expression
+3531100	3536220	And we're not going to break it down to its atomic pieces. We're just going to directly implement tanh. So let's do that
+3537060	3539060	depth tanh and
+3539100	3541100	then out will be a value of
+3542600	3545360	And we need this expression here, so
+3548240	3551000	Let me actually copy paste
+3554000	3560040	Let's grab n which is a sol.theta and then this I believe is the tanh
+3561100	3563100	math.exp of
+3564280	3565600	2
+3565600	3569720	You know n minus 1 over 2n plus 1
+3570400	3572400	Maybe I can call this x
+3572860	3574860	Just so that it matches exactly
+3575480	3579000	okay, and now this will be t and
+3581140	3583440	Children of this node. There's just one child and
+3584280	3587940	I'm wrapping it in a tuple. So this is a tuple of one object just self and
+3588640	3590940	here the name of this operation will be
+3591100	3592100	10h
+3592100	3594100	And we're going to return that
+3596160	3598160	Okay
+3598260	3600260	So now value should be
+3600760	3606480	Implementing tanh and now we can scroll all the way down here and we can actually do n dot tanh
+3606480	3610280	And that's going to return the tanh output of n
+3611100	3615820	And now we should be able to draw it out of o not of n. So let's see how that worked
+3618480	3620920	There we go n went through tanh
+3621500	3623500	to produce this output
+3624000	3625900	so now tanh is a
+3625900	3627500	sort of
+3627500	3631380	our little micro grad supported node here as an operation and
+3633080	3638460	As long as we know the derivative of tanh then we'll be able to back propagate through it now
+3638460	3644100	Let's see this tanh in action. Currently. It's not squashing too much because the input to it is pretty low
+3644400	3647160	So the bias was increased to say 8
+3648860	3651100	Then we'll see that what's flowing in
+3651100	3654100	to the tanh now is 2 and
+3654360	3656500	Tanh is squashing it to 0.96
+3656720	3662800	So we're already hitting the tail of this tanh and it will sort of smoothly go up to 1 and then plateau out over there
+3663220	3669040	Okay, so I'm going to do something slightly strange. I'm going to change this bias from 8 to this number
+3670000	3671040	6.88 etc
+3671040	3676600	and I'm going to do this for specific reasons because we're about to start back propagation and
+3677000	3679740	I want to make sure that our numbers come out nice
+3679900	3681000	They're not like very
+3681000	3686160	Crazy numbers, they're nice numbers that we can sort of understand in our head. Let me also add those label
+3686160	3688560	O is short for output here
+3689820	3691360	So that's the R
+3691360	3697660	Okay, so 0.88 flows into tanh comes out 0.7. So so now we're going to do back propagation
+3697660	3699660	And we're going to fill in all the gradients
+3700000	3704440	so what is the derivative O with respect to all the
+3704960	3710620	inputs here and of course in a typical neural network setting what we really care about the most is the derivative of
+3711000	3713000	these neurons on the weights
+3713440	3719180	specifically the w2 and w1 because those are the weights that we're going to be changing part of the optimization and
+3719560	3721460	The other thing that we have to remember is here
+3721460	3725480	We have only a single neuron but in the neural net you typically have many neurons and they're connected
+3726940	3731960	So this is only like a one small neuron a piece of a much bigger puzzle and eventually there's a loss function
+3732120	3737800	That sort of measures the accuracy of the neural net and we're back propagating with respect to that accuracy and trying to increase it
+3738960	3740960	So let's start off back propagation
+3741000	3742260	Here in the end
+3742260	3749620	What is the derivative of O with respect to O the base case sort of we know always is that the gradient is just 1.0
+3750220	3752220	so let me fill it in and
+3752380	3753500	then
+3753500	3755000	Let me
+3755000	3756860	split out
+3756860	3758860	the drawing function
+3759860	3761860	Here
+3762420	3765020	And then here cell
+3767100	3769060	Clear this output here, okay
+3769860	3773300	So now when we draw O we'll see that or that grad is 1
+3773780	3778420	So now we're going to back propagate through the tanh so to back propagate through tanh
+3778420	3784240	We need to know the local derivative of tanh. So if we have that O is
+3785100	3787100	tanh of n
+3788180	3790960	Then what is do by dn?
+3791780	3798400	Now what you could do is you could come here and you could take this expression and you could do your calculus derivative taking
+3799060	3807600	and that would work but we can also just scroll down Wikipedia here into a section that hopefully tells us that derivative
+3809000	3811000	d by dx of tanh of x is
+3811460	3814460	Any of these I like this one 1 minus tanh square of x
+3815000	3823100	So this is 1 minus tanh of x squared. So basically what this is saying is that d o by dn is
+3824320	3826320	1 minus tanh
+3826860	3828720	of n
+3828720	3837060	squared. And we already have 10h of n. It's just o. So it's 1 minus o squared. So o is
+3837060	3848560	the output here. So the output is this number. o.data is this number. And then what this
+3848560	3857360	is saying is that do by dn is 1 minus this squared. So 1 minus o.data squared is 0.5
+3857360	3865640	conveniently. So the local derivative of this 10h operation here is 0.5. And so that
+3865640	3883040	would be do by dn. So we can fill in that n.grad is 0.5. We'll just fill it in. So this
+3883040	3887340	is exactly 0.5, 1 half. So now we're going to continue the backprop.
+3887360	3897320	This is 0.5. And this is a plus node. So what is backprop going to do here? And if you remember
+3897320	3903140	our previous example, a plus is just a distributor of gradient. So this gradient will simply
+3903140	3907420	flow to both of these equally. And that's because the local derivative of this operation
+3907420	3915260	is 1 for every one of its nodes. So 1 times 0.5 is 0.5. So therefore, we know that this
+3915260	3917260	node here, which we called this.
+3917360	3926040	It's grad. It's just 0.5. And we know that b.grad is also 0.5. So let's set those and
+3926040	3933760	let's draw. So those are 0.5. Continuing, we have another plus. 0.5, again, we'll just
+3933760	3946360	distribute. So 0.5 will flow to both of these. So we can set theirs. x2w2 as well. .grad is
+3946360	3946800	0.5.
+3947360	3953600	And let's redraw. Pluses are my favorite operations to backpropagate through because it's very
+3953600	3959040	simple. So now what's flowing into these expressions is 0.5. And so really, again, keep in mind
+3959040	3963440	what the derivative is telling us at every point in time along here. This is saying that
+3963440	3970880	if we want the output of this neuron to increase, then the influence on these expressions is
+3970880	3973880	positive on the output. Both of them are positive.
+3977360	3984740	So we can put a distribution to the output. So now, backpropagating to x2 and w2 first.
+3984740	3990300	This is a times node. So we know that the local derivative is the other term. So if
+3990300	4002860	we want to calculate x2.grad, then can you think through what it's going to be? So x2.grad
+4002860	4005420	will be w2.data times this x2.grad.
+4005420	4006320	.grad.
+4006320	4007360	.grad.
+4007360	4023600	w2.grad right and w2.grad will be x2.data times x2.w2.grad right so that's the little local piece
+4023600	4031660	of chain rule let's set them and let's redraw so here we see that the gradient on our weight
+4031660	4039960	2 is 0 because x2's data was 0 right but x2 will have the gradient 0.5 because data here was 1
+4039960	4046800	and so what's interesting here right is because the input x2 was 0 then because of the way the
+4046800	4052120	times works of course this gradient will be 0 and think about intuitively why that is
+4052120	4059440	derivative always tells us the influence of this on the final output if i wiggle w2
+4059440	4060940	how is the output changing
+4060940	4066160	it's not changing because we're multiplying by 0 so because it's not changing there is no
+4066160	4073160	derivative and 0 is the correct answer because we're squashing that 0 and let's do it here
+4073160	4080720	0.5 should come here and flow through this times and so we'll have that x1.grad is
+4080720	4085040	can you think through a little bit what what this should be
+4085560	4090540	local derivative of times with respect to x1
+4090540	4090920	is
+4090920	4105800	going to be w1 so w1's data times x1 w1.grad and w1.grad will be x1.data times x1 w2 w1.grad
+4107240	4113400	let's see what those came out to be so this is 0.5 so this would be negative 1.5 and this would be
+4113400	4119400	1. and we've back propagated through this expression these are the actual final derivatives so if we
+4119400	4120520	want this neurons to be negative 1.5 we're going to have to do this we're going to have to do this
+4120520	4124920	bit of elaborating so actually we can do this byаци to here so this is negative 1.5 so if we
+4124920	4129560	now want this neuron's output to increase we know that what's necessary is that
+4131320	4135400	w2 we have no gradient w2 doesn't actually matter to this neuron right now
+4135400	4140920	but this neuron this weight should go up so if this weight goes up then this neurones output
+4140920	4147480	would have gone up and proportionally because the gradient is 1. okay so doing the back propagation
+4147480	4148360	manually is obviously ridiculous so we are now going to put an end to this suffering and we're going to see how we can implement the back propagation's output Health classes method lambda.
+4148360	4148980	self attack self acquire lerud and a random entunkered router operation will be still coercion equal to 0.25éro.
+4148980	4153060	can implement the backward pass a bit more automatically. We're not going to be doing
+4153060	4158140	all of it manually out here. It's now pretty obvious to us by example how these pluses and
+4158140	4163540	times are back-propagating ingredients. So let's go up to the value object and we're going to start
+4163540	4171760	codifying what we've seen in the examples below. So we're going to do this by storing a special
+4171760	4179640	self.backward and underscore backward. And this will be a function which is going to do that
+4179640	4184340	little piece of chain rule. At each little node that took inputs and produced output,
+4185040	4191480	we're going to store how we are going to chain the outputs gradient into the inputs gradients.
+4192340	4200940	So by default, this will be a function that doesn't do anything. And you can also see that
+4200940	4201740	here in the value in my example.
+4201760	4208900	Micrograd. So we have this backward function. By default, it doesn't do anything. This is a
+4208900	4213080	empty function. And that would be sort of the case, for example, for a leaf node. For a leaf
+4213080	4220520	node, there's nothing to do. But now when we're creating these out values, these out values are
+4220520	4230600	an addition of self and other. And so we'll want to set out backward to be the function that
+4230600	4231740	propagates the gradient.
+4231760	4242960	So let's define what should happen. And we're going to store it in a closure. Let's define what
+4242960	4253180	should happen when we call out's grad. For addition, our job is to take out's grad and
+4253180	4258940	propagate it into self's grad and other.grad. So basically, we want to solve self.grad to
+4258940	4261740	something. And we want to set out's grad to something. And we want to set out's grad to
+4261760	4269240	that grad to something okay and the way we saw below how chain rule works we
+4269240	4274300	want to take the local derivative times the sort of global derivative I should
+4274300	4277900	call it which is the derivative of the final output of the expression with
+4277900	4287320	respect to out's data with respect to out so the local derivative of self in an
+4287320	4295420	addition is 1.0 so it's just 1.0 times out's grad that's the chain rule and
+4295420	4300760	others.grad will be 1.0 times out.grad and what you basically what you're seeing
+4300760	4306280	here is that out's grad will simply be copied onto self's grad and others grad
+4306280	4311440	as we saw happens for an addition operation so we're going to later call
+4311440	4316420	this function to propagate the gradient having done an addition let's now do
+4316420	4317040	multiplication
+4317320	4324880	we're going to also define and we're going to set its backward to be
+4324880	4335500	backward and we want to chain out grad into self.grad and others.grad
+4335500	4341940	and this will be a little piece of chain rule for multiplication so we'll have so
+4341940	4345940	what should this be can you think through
+4347320	4351340	scale it up a little bit more I think we can test it but okay so we've got
+4351340	4353680	thatanche squared caught or else what should it be and this is going to be
+4353680	4355900	a little better what should this be it's going to be a little bit better
+4355900	4360160	so finally see here to the other side and this will be the off part second
+4360160	4364840	time creative so where the version to copy to that I was off the plane or up
+4364840	4368040	to the -, and then target my output time so let's go to case sickness
+4368040	4371400	so here's the look of a general promotions of set for entire settings
+4371400	4375540	we want a group this isn't going to come the other way we want to set the
+4375540	4376560	You can also add in a你們 I think return method and even the previous employees
+4376560	4377300	and I'm gonna do a little bit of what we're going to say for the SQL gameplay
+4377320	4385600	to be just backward and here we need to back propagate we have out dot grad and we want to
+4385600	4393780	chain it into salt dot grad and salt dot grad will be the local derivative of this operation
+4393780	4400360	that we've done here which is 10h and so we saw that the local gradient is 1 minus the 10h of x
+4400360	4407120	squared which here is t that's the local derivative because that's t is the output of this 10h
+4407120	4413960	so 1 minus t squared is the local derivative and then gradient has to be multiplied because of the
+4413960	4420100	chain rule so out grad is chained through the local gradient into salt dot grad and that should
+4420100	4426240	be basically it so we're going to redefine our value node we're going to swing all the way down
+4426240	4436560	here and we're going to redefine our expression make sure that all the grads are zero okay but
+4436560	4437100	now we don't have to do this again we're just going to do this again and we're going to do this
+4437100	4441980	to do this manually anymore. We are going to basically be calling the dot backward
+4441980	4455080	in the right order. So first we want to call o's dot backward. So o was the
+4455080	4463320	outcome of 10h, right? So calling o's backward will be this
+4463320	4469480	function. This is what it will do. Now we have to be careful because there's a
+4469480	4479700	times out dot grad and out dot grad remember is initialized to 0. So here we see
+4479700	4487320	grad 0. So as a base case we need to set o's dot grad to 1.0 to initialize
+4487320	4489980	this with 1
+4493320	4499000	and then once this is 1, we can call o dot backward and what that should do is it should
+4499000	4505840	propagate this grad through 10h. So the local derivative times the global derivative which
+4505840	4508780	is initialized at 1. So this should
+4508780	4521080	so I thought about redoing it but I figured I should just leave the error in here because
+4521080	4523200	it's pretty funny. Why is an anti-object
+4523320	4530860	not callable? It's because I screwed up. We're trying to save these functions. So this is
+4530860	4536200	correct. This here, we don't want to call the function because that returns none. These
+4536200	4541000	functions return none. We just want to store the function. So let me redefine the value
+4541000	4547080	object and then we're going to come back in, redefine the expression, draw a dot. Everything
+4547080	4548080	is great.
+4548080	4553080	o dot grad is 1, o dot grad is 1 and now
+4553080	4559580	this should work, of course. Okay. So o dot backward should have, this grad should now
+4559580	4566840	be 0.5 if we redraw and if everything went correctly, 0.5. Yay. Okay. So now we need to
+4566840	4578080	call ns dot grad, ns dot backward, sorry, ns backward. So that seems to have worked.
+4578080	4582920	So ns dot backward routed the gradient to both of these. So this is looking great. So
+4582920	4592280	now we could, of course, call b dot grad, b dot backward, sorry. What's going to happen?
+4592280	4598860	Well b doesn't have a backward. b is backward because b is a leaf node. b is backward is
+4598860	4606200	by initialization the empty function. So nothing would happen. But we can call it on it. But
+4606200	4610920	when we call this one, it's backward.
+4612920	4615300	M Normal entire value.
+4617300	4624820	Let's do this behavior here. Then we expect this 0.5 to give further routed. Right? So
+4624820	4638140	there we go, 0.5, 0.5. And then finally, we want to call it here on x2, w2. And on
+4638140	4640140	x1, w1.
+4640140	4642080	Let's do both of those. And there we go.
+4642080	4642920	??
+4642920	4649420	and one exactly as we did before but now we've done it through calling that backward
+4649420	4656780	sort of manually so we have one last piece to get rid of which is us calling underscore
+4656780	4662660	backward manually so let's think through what we are actually doing we've laid out a mathematical
+4662660	4668760	expression and now we're trying to go backwards through that expression so going backwards through
+4668760	4674520	the expression just means that we never want to call a dot backward for any node before
+4674520	4682140	we've done sort of everything after it so we have to do everything after it before we're ever going
+4682140	4686260	to call dot backward on any one node we have to get all of its full dependencies everything that
+4686260	4693780	it depends on has to propagate to it before we can continue back-propagation so this ordering
+4693780	4697220	of graphs can be achieved using something called topological sort
+4697220	4698620	so topological
+4698620	4705520	sort is basically a laying out of a graph such that all the edges go only from left to right
+4705520	4713380	basically. So here we have a graph it's a directed acyclic graph a DAG and this is two different
+4713380	4717860	topological orders of it I believe where basically you'll see that it's a laying out of the nodes
+4717860	4724260	such that all the edges go only one way from left to right. And implementing topological sort you
+4724260	4731000	can look in wikipedia and so on I'm not going to go through it in detail but basically this is what
+4731000	4740160	builds a topological graph. We maintain a set of visited nodes and then we are going through
+4740160	4744960	starting at some root node which for us is O that's where I want to start the topological sort
+4744960	4751000	and starting at O we go through all of its children and we need to lay them out from left to
+4751000	4754200	right and basically this starts at OH.
+4754260	4757580	Oh, if it's not visited, then it marks it as visited.
+4757880	4763260	And then it iterates through all of its children and calls build topological on them.
+4764080	4767680	And then after it's gone through all the children, it adds itself.
+4768240	4772700	So basically, this node that we're going to call it on, like say, oh,
+4773060	4778860	is only going to add itself to the topo list after all of the children have been processed.
+4778860	4783560	And that's how this function is guaranteeing that you're only going to be in the list
+4783560	4785560	once all of your children are in the list.
+4785820	4787400	And that's the invariant that is being maintained.
+4787820	4791340	So if we build topo on O and then inspect this list,
+4791720	4795740	we're going to see that it ordered our value objects.
+4796500	4800820	And the last one is the value of 0.707, which is the output.
+4801520	4808080	So this is O, and then this is N, and then all the other nodes get laid out before it.
+4809500	4811540	So that builds the topological graph.
+4812100	4813500	And really what we're doing now,
+4813560	4819000	is we're just calling dot underscore backward on all of the nodes in a topological order.
+4819580	4824180	So if we just reset the gradients, they're all 0, what did we do?
+4824540	4830480	We started by setting O.grad to be 1.
+4831160	4832600	That's the base case.
+4833260	4835960	Then we built a topological order.
+4837960	4843240	And then we went for node in reversed.
+4843960	4844680	Of topo.
+4846220	4851220	Now, in the reverse order, because this list goes from, you know,
+4851620	4853080	we need to go through it in reversed order.
+4853960	4857180	So starting at O, node dot backward.
+4858480	4861580	And this should be it.
+4863180	4863940	There we go.
+4865380	4866580	Those are the correct derivatives.
+4867140	4869480	Finally, we are going to hide this functionality.
+4870020	4872420	So I'm going to copy this.
+4872740	4873540	And we're going to hide this functionality.
+4873560	4874840	And we're going to hide it inside the value class,
+4875000	4877340	because we don't want to have all that code lying around.
+4878340	4879720	So instead of an underscore backward,
+4879940	4881840	we're now going to define an actual backward.
+4882160	4884200	So that's backward, without the underscore.
+4886120	4888400	And that's going to do all the stuff that we just derived.
+4889000	4890700	So let me just clean this up a little bit.
+4891160	4898360	So we're first going to build a topological graph,
+4898840	4900340	starting at self.
+4901340	4903380	So build topo of self.
+4903820	4907380	We'll populate the topological order into the topo list,
+4907540	4908500	which is a local variable.
+4909060	4911520	Then we set self.grads to be one.
+4912780	4915740	And then for each node in the reversed list,
+4916060	4918240	so starting at S and going to all the children,
+4919240	4920700	underscore backward.
+4922180	4924460	And that should be it.
+4924820	4926460	So save.
+4927700	4928720	Come down here.
+4929340	4930000	We define.
+4931000	4932340	Okay, all the grads are zero.
+4933560	4936520	And now what we can do is odot backward without the underscore.
+4937480	4942000	And there we go.
+4942900	4945040	And that's backpropagation.
+4946420	4947580	Place for one neuron.
+4948540	4950700	Now we shouldn't be too happy with ourselves, actually,
+4950700	4952700	because we have a bad bug.
+4953340	4955060	And we have not surfaced the bug
+4955060	4958780	because of some specific conditions that we have to think about right now.
+4959700	4962440	So here's the simplest case that shows the bug.
+4963560	4965800	Say I create a single node A,
+4966160	4969980	and then I create a B that is A plus A.
+4971460	4972440	And then I call backward.
+4974740	4976780	So what's going to happen is A is three,
+4977280	4979120	and then B is A plus A.
+4979340	4981640	So there's two arrows on top of each other here.
+4983660	4986320	Then we can see that B is, of course, the forward pass works.
+4986780	4989240	B is just A plus A, which is six.
+4989240	4992100	But the gradient here is not actually correct.
+4992580	4993540	That we calculated.
+4993560	4994160	We can calculate it automatically.
+4995740	5002160	And that's because, of course, just doing calculus in your head,
+5002540	5005940	the derivative of B with respect to A should be two.
+5007420	5008240	One plus one.
+5008880	5009580	It's not one.
+5010940	5012320	Intuitively, what's happening here, right?
+5012380	5015840	So B is the result of A plus A, and then we call backward on it.
+5016440	5019200	So let's go up and see what that does.
+5023560	5026680	B is the result of addition, so out as B.
+5028020	5034000	And then when we call backward, what happened is self.grad was set to one,
+5034560	5036540	and then other.grad was set to one.
+5037280	5042740	But because we're doing A plus A, self and other are actually the exact same object.
+5043420	5045660	So we are overriding the gradient.
+5045840	5049160	We are setting it to one, and then we are setting it again to one.
+5049500	5052320	And that's why it stays at one.
+5052580	5053540	So that's a good thing.
+5054540	5058000	There's another way to see this in a little bit more complicated expression.
+5061340	5064660	So here we have A and B.
+5065920	5069320	And then D will be the multiplication of the two,
+5069620	5071240	and E will be the addition of the two.
+5072140	5074800	And then we multiply E times D to get F.
+5075260	5076540	And then we call F dot backward.
+5077660	5080040	And these gradients, if you check, will be incorrect.
+5080600	5082880	So fundamentally what's happening here, again,
+5082880	5088660	is basically we're going to see an issue any time we use a variable more than once.
+5089180	5093060	Until now, in these expressions above, every variable is used exactly once.
+5093160	5094160	So we didn't see the issue.
+5094920	5097000	But here, if a variable is used more than once,
+5097100	5098580	what's going to happen during backward pass?
+5099100	5101680	We're back-propagating from F to E to D.
+5101860	5102480	So far, so good.
+5102720	5107080	But now E calls it backward, and it deposits its gradients to A and B.
+5107420	5110020	But then we come back to D and call backward,
+5110020	5112860	and it overwrites those gradients at A and B.
+5112880	5116100	So that's obviously a problem.
+5117300	5122260	And the solution here, if you look at the multivariate case of the chain rule
+5122260	5123420	and its generalization there,
+5123780	5127880	the solution there is basically that we have to accumulate these gradients.
+5128020	5129020	These gradients add.
+5130200	5132820	And so instead of setting those gradients,
+5133780	5136260	we can simply do plus equals.
+5136680	5138380	We need to accumulate those gradients.
+5138880	5142560	Plus equals, plus equals, plus equals.
+5142880	5149880	And this will be okay, remember, because we are initializing them at zero.
+5150040	5158100	So they start at zero, and then any contribution that flows backwards will simply add.
+5158800	5165500	So now if we redefine this one, because the plus equals, this now works.
+5165880	5169220	Because A dot grad started at zero, and we called B dot backward,
+5169660	5172460	we deposit one, and then we deposit one again.
+5172720	5172860	And then we call B dot backward.
+5172860	5174280	And now this is two, which is correct.
+5174860	5177900	And here, this will also work, and we'll get correct gradients.
+5178380	5182060	Because when we call E dot backward, we will deposit the gradients from this branch,
+5182460	5186480	and then when we get to D dot backward, it will deposit its own gradients.
+5186900	5189580	And then those gradients simply add on top of each other.
+5190120	5192820	And so we just accumulate those gradients, and that fixes the issue.
+5193440	5196320	Okay, now before we move on, let me actually do a bit of cleanup here
+5196320	5200000	and delete some of this intermediate work.
+5200720	5202620	So I'm not going to need any of this.
+5202620	5204000	Now that we've derived all of it.
+5205460	5208840	We are going to keep this, because I want to come back to it.
+5209640	5216640	Delete the 10H, delete our modigating example, delete the step, delete this,
+5216960	5221220	keep the code that draws, and then delete this example,
+5221840	5224180	and leave behind only the definition of value.
+5225360	5228800	And now let's come back to this non-linearity here that we implemented, the 10H.
+5229060	5232060	Now I told you that we could have broken down 10H
+5232060	5237200	into its explicit atoms in terms of other expressions if we had the exp function.
+5237880	5239720	So if you remember, 10H is defined like this,
+5240140	5242620	and we chose to develop 10H as a single function,
+5242960	5245080	and we can do that because we know it's derivative,
+5245280	5246440	and we can backpropagate through it.
+5246880	5250740	But we can also break down 10H into an expressiveness, a function of exp.
+5251160	5253760	And I would like to do that now, because I want to prove to you
+5253760	5255760	that you get all the same results and all the same gradients,
+5256300	5259560	but also because it forces us to implement a few more expressions.
+5259560	5261940	It forces us to do exponentiation,
+5262060	5265160	addition, subtraction, division, and things like that.
+5265160	5267660	And I think it's a good exercise to go through a few more of these.
+5268160	5271360	Okay, so let's scroll up to the definition of value.
+5272160	5274560	And here, one thing that we currently can't do is,
+5274560	5277560	we can do like a value of, say, 2.0.
+5278460	5282360	But we can't do, you know, here, for example, we want to add a constant 1.
+5282560	5284260	And we can't do something like this.
+5285260	5288360	And we can't do it because it says int object has no attribute data.
+5288660	5291660	That's because a plus 1 comes right here to add,
+5292160	5294460	and then other is the integer 1.
+5294860	5298360	And then here, Python is trying to access 1.data, and that's not a thing.
+5298760	5301460	And that's because basically, 1 is not a value object,
+5301460	5303560	and we only have addition for value objects.
+5303960	5307760	So as a matter of convenience, so that we can create expressions like this
+5307760	5310860	and make them make sense, we can simply do something like this.
+5312360	5317060	Basically, we let other alone if other is an instance of value.
+5317260	5319860	But if it's not an instance of value, we're going to assume that it's a number,
+5319860	5321860	like an integer or a float, and we're going to simply
+5321860	5323860	wrap it in value.
+5324160	5326060	And then other will just become value of other,
+5326060	5328960	and then other will have a data attribute, and this should work.
+5329360	5332860	So if I just say this, redefine value, then this should work.
+5333360	5333860	There we go.
+5334360	5336560	Okay, now let's do the exact same thing for multiply,
+5336660	5341060	because we can't do something like this, again, for the exact same reason.
+5341360	5345660	So we just have to go to mol, and if other is not a value,
+5345660	5347160	then let's wrap it in value.
+5347660	5349960	Let's redefine value, and now this works.
+5350660	5351660	Now, here's a kind of, unfortunately,
+5351660	5355760	and not obvious part, a times two works, we saw that,
+5355960	5358560	but two times a, is that going to work?
+5359860	5360960	You'd expect it to, right?
+5361360	5362760	But actually, it will not.
+5363160	5365760	And the reason it won't is because Python doesn't know,
+5366260	5370860	like when you do a times two, basically, so a times two,
+5370960	5375760	Python will go and it will basically do something like a dot mol of two.
+5375860	5377060	That's basically what it will call.
+5377260	5381460	But to it, two times a is the same as two dot mol of a.
+5381860	5385460	And it doesn't, two can't multiply value.
+5385560	5387060	And so it's really confused about that.
+5387560	5391460	So instead, what happens is in Python, the way this works is you are free to define
+5391860	5393460	something called the rmol.
+5394460	5397260	And rmol is kind of like a fallback.
+5397360	5403660	So if Python can't do two times a, it will check if by any chance,
+5403860	5407660	a knows how to multiply two, and that will be called into rmol.
+5408860	5411260	So because Python can't do two times a,
+5411660	5413560	it will check, is there an rmol in value?
+5413860	5416360	And because there is, it will now call that.
+5417060	5420360	And what we'll do here is we will swap the order of the operands.
+5420760	5423360	So basically, two times a will redirect to rmol,
+5423660	5425760	and rmol will basically call a times two.
+5426360	5427560	And that's how that will work.
+5428560	5432360	So redefining that with rmol, two times a becomes four.
+5432860	5435060	Okay, now looking at the other elements that we still need,
+5435160	5436960	we need to know how to exponentiate and how to divide.
+5437460	5440160	So let's first do the exponentiation part.
+5440560	5441460	We're going to introduce
+5441960	5444360	a single function exp here.
+5445160	5449860	And exp is going to mirror 10h in the sense that it's a single function
+5449860	5452660	that transforms a single scalar value and outputs a single scalar value.
+5453260	5455260	So we pop out the Python number.
+5455760	5458860	We use math.exp to exponentiate it, create a new value object,
+5459360	5460560	everything that we've seen before.
+5461060	5464160	The tricky part, of course, is how do you backpropagate through e to the x?
+5464860	5470160	And so here you can potentially pause the video and think about what should go here.
+5471660	5478260	Okay, so basically, we need to know what is the local derivative of e to the x.
+5478560	5482060	So d by dx of e to the x is famously just e to the x.
+5482360	5486360	And we've already just calculated e to the x, and it's inside out.data.
+5486660	5491260	So we can do out.data times and out.grad, that's the chain rule.
+5492160	5494660	So we're just chaining on to the current running grad.
+5495360	5497160	And this is what the expression looks like.
+5497360	5499760	It looks a little confusing, but this is what it is.
+5499760	5501060	And that's the exponentiation.
+5501660	5504960	So redefining, we should now be able to call a.exp.
+5505460	5508160	And hopefully the backward pass works as well.
+5508360	5511660	Okay, and the last thing we'd like to do, of course, is we'd like to be able to divide.
+5512360	5516060	Now, I actually will implement something slightly more powerful than division,
+5516060	5519560	because division is just a special case of something a bit more powerful.
+5520160	5526960	So in particular, just by rearranging, if we have some kind of a b equals value of 4.0 here,
+5527060	5530860	we'd like to basically be able to do a divide b, and we'd like this to be able to give us 0.5.
+5531660	5534960	Now, division actually can be reshuffled as follows.
+5535460	5539360	If we have a divide b, that's actually the same as a multiplying 1 over b.
+5540060	5543460	And that's the same as a multiplying b to the power of negative 1.
+5544460	5551460	And so what I'd like to do instead is I basically like to implement the operation of x to the k for some constant k.
+5551660	5553160	So it's an integer or a float.
+5554160	5556260	And we would like to be able to differentiate this.
+5556260	5560160	And then as a special case, negative 1 will be division.
+5560960	5561560	And so I'm doing that.
+5561560	5566060	Just because it's more general and you might as well do it that way.
+5566460	5573560	So basically what I'm saying is we can redefine division, which we will put here somewhere.
+5574660	5575860	You know, we can put it here somewhere.
+5576360	5578860	What I'm saying is that we can redefine division.
+5579160	5580460	So self divide other.
+5580860	5584960	This can actually be rewritten as self times other to the power of negative 1.
+5585860	5590860	And now, value raised to the power of negative 1, we have to now define that.
+5591560	5595660	So here's, so we need to implement the pow function.
+5596160	5597860	Where am I going to put the pow function?
+5597860	5598760	Maybe here somewhere.
+5600160	5601360	This is the skeleton for it.
+5602560	5608060	So this function will be called when we try to raise a value to some power and other will be that power.
+5608760	5612060	Now, I'd like to make sure that other is only an int or a float.
+5612260	5615360	Usually other is some kind of a different value object.
+5615560	5618460	But here other will be forced to be an int or a float.
+5618760	5621460	Otherwise, the math won't work.
+5621660	5624360	For what we're trying to achieve in this specific case.
+5624760	5628660	That would be a different derivative expression if we wanted other to be a value.
+5629760	5634660	So here we create the other value, which is just, you know, this data raised to the power of other.
+5634860	5636660	And other here could be, for example, negative 1.
+5636760	5638360	That's what we are hoping to achieve.
+5639460	5641660	And then this is the backward stub.
+5641960	5650960	And this is the fun part, which is what is the chain rule expression here for back propagating through
+5651060	5655160	the power function where the power is to the power of some kind of a constant.
+5655860	5660860	So this is the exercise and maybe pause the video here and see if you can figure it out yourself as to what we should put here.
+5667060	5672460	Okay, so you can actually go here and look at derivative rules as an example.
+5672760	5675760	And we see lots of derivative rules that you can hopefully know from calculus.
+5675960	5680860	In particular, what we're looking for is the power rule because that's telling us that if we're trying to take
+5680960	5688860	d by dx of x to the n, which is what we're doing here, then that is just n times x to the n minus 1, right?
+5689660	5695360	Okay, so that's telling us about the local derivative of this power operation.
+5696060	5703060	So all we want here basically n is now other and self.data is x.
+5703660	5709560	And so this now becomes other which is n times self.data,
+5710460	5710760	which is now another.
+5710960	5712460	Python int or a float.
+5713260	5714360	It's not a value object.
+5714360	5720460	We're accessing the data attribute raised to the power of other minus 1 or n minus 1.
+5721360	5727960	I can put brackets around this, but this doesn't matter because power takes precedence over multiply in pyhelm.
+5727960	5729060	So that would have been okay.
+5729660	5731360	And that's the local derivative only.
+5731360	5736260	But now we have to chain it and we chain it just simply by multiplying by a path grad that's chain rule.
+5736860	5739460	And this should technically work.
+5740860	5742060	And we're going to find out soon.
+5742360	5745960	But now if we do this, this should now work.
+5746860	5747960	And we get 0.5.
+5747960	5750860	So the forward pass works, but does the backward pass work?
+5751260	5753960	And I realized that we actually also have to know how to subtract.
+5754060	5758460	So right now a minus b will not work to make it work.
+5758660	5761160	We need one more piece of code here.
+5761860	5770760	And basically this is the subtraction and the way we're going to implement subtraction is we're going to implement it by addition of a negation.
+5770960	5773460	And then to implement negation, we're going to multiply by negative one.
+5773960	5780760	So just again using the stuff we've already built and just expressing it in terms of what we have and a minus b is not working.
+5781260	5784460	Okay, so now let's scroll again to this expression here for this neuron.
+5785260	5788460	And let's just compute the backward pass here.
+5788460	5791260	Once we've defined O and let's draw it.
+5792160	5797860	So here's the gradients for all these leaf nodes for this two-dimensional neuron that has a 10h that we've seen before.
+5798560	5800760	So now what I'd like to do is I'd like to break up.
+5800860	5803960	This 10h into this expression here.
+5804560	5813060	So let me copy paste this here and now instead of will preserve the label and we will change how we define O.
+5813860	5816460	So in particular we're going to implement this formula here.
+5816860	5820560	So we need e to the 2x minus 1 over e to the x plus 1.
+5820960	5825960	So e to the 2x we need to take 2 times n and we need to exponentiate it.
+5826460	5829560	That's e to the 2x and then because we're using it twice.
+5829860	5830760	Let's create an intermediate.
+5830860	5844260	Variable e and then define O as e plus 1 over e minus 1 over e plus 1 e minus 1 over e plus 1 and that should be it.
+5844360	5846460	And then we should be able to draw dot of O.
+5847160	5850360	So now before I run this, what do we expect to see?
+5851060	5857160	Number one, we're expecting to see a much longer graph here because we've broken up 10h into a bunch of other operations.
+5857760	5860060	But those operations are mathematically equivalent.
+5860360	5860760	And so what we're expecting.
+5860960	5864460	To see is number one, the same result here.
+5864560	5868260	So the forward pass works and number two because of that mathematical equivalence.
+5868560	5872460	We expect to see the same backward pass and the same gradients on these leaf nodes.
+5872860	5874460	So these gradients should be identical.
+5875160	5876460	So let's run this.
+5877960	5881260	So number one, let's verify that instead of a single 10h node.
+5881360	5886460	We have now X and we have plus we have times negative one.
+5887060	5890760	This is the division and we end up with the same forward pass.
+5890960	5892860	Here and then the gradients.
+5892960	5894860	We have to be careful because they're in slightly different order.
+5894960	5906760	Potentially the gradients for W2 X2 should be 0 and 0.5 W2 and X2 are 0 and 0.5 and W1 X1 are 1 and negative 1.5 1 and negative 1.5.
+5907360	5914960	So that means that both our forward passes and backward passes were correct because this turned out to be equivalent to 10h before.
+5915960	5918660	And so the reason I wanted to go through this exercise is number one.
+5918960	5920760	We got to practice a few more operations.
+5921060	5923960	And writing more backwards passes and number two.
+5924160	5931260	I wanted to illustrate the point that the the level at which you implement your operations is totally up to you.
+5931460	5936360	You can implement backward passes for tiny expressions like a single individual plus or a single times.
+5936860	5941560	Or you can implement them for say 10h which is a kind of a potential.
+5941660	5945960	You can see it as a composite operation because it's made up of all these more atomic operations.
+5946460	5948460	But really all of this is kind of like a fake concept.
+5948660	5950460	All that matters is we have some kind of inputs.
+5950460	5953760	And some kind of an output and this output is a function of the inputs in some way.
+5953960	5958060	And as long as you can do forward pass and the backward pass of that little operation.
+5958460	5962660	It doesn't matter what that operation is and how composite it is.
+5963160	5967260	If you can write the local gradients you can chain the gradient and you can continue back propagation.
+5967460	5970960	So the design of what those functions are is completely up to you.
+5972060	5976960	So now I would like to show you how you can do the exact same thing but using a modern deep neural network library.
+5977060	5978460	Like for example PyTorch.
+5978860	5980360	Which I've roughly modeled.
+5980560	5982360	Micrograd by.
+5983060	5985760	And so PyTorch is something you would use in production.
+5986160	5989360	And I'll show you how you can do the exact same thing but in PyTorch API.
+5989860	5992660	So I'm just going to copy paste it in and walk you through it a little bit.
+5992860	5993760	This is what it looks like.
+5994960	5996560	So we're going to import PyTorch.
+5997060	6001460	And then we need to define these value objects like we have here.
+6001960	6005360	Now Micrograd is a scalar valued engine.
+6005460	6008560	So we only have scalar values like 2.0.
+6009160	6009760	But in PyTorch.
+6010460	6011760	We only have around tensors.
+6012060	6015860	And like I mentioned tensors are just n dimensional arrays of scalars.
+6016360	6019260	So that's why things get a little bit more complicated here.
+6019360	6021760	I just need a scalar valued tensor.
+6021860	6023460	A tensor with just a single element.
+6024060	6030760	But by default when you work with PyTorch you would use more complicated tensors like this.
+6031060	6032360	So if I import PyTorch.
+6034560	6036360	Then I can create tensors like this.
+6036760	6037960	And this tensor for example.
+6038060	6039960	Is a 2x3 array.
+6039960	6044660	Of scalars in a single compact representation.
+6045060	6046060	So we can check its shape.
+6046160	6048860	We see that it's a 2x3 array and so on.
+6049560	6053160	So this is usually what you would work with in the actual libraries.
+6053660	6058960	So here I'm creating a tensor that has only a single element 2.0.
+6060560	6063160	And then I'm casting it to be double.
+6063660	6067860	Because Python is by default using double precision for its floating point numbers.
+6067960	6069760	So I'd like everything to be identical.
+6069960	6074360	By default the data type of these tensors will be float32.
+6074460	6076460	So it's only using a single precision float.
+6076560	6078260	So I'm casting it to double.
+6078960	6081860	So that we have float64 just like in Python.
+6082660	6083860	So I'm casting to double.
+6084060	6087660	And then we get something similar to value of 2.
+6088060	6090460	The next thing I have to do is because these are leaf nodes.
+6090560	6093660	By default PyTorch assumes that they do not require gradients.
+6093860	6097560	So I need to explicitly say that all of these nodes require gradients.
+6097960	6098460	Okay.
+6098560	6099660	So this is going to construct.
+6100060	6102860	Scalar valued one element tensors.
+6103460	6105660	Make sure that PyTorch knows that they require gradients.
+6106260	6109960	Now by default these are set to false by the way because of efficiency reasons.
+6110160	6112960	Because usually you would not want gradients for leaf nodes.
+6113660	6115460	Like the inputs to the network.
+6115660	6118460	And this is just trying to be efficient in the most common cases.
+6119360	6122360	So once we've defined all of our values in PyTorch land.
+6122660	6125660	We can perform arithmetic just like we can here in micrograd land.
+6125960	6126860	So this would just work.
+6127260	6129060	And then there's a torch.10h also.
+6129660	6132060	And when we get back as a tensor again.
+6132660	6134960	And we can just like in micrograd.
+6135060	6137760	It's got a data attribute and it's got grad attributes.
+6138360	6142360	So these tensor objects just like in micrograd have a dot data and a dot grad.
+6142860	6146260	And the only difference here is that we need to call a dot item.
+6146660	6153960	Because otherwise PyTorch dot item basically takes a single tensor of one element.
+6154060	6156860	And it just returns that element stripping out the tensor.
+6157960	6158860	So let me just run this.
+6158860	6160360	And hopefully we are going to get.
+6160460	6164560	This is going to print the forward pass which is 0.707.
+6165060	6170760	And this will be the gradients which hopefully are 0.50, negative 1.5, and 1.
+6171260	6172460	So if we just run this.
+6174060	6174460	There we go.
+6175160	6175560	0.7.
+6175560	6176960	So the forward pass agrees.
+6177260	6179860	And then 0.50, negative 1.5, and 1.
+6180860	6182260	So PyTorch agrees with us.
+6182860	6184060	And just to show you here basically.
+6184060	6187060	Oh, here's a tensor with a single element.
+6187060	6189160	And it's a double.
+6189760	6193660	And we can call that item on it to just get the single number out.
+6194460	6195660	So that's what item does.
+6196060	6198360	And O is a tensor object like I mentioned.
+6198660	6201160	And it's got a backward function just like we've implemented.
+6202260	6204260	And then all of these also have a dot grad.
+6204260	6206060	So like X2 for example has a grad.
+6206360	6207060	And it's a tensor.
+6207360	6210060	And we can pop out the individual number with dot item.
+6211560	6216860	So basically Torch can do what we did in micrograd as a special case.
+6217060	6220060	When your tensors are all single element tensors.
+6220560	6223860	But the big deal with PyTorch is that everything is significantly more efficient.
+6224160	6226560	Because we are working with these tensor objects.
+6226760	6230060	And we can do lots of operations in parallel on all of these tensors.
+6231660	6235160	But otherwise what we've built very much agrees with the API of PyTorch.
+6235760	6239660	Okay, so now that we have some machinery to build out pretty complicated mathematical expressions.
+6239960	6241860	We can also start building up neural nets.
+6242060	6246260	And as I mentioned neural nets are just a specific class of mathematical expressions.
+6247060	6249460	So we're going to start building out a neural net piece by piece.
+6249460	6253860	And eventually we'll build out a two-layer multi-layer layer perceptron as it's called.
+6254160	6255560	And I'll show you exactly what that means.
+6256060	6257660	Let's start with a single individual neuron.
+6258060	6259260	We've implemented one here.
+6259660	6264060	But here I'm going to implement one that also subscribes to the PyTorch API.
+6264060	6266860	And how it designs its neural network modules.
+6267460	6272660	So just like we saw that we can like match the API of PyTorch on the autograd side.
+6273160	6275360	We're going to try to do that on the neural network modules.
+6276060	6276960	So here's class neuron.
+6277460	6280660	And just for the sake of efficiency.
+6280960	6284360	I'm going to copy paste some sections that are relatively straightforward.
+6285660	6289460	So the constructor will take number of inputs to this neuron.
+6289460	6292160	Which is how many inputs come to a neuron.
+6292560	6294260	So this one for example has three inputs.
+6295360	6296860	And then it's going to create a weight.
+6297360	6300860	That is some random number between negative one and one for every one of those inputs.
+6301360	6305160	And a bias that controls the overall trigger happiness of this neuron.
+6305160	6312560	And then we're going to implement a def underscore underscore call of self and x.
+6312560	6313560	Some input x.
+6313560	6316860	And really what we don't want to do here is w times x plus b.
+6316860	6320260	Where w times x here is a dot product specifically.
+6320260	6323260	Now if you haven't seen call.
+6323260	6326160	Let me just return 0.0 here for now.
+6326160	6330360	The way this works now is we can have an x which is say like 2.0, 3.0.
+6330360	6333260	Then we can initialize a neuron that is two-dimensional.
+6333260	6335060	Because these are two numbers.
+6335160	6338560	And then we can feed those two numbers into that neuron to get an output.
+6339560	6342560	And so when you use this notation n of x.
+6342560	6344060	Python will use call.
+6344860	6346960	So currently call just returns 0.0.
+6349960	6353960	Now we'd like to actually do the forward pass of this neuron instead.
+6354760	6356360	So we're going to do here first.
+6356560	6360260	Is we need to basically multiply all of the elements of w.
+6360260	6362460	With all of the elements of x pairwise.
+6362460	6363460	We need to multiply them.
+6364160	6365060	So the first thing we're going to do.
+6365060	6369060	Is we're going to zip up salta w and x.
+6369060	6372660	And in Python zip takes two iterators.
+6372660	6377960	And it creates a new iterator that iterates over the tuples of their corresponding entries.
+6377960	6382060	So for example, just to show you we can print this list.
+6382060	6385860	And still return 0.0 here.
+6390860	6392560	Sorry.
+6392560	6394260	I'm in life.
+6394260	6397460	So we see that these w's are paired up with the x's.
+6397460	6398660	W with x.
+6401660	6403160	And now what we want to do is.
+6407560	6409860	For wi xi in.
+6410860	6414260	We want to multiply w times wi times xi.
+6415060	6417260	And then we want to sum all of that together.
+6417760	6419060	To come up with an activation.
+6419760	6421660	And add also salta b on top.
+6422460	6423660	So that's the raw activation.
+6424260	6426860	And then of course we need to pass that through a null linearity.
+6426860	6430260	So what we're going to be returning is act dot 10h.
+6430260	6432460	And here's out.
+6432460	6435760	So now we see that we are getting some outputs.
+6435760	6437560	And we get a different output from a neuron each time.
+6437560	6441560	Because we are initializing different weights and biases.
+6441560	6443660	And then to be a bit more efficient here actually.
+6443660	6447560	Sum by the way takes a second optional parameter.
+6447560	6449160	Which is the start.
+6449160	6451660	And by default the start is 0.
+6451660	6453660	So these elements of this sum.
+6453660	6455860	Will be added on top of 0 to begin with.
+6455860	6457660	But actually we can just start with salta b.
+6458560	6460260	And then we just have an expression like this.
+6465660	6468760	And then the generator expression here must be parenthesized in python.
+6469560	6470060	There we go.
+6473960	6476260	Yep so now we can forward a single neuron.
+6476660	6479060	Next up we're going to define a layer of neurons.
+6479460	6482060	So here we have a schematic for a MLP.
+6482660	6483560	So we see that.
+6483660	6485360	These MLPs each layer.
+6485360	6486460	This is one layer.
+6486460	6487960	Has actually a number of neurons.
+6487960	6489160	And they're not connected to each other.
+6489160	6491460	But all of them are fully connected to the input.
+6491460	6493160	So what is a layer of neurons?
+6493160	6496760	It's just it's just a set of neurons evaluated independently.
+6496760	6499160	So in the interest of time.
+6499160	6503160	I'm going to do something fairly straightforward here.
+6503160	6509160	It's literally a layer is just a list of neurons.
+6509160	6510760	And then how many neurons do we have?
+6510760	6512760	We take that as an input argument here.
+6512760	6515860	How many neurons do you want in your layer number of outputs in this layer?
+6516760	6521160	And so we just initialize completely independent neurons with this given dimensionality.
+6521460	6522960	And we call on it.
+6522960	6525860	We just independently evaluate them.
+6526460	6529660	So now instead of a neuron we can make a layer of neurons.
+6529660	6531860	They are two dimensional neurons and let's have three of them.
+6532460	6537660	And now we see that we have three independent evaluations of three different neurons, right?
+6538960	6539160	Okay.
+6539160	6542560	And finally, let's complete this picture and define an entire multi-layer.
+6542560	6544060	Perceptron or MLP.
+6544060	6548460	And as we can see here in an MLP, these layers just feed into each other sequentially.
+6548460	6553460	So let's come here and I'm just going to copy the code here in interest of time.
+6553460	6556060	So an MLP is very similar.
+6556060	6559260	We're taking the number of inputs as before.
+6559260	6563360	But now instead of saying taking a single and out which is number of neurons in a single layer.
+6563360	6569560	We're going to take a list of an outs and this list defines the sizes of all the layers that we want in our MLP.
+6569560	6572260	So here we just put them all together and then iterate.
+6572560	6577060	Over consecutive pairs of these sizes and create a layer objects for them.
+6577760	6580160	And then in the call function, we are just calling them sequentially.
+6580460	6581960	So that's an MLP really.
+6582760	6584460	And let's actually re-implement this picture.
+6584460	6588460	So we want three input neurons and then two layers of four and an output unit.
+6589560	6593360	So we want three dimensional input.
+6593460	6594760	Say this is an example input.
+6595160	6599960	We want three inputs into two layers of four and one output.
+6600360	6601960	And this of course is an MLP.
+6602560	6604560	And there we go.
+6604560	6606160	That's a forward pass of an MLP.
+6606160	6608260	To make this a little bit nicer.
+6608260	6613060	You see how we have just a single element, but it's wrapped in a list because layer always returns lists.
+6613060	6620060	So for convenience, return outs at zero if len outs is exactly a single element.
+6620060	6622060	Else return fullest.
+6622060	6627060	And this will allow us to just get a single value out at the last layer that only has a single neuron.
+6627060	6631060	And finally, we should be able to draw a dot of N of X.
+6632560	6637960	As you might imagine, these expressions are now getting relatively involved.
+6638660	6641160	So this is an entire MLP that we're defining now.
+6645360	6647360	All the way until a single output.
+6648360	6653460	Okay, and so obviously you would never differentiate on pen and paper these expressions.
+6653660	6662360	But with micrograd, we will be able to back propagate all the way through this and back propagate into these weights of all these neurons.
+6662560	6664360	So let's see how that works.
+6664360	6668360	Okay, so let's create ourselves a very simple example data set here.
+6668360	6670360	So this data set has four examples.
+6670360	6675360	And so we have four possible inputs into the neural net.
+6675360	6677360	And we have four desired targets.
+6677360	6684360	So we'd like the neural net to assign or output 1.0 when it's fed this example.
+6684360	6686360	Negative one when it's fed these examples.
+6686360	6688360	And one when it's fed this example.
+6688360	6692360	So it's a very simple binary classifier neural net basically that we would like here.
+6692560	6695960	Now let's think what the neural net currently thinks about these four examples.
+6695960	6698260	We can just get their predictions.
+6698260	6702160	Basically, we can just call N of X for X and Xs.
+6702160	6705160	And then we can print.
+6705160	6708960	So these are the outputs of the neural net on those four examples.
+6708960	6713860	So the first one is 0.91, but we'd like it to be one.
+6713860	6715860	So we should push this one higher.
+6715860	6718260	This one we want to be higher.
+6718260	6722360	This one says 0.88, and we want this to be negative one.
+6722560	6725160	This is 0.88, we want it to be negative one.
+6725160	6728160	And this one is 0.88, we want it to be one.
+6728160	6730160	So how do we make the neural net?
+6730160	6736760	And how do we tune the weights to better predict the desired targets?
+6736760	6741860	And the trick used in deep learning to achieve this is to calculate a single number
+6741860	6745160	that somehow measures the total performance of your neural net.
+6745160	6748060	And we call this single number the loss.
+6748060	6752260	So the loss first is a single number
+6752560	6756260	that we're going to define that basically measures how well the neural net is performing.
+6756260	6758560	Right now, we have the intuitive sense that it's not performing very well
+6758560	6761060	because we're not very much close to this.
+6761060	6764860	So the loss will be high, and we'll want to minimize the loss.
+6764860	6769860	So in particular, in this case, what we're going to do is we're going to implement the mean squared error loss.
+6769860	6774160	So what this is doing is we're going to basically iterate
+6774160	6781360	for Y ground truth and Y output in zip of Ys and Ybred.
+6781360	6782360	So we're going to pair up
+6782360	6789060	the ground truths with the predictions and the zip iterates over tuples of them.
+6789060	6793260	And for each Y ground truth and Y output,
+6793260	6798760	we're going to subtract them and square them.
+6798760	6803060	So let's first see what these losses are. These are individual loss components.
+6803060	6806560	And so basically for each one of the four,
+6806560	6809560	we are taking the prediction and the ground truth.
+6809560	6811560	We are subtracting them and squaring them.
+6812360	6816360	So because this one is so close to its target,
+6816360	6822060	0.91 is almost 1, subtracting them gives a very small number.
+6822060	6824360	So here we would get like a negative 0.1,
+6824360	6828960	and then squaring it just makes sure that regardless of
+6828960	6831060	whether we are more negative or more positive,
+6831060	6834460	we always get a positive number.
+6834460	6836160	Instead of squaring, we could also take,
+6836160	6839560	for example, the absolute value. We need to discard the sign.
+6839560	6842260	And so you see that the expression is ranged so that you
+6842360	6846560	only get 0 exactly when Y out is equal to Y ground truth.
+6846560	6847660	When those two are equal,
+6847660	6849560	so your prediction is exactly the target,
+6849560	6853060	you are going to get 0. And if your prediction is not the target,
+6853060	6855260	you are going to get some other number.
+6855260	6857160	So here, for example, we are way off.
+6857160	6859960	And so that's why the loss is quite high.
+6859960	6864160	And the more off we are, the greater the loss will be.
+6864160	6867960	So we don't want high loss, we want low loss.
+6867960	6872160	And so the final loss here will be just the sum,
+6872360	6874460	all of these numbers.
+6874460	6878660	So you see that this should be 0 roughly plus 0 roughly,
+6878660	6880960	but plus 7.
+6880960	6885060	So loss should be about 7 here.
+6885060	6887360	And now we want to minimize the loss.
+6887360	6891660	We want the loss to be low because if loss is low,
+6891660	6896560	then every one of the predictions is equal to its target.
+6896560	6899060	So the loss, the lowest it can be is 0,
+6899060	6902160	and the greater it is, the worse off the neural net is,
+6902360	6905160	and the higher the risk of shifting.
+6905160	6908760	So now, of course, if we do loss.backward,
+6908760	6911560	something magical happened when I hit enter.
+6911560	6914360	And the magical thing, of course, that happened is that we can look at
+6914360	6919660	n.layers.neuron, n.layers at, say, like the first layer,
+6919660	6923360	that neurons at 0,
+6923360	6927360	because remember that MLP has the layers, which is a list,
+6927360	6929660	and each layer has neurons, which is a list,
+6929660	6931560	and that gives us an individual neuron,
+6931560	6933560	and that gives us some weights.
+6933560	6940560	And so we can, for example, look at the weights at 0.
+6940560	6944560	Oops, it's not called weights, it's called w.
+6944560	6948560	And that's a value, but now this value also has a grad
+6948560	6950560	because of the backward pass.
+6950560	6953560	And so we see that because this gradient here
+6953560	6955560	on this particular weight of this particular neuron
+6955560	6958560	of this particular layer is negative,
+6958560	6961360	we see that its influence on the loss is also negative.
+6961360	6965360	So slightly increasing this particular weight of this neuron of this layer
+6965360	6968360	would make the loss go down.
+6968360	6972360	And we actually have this information for every single one of our neurons
+6972360	6973360	and all of their parameters.
+6973360	6977360	Actually, it's worth looking at also the draw dot of loss, by the way.
+6977360	6981360	So previously, we looked at the draw dot of a single neuron forward pass,
+6981360	6983360	and that was already a large expression.
+6983360	6985360	But what is this expression?
+6985360	6988360	We actually forwarded every one of those four examples,
+6988360	6990360	and then we have the loss on top of them,
+6990360	6992360	with the mean squared error.
+6992360	6995360	And so this is a really massive graph
+6995360	6998360	because this graph that we've built up now,
+6998360	7000360	oh my gosh,
+7000360	7002360	this graph that we've built up now,
+7002360	7004360	which is kind of excessive,
+7004360	7007360	it's excessive because it has four forward passes of a neural net
+7007360	7009360	for every one of the examples,
+7009360	7011360	and then it has the loss on top,
+7011360	7014360	and it ends with the value of the loss, which was 7.12.
+7014360	7018360	And this loss will now back propagate through all the four forward passes
+7018360	7019360	all the way through,
+7019360	7022360	just every single intermediate value of the neural net,
+7022360	7024360	all the way back to,
+7024360	7026360	of course, the parameters of the weights,
+7026360	7027360	which are the input.
+7027360	7031360	So these weight parameters here are inputs to this neural net,
+7031360	7033360	and these numbers here,
+7033360	7034360	these scalars,
+7034360	7036360	are inputs to the neural net.
+7036360	7038360	So if we went around here,
+7038360	7041360	we will probably find some of these examples,
+7041360	7042360	this 1.0,
+7042360	7044360	potentially maybe this 1.0,
+7044360	7046360	or, you know, some of the others.
+7046360	7048360	And you'll see that they all have gradients as well.
+7048360	7051360	The thing is these gradients on the input data
+7051360	7053360	are not that useful to us,
+7053360	7057360	and that's because the input data seems to be not changeable.
+7057360	7059360	It's a given to the problem,
+7059360	7060360	and so it's a fixed input.
+7060360	7062360	We're not going to be changing it or messing with it,
+7062360	7065360	even though we do have gradients for it.
+7065360	7068360	But some of these gradients here
+7068360	7070360	will be for the neural network parameters,
+7070360	7072360	the w's and the b's,
+7072360	7075360	and those we, of course, we want to change.
+7075360	7077360	Okay, so now we're going to want
+7077360	7079360	some convenience codes to gather up
+7079360	7081360	all of the parameters of the neural net
+7081360	7084360	so that we can operate on all of them simultaneously.
+7084360	7085360	And every one of them,
+7085360	7088360	we will nudge a tiny amount
+7088360	7090360	based on the gradient information.
+7090360	7092360	So let's collect the parameters of the neural net
+7092360	7094360	all in one array.
+7094360	7097360	So let's create a parameters of self
+7097360	7099360	that just returns
+7099360	7102360	self.w, which is a list,
+7102360	7106360	concatenated with a list of self.b.
+7107360	7109360	So this will just return a list.
+7109360	7112360	List plus list just gives you a list.
+7112360	7114360	So that's parameters of neuron,
+7114360	7116360	and I'm calling it this way
+7116360	7118360	because also PyTorch has parameters
+7118360	7120360	on every single NN module,
+7120360	7122360	and it does exactly what we're doing here.
+7122360	7125360	It just returns the parameter tensors.
+7125360	7128360	For us, it's the parameter scalars.
+7128360	7130360	Now, layer is also a module,
+7130360	7134360	so it will have parameters, self,
+7134360	7136360	and basically what we want to do here is
+7136360	7139360	something like this, like
+7139360	7141360	params is here,
+7141360	7147360	and then for neuron in self.neurons,
+7147360	7150360	we want to get neuron.parameters,
+7150360	7154360	and we want to params.extend.
+7154360	7156360	So these are the parameters of this neuron,
+7156360	7159360	and then we want to put them on top of params,
+7159360	7162360	so params.extend of piece,
+7162360	7165360	and then we want to return params.
+7165360	7167360	So this is way too much code,
+7167360	7169360	so actually there's a way to simplify this,
+7169360	7179360	which is return p for neuron in self.neurons
+7179360	7185360	for p in neuron.parameters.
+7185360	7187360	So it's a single list comprehension.
+7187360	7189360	In Python, you can sort of nest them like this,
+7189360	7194360	and you can then create the desired array.
+7194360	7196360	So these are identical.
+7196360	7199360	We can take this out.
+7199360	7204360	And then let's do the same here.
+7204360	7207360	dev.parameters self
+7207360	7213360	and return a parameter for layer in self.layers
+7213360	7220360	for p in layer.parameters.
+7220360	7222360	And that should be good.
+7222360	7225360	Now let me pop out this
+7225360	7228360	so we don't reinitialize our network,
+7228360	7235360	because we need to reinitialize our...
+7235360	7236360	Okay, so unfortunately,
+7236360	7238360	we will have to probably reinitialize the network
+7238360	7241360	because we just added functionality.
+7241360	7242360	Because this class, of course,
+7242360	7245360	I want to get all the end.parameters,
+7245360	7246360	but that's not going to work
+7246360	7249360	because this is the old class.
+7249360	7250360	Okay.
+7250360	7251360	So unfortunately,
+7251360	7253360	we do have to reinitialize the network,
+7253360	7255360	which will change some of the numbers.
+7255360	7258360	But let me do that so that we pick up the new API.
+7258360	7260360	We can now do end.parameters.
+7260360	7262360	And these are all the weights and biases
+7262360	7265360	inside the entire neural net.
+7265360	7271360	So in total, this MLP has 41 parameters.
+7271360	7275360	And now we'll be able to change them.
+7275360	7278360	If we recalculate the loss here,
+7278360	7279360	we see that unfortunately,
+7279360	7283360	we have slightly different predictions
+7283360	7286360	and slightly different loss.
+7286360	7288360	But that's okay.
+7288360	7291360	Okay, so we see that this neuron's gradient
+7291360	7293360	is slightly negative.
+7293360	7296360	We can also look at its data right now,
+7296360	7298360	which is 0.85.
+7298360	7299360	So this is the current value of this neuron,
+7299360	7303360	and this is its gradient on the loss.
+7303360	7304360	So what we want to do now
+7304360	7308360	is we want to iterate for every p in end.parameters.
+7308360	7311360	So for all the 41 parameters in this neural net,
+7311360	7315360	we actually want to change p.data slightly
+7315360	7318360	according to the gradient information.
+7318360	7321360	Okay, so dot dot dot to do here.
+7321360	7324360	But this will be basically a tiny update
+7324360	7327360	in this gradient descent scheme.
+7327360	7329360	And gradient descent,
+7329360	7331360	we are thinking of the gradient
+7331360	7333360	as a vector pointing in the direction
+7333360	7337360	of increased loss.
+7337360	7340360	And so in gradient descent,
+7340360	7343360	we are modifying p.data
+7343360	7345360	by a small step size
+7345360	7347360	in the direction of the gradient.
+7347360	7348360	So the step size as an example
+7348360	7349360	could be like a very small number,
+7349360	7351360	like 0.01 is the step size,
+7351360	7355360	times p.grad, right?
+7355360	7357360	But we have to think through
+7357360	7358360	some of the signs here.
+7358360	7361360	So in particular,
+7361360	7364360	working with this specific example here,
+7364360	7366360	we see that if we just left it like this,
+7366360	7368360	then this neuron's value
+7368360	7370360	would be currently increased
+7370360	7372360	by a tiny amount of the gradient.
+7372360	7374360	The gradient is negative,
+7374360	7376360	so this value of this neuron
+7376360	7378360	would go slightly down.
+7378360	7380360	It would become like 0.84
+7380360	7382360	or something like that.
+7382360	7385360	But if this neuron's value goes lower,
+7385360	7390360	that would actually increase the loss.
+7390360	7393360	That's because the derivative
+7393360	7395360	of this neuron is negative.
+7395360	7397360	So increasing this
+7397360	7399360	makes the loss go down.
+7399360	7401360	So increasing it is what we want to do
+7401360	7403360	instead of decreasing it.
+7403360	7404360	So basically what we're missing here
+7404360	7406360	is we're actually missing a negative sign.
+7406360	7409360	And again, this other interpretation,
+7409360	7411360	and that's because we want to minimize the loss.
+7411360	7412360	We don't want to maximize the loss.
+7412360	7414360	We want to decrease it.
+7414360	7415360	And the other interpretation, as I mentioned,
+7415360	7417360	is you can think of the gradient vector,
+7417360	7420360	so basically just the vector of all the gradients,
+7420360	7422360	as pointing in the direction
+7422360	7425360	of increasing the loss.
+7425360	7426360	But then we want to decrease it.
+7426360	7429360	So we actually want to go in the opposite direction.
+7429360	7430360	And so you can convince yourself
+7430360	7432360	that this does the right thing here with the negative
+7432360	7435360	because we want to minimize the loss.
+7435360	7440360	So if we nudge all the parameters by a tiny amount,
+7440360	7442360	then we'll see that this data
+7442360	7444360	will have changed a little bit.
+7444360	7449360	So now this neuron is a tiny amount greater value.
+7449360	7453360	So 0.854 went to 0.857.
+7453360	7454360	And that's a good thing
+7454360	7458360	because slightly increasing this neuron data
+7458360	7462360	makes the loss go down according to the gradient.
+7462360	7465360	And so the correcting has happened sign-wise.
+7465360	7467360	And so now what we would expect, of course,
+7467360	7470360	is that because we've changed all these parameters,
+7470360	7474360	we expect that the loss should have gone down a bit.
+7474360	7476360	So we want to reevaluate the loss.
+7476360	7479360	Let me basically...
+7479360	7482360	This is just a data definition that hasn't changed.
+7482360	7483360	But the forward pass here,
+7483360	7485360	of the network,
+7485360	7487360	we can recalculate.
+7489360	7491360	And actually, let me do it outside here
+7491360	7494360	so that we can compare the two loss values.
+7494360	7497360	So here, if I recalculate the loss,
+7497360	7499360	we'd expect the new loss now
+7499360	7501360	to be slightly lower than this number.
+7501360	7503360	So hopefully, what we're getting now
+7503360	7506360	is a tiny bit lower than 4.84.
+7506360	7508360	4.36.
+7508360	7510360	And remember, the way we've arranged this
+7510360	7512360	is that low loss means that
+7512360	7514360	our predictions are matching the targets.
+7514360	7515360	So our predictions now
+7515360	7519360	are probably slightly closer to the targets.
+7519360	7521360	And now all we have to do
+7521360	7523360	is we have to iterate this process.
+7523360	7526360	So again, we've done the forward pass,
+7526360	7527360	and this is the loss.
+7527360	7529360	Now we can loss that backward.
+7529360	7531360	Let me take these out.
+7531360	7533360	And we can do a step size.
+7533360	7536360	And now we should have a slightly lower loss.
+7536360	7539360	4.36 goes to 3.9.
+7539360	7541360	And okay, so we've done the forward pass.
+7541360	7543360	Here's the backward pass.
+7543360	7545360	Nudge.
+7545360	7547360	And now the loss is 3.66.
+7547360	7551360	3.47.
+7551360	7553360	And you get the idea.
+7553360	7555360	We just continue doing this.
+7555360	7557360	And this is gradient descent.
+7557360	7559360	We're just iteratively doing forward pass,
+7559360	7561360	backward pass, update.
+7561360	7563360	Forward pass, backward pass, update.
+7563360	7565360	And the neural net is improving its predictions.
+7565360	7568360	So here, if we look at ypred now,
+7568360	7570360	ypred,
+7570360	7576360	we see that this value should be getting closer to 1.
+7576360	7578360	So this value should be getting more positive.
+7578360	7579360	These should be getting more negative.
+7579360	7581360	And this one should be also getting more positive.
+7581360	7586360	So if we just iterate this a few more times,
+7586360	7589360	actually, we may be able to afford to go a bit faster.
+7589360	7594360	Let's try a slightly higher learning rate.
+7594360	7595360	Oops, okay, there we go.
+7595360	7599360	So now we're at 0.31.
+7599360	7601360	If you go too fast, by the way,
+7601360	7603360	if you try to make it too big of a step,
+7603360	7607360	you may actually overstep.
+7607360	7608360	It's overconfidence.
+7608360	7609360	Because again, remember,
+7609360	7611360	we don't actually know exactly about the loss function.
+7611360	7613360	The loss function has all kinds of structure.
+7613360	7616360	And we only know about the very local dependence
+7616360	7618360	of all these parameters on the loss.
+7618360	7619360	But if we step too far,
+7619360	7621360	we may step into, you know,
+7621360	7623360	a part of the loss that is completely different.
+7623360	7625360	And that can destabilize training
+7625360	7628360	and make your loss actually blow up even.
+7628360	7630360	So the loss is now 0.04.
+7630360	7633360	So actually, the predictions should be really quite close.
+7633360	7635360	Let's take a look.
+7635360	7637360	So you see how this is almost one,
+7637360	7639360	almost negative one, almost one.
+7639360	7641360	We can continue going.
+7641360	7645360	So, yep, backward, update.
+7645360	7646360	Oops, there we go.
+7646360	7648360	So we went way too fast.
+7648360	7651360	And we actually overstepped.
+7651360	7654360	So we got too eager.
+7654360	7655360	Where are we now?
+7655360	7656360	Oops.
+7656360	7657360	Okay.
+7657360	7658360	7E-9.
+7658360	7661360	So this is very, very low loss.
+7661360	7665360	And the predictions are basically perfect.
+7665360	7667360	So somehow we...
+7667360	7669360	Basically, we were doing way too big updates
+7669360	7670360	and we briefly exploded,
+7670360	7673360	but then somehow we ended up getting into a really good spot.
+7673360	7675360	So usually this learning rate
+7675360	7677360	and the tuning of it is a subtle art.
+7677360	7679360	You want to set your learning rate.
+7679360	7680360	If it's too low,
+7680360	7682360	you're going to take way too long to converge.
+7682360	7683360	But if it's too high,
+7683360	7684360	the whole thing gets unstable
+7684360	7686360	and you might actually even explode the loss,
+7686360	7688360	depending on your loss function.
+7688360	7691360	So finding the step size to be just right,
+7691360	7693360	it's a pretty subtle art sometimes
+7693360	7695360	when you're using sort of vanilla gradient descent.
+7695360	7697360	But we happened to get into a good spot.
+7697360	7702360	We can look at n.parameters.
+7702360	7706360	So this is the setting of weights and biases
+7706360	7708360	that makes our network
+7708360	7711360	predict the desired targets
+7711360	7713360	very, very close.
+7713360	7715360	And basically,
+7715360	7718360	we've successfully trained a neural net.
+7718360	7720360	Okay, let's make this a tiny bit more respectable
+7720360	7722360	and implement an actual training loop
+7722360	7723360	and what that looks like.
+7723360	7725360	So this is the data definition that stays.
+7725360	7727360	This is the forward pass.
+7727360	7731360	So for k in range,
+7731360	7737360	we're going to take a bunch of steps.
+7737360	7739360	First, we do the forward pass.
+7739360	7743360	We validate the loss.
+7743360	7745360	Let's reinitialize the neural net from scratch.
+7745360	7748360	And here's the data.
+7748360	7750360	And we first do the forward pass.
+7750360	7752360	Then we do the backward pass.
+7759360	7760360	And then we do an update.
+7760360	7762360	That's gradient descent.
+7766360	7767360	And then we should be able to iterate this
+7767360	7770360	and we should be able to print the current step,
+7770360	7772360	the current loss.
+7772360	7774360	Let's just print the sort of
+7774360	7777360	number of the loss.
+7777360	7780360	And that should be it.
+7780360	7782360	And then the learning rate,
+7782360	7783360	0.01 is a little too small.
+7783360	7785360	0.1 we saw is like a little bit dangerous
+7785360	7786360	and too high.
+7786360	7788360	Let's go somewhere in between.
+7788360	7790360	And we'll optimize this for
+7790360	7791360	not 10 steps,
+7791360	7794360	but let's go for say 20 steps.
+7794360	7799360	Let me erase all of this junk.
+7799360	7802360	And let's run the optimization.
+7802360	7805360	And you see how we've actually converged slower
+7805360	7807360	in a more controlled manner
+7807360	7810360	and got to a loss that is very low.
+7810360	7814360	So I expect YPred to be quite good.
+7814360	7816360	There we go.
+7821360	7823360	And that's it.
+7823360	7825360	Okay, so this is kind of embarrassing,
+7825360	7828360	but we actually have a really terrible bug in here.
+7828360	7830360	And it's a subtle bug
+7830360	7832360	and it's a very common bug.
+7832360	7834360	And I can't believe I've done it
+7834360	7836360	for the 20th time in my life,
+7836360	7837360	especially on camera.
+7837360	7839360	And I could have reshot the whole thing,
+7839360	7841360	but I think it's pretty funny.
+7841360	7843360	And you get to appreciate a bit
+7843360	7845360	what working with neural nets
+7845360	7847360	maybe is like sometimes.
+7847360	7849360	We are guilty of
+7849360	7851360	a common bug.
+7851360	7853360	I've actually tweeted
+7853360	7855360	the most common neural net mistakes
+7855360	7857360	a long time ago now.
+7857360	7859360	And I'm not really
+7859360	7861360	going to explain any of these,
+7861360	7863360	but remember we are guilty of number three.
+7863360	7865360	You forgot to zero grad
+7865360	7866360	before dot backward.
+7866360	7869360	What is that?
+7869360	7870360	Basically what's happening,
+7870360	7871360	and it's a subtle bug
+7871360	7873360	and I'm not sure if you saw it,
+7873360	7876360	is that all of these weights here
+7876360	7879360	have a dot data and a dot grad.
+7879360	7882360	And dot grad starts at zero.
+7882360	7883360	And then we do backward
+7883360	7885360	and we fill in the gradients.
+7885360	7887360	And then we do an update on the data,
+7887360	7889360	but we don't flush the grad.
+7889360	7890360	It stays there.
+7890360	7893360	So when we do the second forward pass
+7893360	7895360	and we do backward again,
+7895360	7897360	remember that all the backward operations
+7897360	7899360	do a plus equals on the grad.
+7899360	7901360	And so these gradients just add up
+7901360	7904360	and they never get reset to zero.
+7904360	7907360	So basically we didn't zero grad.
+7907360	7908360	So here's how we zero grad
+7908360	7910360	before backward.
+7910360	7913360	We need to iterate over all the parameters.
+7913360	7915360	And we need to make sure that
+7915360	7918360	p dot grad is set to zero.
+7918360	7920360	We need to reset it to zero.
+7920360	7922360	Just like it is in the constructor.
+7922360	7924360	So remember all the way here
+7924360	7925360	for all these value nodes,
+7925360	7927360	grad is reset to zero.
+7927360	7929360	And then all these backward passes
+7929360	7931360	do a plus equals from that grad.
+7931360	7933360	But we need to make sure that
+7933360	7935360	we reset these grads to zero
+7935360	7937360	so that when we do backward,
+7937360	7938360	all of them start at zero
+7938360	7939360	and the actual backward pass
+7939360	7943360	accumulates the loss derivatives
+7943360	7945360	into the grads.
+7945360	7948360	So this is zero grad in PyTorch.
+7948360	7949360	And
+7949360	7953360	we will get a slightly different optimization.
+7953360	7955360	Let's reset the neural net.
+7955360	7956360	The data is the same.
+7956360	7958360	This is now, I think, correct.
+7958360	7961360	And we get a much more
+7961360	7964360	slower descent.
+7964360	7966360	We still end up with pretty good results.
+7966360	7968360	And we can continue this a bit more
+7968360	7970360	to get down lower
+7970360	7971360	and lower
+7971360	7974360	and lower.
+7974360	7976360	Yeah.
+7976360	7978360	So the only reason that the previous thing worked,
+7978360	7980360	it's extremely buggy.
+7980360	7981360	The only reason that worked
+7981360	7983360	is that
+7983360	7986360	this is a very, very simple problem.
+7986360	7988360	And it's very easy for this neural net
+7988360	7989360	to fit this data.
+7989360	7992360	And so the grads ended up accumulating
+7992360	7993360	and it effectively gave us
+7993360	7995360	a massive step size.
+7995360	7999360	And it made us converge extremely fast.
+7999360	8001360	But basically now we have to do more steps
+8001360	8004360	to get to very low values of loss
+8004360	8006360	and get YPRED to be really good.
+8006360	8007360	We can try to
+8007360	8014360	step a bit greater.
+8014360	8015360	Yeah.
+8015360	8016360	We're going to get closer and closer
+8016360	8018360	to one minus one and one.
+8018360	8019360	So
+8019360	8021360	working with neural nets is sometimes
+8021360	8024360	tricky because
+8024360	8026360	you may have lots of bugs in the code
+8026360	8028360	and
+8028360	8029360	your network might actually work
+8029360	8031360	just like ours worked.
+8031360	8032360	But chances are is that
+8032360	8034360	if we had a more complex problem
+8034360	8036360	then actually this bug would have
+8036360	8038360	made us not optimize the loss very well.
+8038360	8040360	And we were only able to get away with it
+8040360	8041360	because
+8041360	8043360	the problem is very simple.
+8043360	8045360	So let's now bring everything together
+8045360	8047360	and summarize what we learned.
+8047360	8048360	What are neural nets?
+8048360	8051360	Neural nets are these mathematical expressions.
+8051360	8053360	Fairly simple mathematical expressions
+8053360	8055360	in the case of multi-layer perceptron
+8055360	8058360	that take input as the data
+8058360	8060360	and they take input the weights
+8060360	8061360	and the parameters of the neural net.
+8061360	8064360	Mathematical expression for the forward pass
+8064360	8065360	followed by a loss function.
+8065360	8067360	And the loss function tries to measure
+8067360	8069360	the accuracy of the predictions.
+8069360	8071360	And usually the loss will be low
+8071360	8073360	when your predictions are matching your targets
+8073360	8076360	or where the network is basically behaving well.
+8076360	8078360	So we manipulate the loss function
+8078360	8080360	so that when the loss is low
+8080360	8082360	the network is doing what you want it to do
+8082360	8083360	on your problem.
+8083360	8086360	And then we backward the loss.
+8086360	8088360	Use back propagation to get the gradient
+8088360	8090360	and then we know how to tune all the parameters
+8090360	8092360	to decrease the loss locally.
+8092360	8094360	But then we have to iterate that process
+8094360	8097360	many times in what's called the gradient descent.
+8097360	8099360	So we simply follow the gradient information
+8099360	8101360	and that minimizes the loss
+8101360	8102360	and the loss is arranged so that
+8102360	8104360	when the loss is minimized
+8104360	8106360	the network is doing what you want it to do.
+8106360	8110360	And yeah, so we just have a blob of neural stuff
+8110360	8112360	and we can make it do arbitrary things.
+8112360	8115360	And that's what gives neural nets their power.
+8115360	8117360	It's, you know, this is a very tiny network
+8117360	8119360	with 41 parameters.
+8119360	8121360	But you can build significantly more complicated
+8121360	8123360	neural nets with billions
+8123360	8126360	at this point almost trillions of parameters.
+8126360	8128360	And it's a massive blob of neural tissue
+8128360	8130360	simulated neural tissue
+8130360	8132360	roughly speaking.
+8132360	8135360	And you can make it do extremely complex problems.
+8135360	8137360	And these neural nets then
+8137360	8139360	have all kinds of very fascinating emergent properties
+8139360	8143360	in when you try to make them do
+8143360	8145360	significantly hard problems.
+8145360	8147360	As in the case of GPT for example
+8147360	8150360	we have massive amounts of text from the internet
+8150360	8152360	and we're trying to get a neural net to predict
+8152360	8154360	to take like a few words
+8154360	8156360	and try to predict the next word in a sequence.
+8156360	8158360	That's the learning problem.
+8158360	8159360	And it turns out that when you train this
+8159360	8160360	on all of internet
+8160360	8162360	the neural net actually has like really remarkable
+8162360	8164360	emergent properties.
+8164360	8165360	But that neural net would have
+8165360	8167360	hundreds of billions of parameters.
+8167360	8170360	But it works on fundamentally the exact same principles.
+8170360	8173360	The neural net of course will be a bit more complex.
+8173360	8176360	But otherwise the evaluating the gradient
+8176360	8179360	is there and will be identical.
+8179360	8181360	And the gradient descent would be there
+8181360	8182360	and basically identical.
+8182360	8184360	But people usually use slightly different updates.
+8184360	8188360	This is a very simple stochastic gradient descent update.
+8188360	8191360	And the loss function would not be a mean squared error.
+8191360	8193360	They would be using something called the cross entropy loss
+8193360	8195360	for predicting the next token.
+8195360	8196360	So there's a few more details
+8196360	8198360	but fundamentally the neural network setup
+8198360	8199360	and neural network training
+8199360	8201360	is identical and pervasive.
+8201360	8203360	And now you understand intuitively
+8203360	8205360	how that works under the hood.
+8205360	8206360	In the beginning of this video
+8206360	8208360	I told you that by the end of it
+8208360	8210360	you would understand everything in MicroGrad
+8210360	8212360	and then we'd slowly build it up.
+8212360	8214360	Let me briefly prove that to you.
+8214360	8215360	So I'm going to step through all the code
+8215360	8217360	that is in MicroGrad as of today.
+8217360	8219360	Actually potentially some of the code will change
+8219360	8220360	by the time you watch this video
+8220360	8223360	because I intend to continue developing MicroGrad.
+8223360	8225360	But let's look at what we have so far at least.
+8225360	8227360	Init.py is empty.
+8227360	8230360	When you go to engine.py that has the value.
+8230360	8232360	Everything here you should mostly recognize.
+8232360	8234360	So we have the data.data.grad attributes.
+8234360	8236360	We have the backward function.
+8236360	8237360	We have the previous set of children
+8237360	8240360	and the operation that produced this value.
+8240360	8242360	We have addition, multiplication
+8242360	8244360	and raising to a scalar power.
+8244360	8246360	We have the ReLU non-linearity
+8246360	8248360	which is a slightly different type of non-linearity
+8248360	8250360	than tanh that we used in this video.
+8250360	8252360	Both of them are non-linearities
+8252360	8254360	and notably tanh is not actually present
+8254360	8256360	in MicroGrad as of right now
+8256360	8258360	but I intend to add it later.
+8258360	8260360	We have the backward which is identical
+8260360	8262360	and then all of these other operations
+8262360	8265360	which are built up on top of operations here.
+8265360	8267360	So values should be very recognizable
+8267360	8269360	except for the non-linearity used in this video.
+8270360	8272360	There's no massive difference between ReLU and tanh
+8272360	8274360	and sigmoid and these other non-linearities.
+8274360	8276360	They're all roughly equivalent
+8276360	8278360	and can be used in MLPs.
+8278360	8280360	So I use tanh because it's a bit smoother
+8280360	8282360	and because it's a little bit more complicated than ReLU
+8282360	8284360	and therefore it's stressed a little bit more
+8284360	8286360	the local gradients
+8286360	8288360	and working with those derivatives
+8288360	8290360	which I thought would be useful.
+8290360	8292360	Init.py is the neural networks library
+8292360	8294360	as I mentioned.
+8294360	8296360	So you should recognize identical implementation
+8296360	8298360	of neuron, layer and MLP.
+8298360	8300360	Notably, or not so much
+8300360	8302360	we have a class module here
+8302360	8304360	that is a parent class of all these modules.
+8304360	8306360	I did that because there's an nn.module class
+8306360	8308360	in PyTorch
+8308360	8310360	and so this exactly matches that API
+8310360	8312360	and nn.module in PyTorch has also a 0 grad
+8312360	8314360	which I refactored out here.
+8316360	8318360	So that's the end of MicroGrad really.
+8318360	8320360	Then there's a test
+8320360	8322360	which you'll see basically creates
+8322360	8324360	two chunks of code
+8324360	8326360	one in MicroGrad and one in PyTorch
+8326360	8328360	and we'll make sure that the forward
+8328360	8330360	and the backward pass agree identically.
+8330360	8332360	For a slightly less complicated expression
+8332360	8334360	and slightly more complicated expression
+8334360	8336360	everything agrees
+8336360	8338360	so we agree with PyTorch on all of these operations.
+8338360	8340360	And finally there's a demo.pypyymb
+8340360	8342360	here and it's a bit more
+8342360	8344360	complicated binary classification demo
+8344360	8346360	than the one I covered in this lecture.
+8346360	8348360	So we only had a tiny data set of four examples.
+8348360	8350360	Here we have a bit more
+8350360	8352360	complicated example with lots of
+8352360	8354360	blue points and lots of red points
+8354360	8356360	and we're trying to again build a binary classifier
+8356360	8358360	to distinguish two-dimensional
+8358360	8360360	points as red or blue.
+8360360	8362360	It's a bit more complicated MLP here
+8362360	8364360	with it's a bigger MLP.
+8364360	8366360	The loss is a bit more complicated
+8366360	8368360	because it supports batches
+8368360	8370360	so because our data set
+8370360	8372360	was so tiny we always did a forward pass
+8372360	8374360	on the entire data set of four examples.
+8374360	8376360	But when your data set is like a million
+8376360	8378360	examples what we usually do in practice
+8378360	8380360	is we basically
+8380360	8382360	pick out some random subset, we call that a batch
+8382360	8384360	and then we only process the batch
+8384360	8386360	forward, backward and update.
+8386360	8388360	So we don't have to forward the entire training set.
+8388360	8390360	So this is
+8390360	8392360	something that supports batching
+8392360	8394360	because there's a lot more examples here.
+8394360	8396360	We do a forward pass.
+8396360	8398360	The loss is slightly more different.
+8398360	8400360	This is a max margin loss that I implement here.
+8400360	8402360	The one that we used was
+8402360	8404360	the mean squared error loss
+8404360	8406360	because it's the simplest one.
+8406360	8408360	There's also the binary cross entropy loss.
+8408360	8410360	All of them can be used for binary classification
+8410360	8412360	and don't make too much of a difference
+8412360	8414360	in the simple examples that we looked at so far.
+8414360	8416360	There's something called L2 regularization
+8416360	8418360	used here.
+8418360	8420360	This has to do with generalization of the neural net
+8420360	8422360	that controls the overfitting in machine learning setting
+8422360	8424360	but I did not cover these concepts
+8424360	8426360	in this video, potentially later.
+8426360	8428360	And the training loop you should recognize.
+8428360	8430360	So forward, backward,
+8430360	8432360	with, zero grad
+8432360	8434360	and update and so on.
+8434360	8436360	You'll notice that in the update here
+8436360	8438360	the learning rate is scaled as a function of
+8438360	8440360	number of iterations and it
+8440360	8442360	shrinks.
+8442360	8444360	And this is something called learning rate decay.
+8444360	8446360	So in the beginning you have a high learning rate
+8446360	8448360	and as the network sort of stabilizes near the end
+8448360	8450360	you bring down the learning rate
+8450360	8452360	to get to some of the fine details in the end.
+8452360	8454360	And in the end we see
+8454360	8456360	the decision surface of the neural net
+8456360	8458360	and we see that it learned to separate out the red
+8458360	8460360	and the blue area based on
+8460360	8462360	the data points.
+8462360	8464360	So that's the slightly more complicated example
+8464360	8466360	in the demo.hypiYMB
+8466360	8468360	that you're free to go over.
+8468360	8470360	But yeah, as of today, that is MicroGrad.
+8470360	8472360	I also wanted to show you a little bit of real stuff
+8472360	8474360	so that you get to see how this is actually implemented
+8474360	8476360	in a production grade library like PyTorch.
+8476360	8478360	So in particular I wanted to show
+8478360	8480360	I wanted to find and show you
+8480360	8482360	the backward pass for 10h in PyTorch.
+8482360	8484360	So here in MicroGrad
+8484360	8486360	we see that the backward pass for 10h
+8486360	8488360	is 1 minus t squared
+8488360	8490360	where t is the output of the 10h
+8490360	8492360	of x
+8492360	8494360	times of that grad
+8494360	8496360	which is the chain rule.
+8496360	8498360	So we're looking for something that looks like this.
+8498360	8500360	Now, I went to PyTorch
+8500360	8502360	which has
+8502360	8504360	an open source GitHub codebase
+8504360	8506360	and I looked through a lot of its code
+8506360	8508360	and honestly
+8508360	8510360	I spent about 15 minutes
+8510360	8512360	and I couldn't find 10h.
+8512360	8514360	And that's because these libraries, unfortunately
+8514360	8516360	they grow in size and entropy.
+8516360	8518360	And if you just search for 10h
+8518360	8520360	you get apparently 2,800 results
+8520360	8522360	and 406 files.
+8522360	8524360	So I don't know what these files
+8524360	8526360	are doing, honestly.
+8526360	8528360	And why there are
+8528360	8530360	so many mentions of 10h.
+8530360	8532360	But unfortunately these libraries are quite complex
+8532360	8534360	they're meant to be used, not really inspected.
+8534360	8536360	Eventually I did
+8536360	8538360	stumble on someone
+8538360	8540360	who tries to change
+8540360	8542360	the 10h backward code for some reason
+8542360	8544360	and someone here pointed to the
+8544360	8546360	CPU kernel and the CUDA kernel for
+8546360	8548360	10h backward.
+8548360	8550360	So basically it depends on if you're using
+8550360	8552360	PyTorch on a CPU device or on a GPU
+8552360	8554360	which these are different devices
+8554360	8556360	and I haven't covered this.
+8556360	8558360	But this is the 10h backward kernel
+8558360	8560360	for CPU
+8560360	8562360	and the reason it's so large
+8562360	8564360	is that
+8564360	8566360	number one, this is like if you're using a complex type
+8566360	8568360	which we haven't even talked about
+8568360	8570360	you're using a specific data type of bfloat16
+8570360	8572360	which we haven't talked about
+8572360	8574360	and then if you're not
+8574360	8576360	then this is the kernel
+8576360	8578360	and deep here we see something that resembles
+8578360	8580360	our backward pass.
+8580360	8582360	So they have a times one minus
+8582360	8584360	b square
+8584360	8586360	so this b here
+8586360	8588360	must be the output of the 10h
+8588360	8590360	and this is the out.grad
+8590360	8592360	so here we found it
+8592360	8594360	deep inside
+8594360	8596360	PyTorch on this location
+8596360	8598360	for some reason inside binary ops kernel
+8598360	8600360	10h is not actually binary op
+8600360	8602360	and then this is the
+8602360	8604360	GPU kernel
+8604360	8606360	we're not complex
+8606360	8608360	we're here
+8608360	8610360	and here we go with one line of code
+8610360	8612360	so we did find it
+8612360	8614360	but basically unfortunately
+8614360	8616360	these code bases are very large
+8616360	8618360	and micrograd is very very simple
+8618360	8620360	but if you actually want to use real stuff
+8620360	8622360	finding the code for it
+8622360	8624360	you'll actually find that difficult
+8624360	8626360	I also wanted to show you
+8626360	8628360	a little example here where PyTorch is showing you
+8628360	8630360	you can register a new type of function
+8630360	8632360	that you want to add to PyTorch
+8632360	8634360	as a lego building block
+8634360	8636360	so here if you want to for example add
+8636360	8638360	a gender polynomial 3
+8638360	8640360	here's how you could do it
+8640360	8642360	you will register it
+8642360	8644360	as a class that
+8644360	8646360	subclass says torch.rgrad.function
+8646360	8648360	and then you have to tell PyTorch how to forward
+8648360	8650360	your new function
+8650360	8652360	and how to backward through it
+8652360	8654360	so as long as you can do the forward pass
+8654360	8656360	of this little function piece that you want to add
+8656360	8658360	and as long as you know the local
+8658360	8660360	derivative, the local gradients
+8660360	8662360	which are implemented in the backward
+8662360	8664360	PyTorch will be able to back propagate through your function
+8664360	8666360	and then you can use this as a lego block
+8666360	8668360	in a larger lego castle
+8668360	8670360	of all the different lego blocks that PyTorch already has
+8670360	8672360	and so that's the only thing
+8672360	8674360	you have to tell PyTorch and everything will just work
+8674360	8676360	and you can register new types of functions
+8676360	8678360	in this way following this example
+8678360	8680360	and that is everything that I wanted to cover
+8680360	8682360	in this lecture
+8682360	8684360	so I hope you enjoyed building out micrograd with me
+8684360	8686360	I hope you find it interesting, insightful
+8686360	8688360	and yeah
+8688360	8690360	I will post a lot of the links
+8690360	8692360	that are related to this video
+8692360	8694360	in the video description below
+8694360	8696360	I will also probably post a link to a discussion forum
+8696360	8698360	or discussion group where you can ask
+8698360	8700360	questions related to this video
+8700360	8702360	and then I can answer or someone else can answer
+8702360	8704360	your questions
+8704360	8706360	and I may also do a follow up video
+8706360	8708360	that answers some of the most common questions
+8708360	8710360	but for now that's it
+8710360	8712360	I hope you enjoyed it
+8712360	8714360	if you did then please like and subscribe
+8714360	8716360	so that YouTube knows to feature this video to more people
+8716360	8718360	and that's it for now, I'll see you later
+8718360	8720360	bye
+8748360	8750360	I know what happened there

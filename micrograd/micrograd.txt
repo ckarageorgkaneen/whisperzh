@@ -1,0 +1,3286 @@
+Hello, my name is Andre and I've been training deep neural networks for a bit more than a decade
+and in this lecture I'd like to show you what neural network training looks like under the hood.
+So in particular we are going to start with a blank Jupyter notebook and by the end of this
+lecture we will define and train a neural net and you'll get to see everything that goes on
+under the hood and exactly sort of how that works on an intuitive level. Now specifically what I
+would like to do is I would like to take you through building of micrograd. Now micrograd
+is this library that I released on github about two years ago but at the time I only uploaded the
+source code and you'd have to go in by yourself and really figure out how it works. So in this
+lecture I will take you through it step by step and kind of comment on all the pieces of it.
+So what is micrograd and why is it interesting? Thank you. Micrograd is basically an autograd
+engine. Autograd is short for automatic gradient and really what it does is it implements back
+propagation. Now back propagation is this algorithm
+that you can use to create a neural network and you can use it to create a neural network
+and you can use it to create a neural network and you can use it to create a neural network.
+That allows you to efficiently evaluate the gradient of some kind of a loss function with
+respect to the weights of a neural network and what that allows us to do then is we can
+iteratively tune the weights of that neural network to minimize the loss function and
+therefore improve the accuracy of the network. So back propagation would be at the mathematical
+core of any modern deep neural network library like say PyTorch or JAX. So the functionality
+of micrograd is I think best illustrated by an example. So if we just scroll down here
+you'll see that micrograd basically allows you to build out mathematical expressions
+and here what we are doing is we have an expression that we're building out where you have two
+inputs a and b and you'll see that a and b are negative four and two but we are wrapping those
+values into this value object that we are going to build out as part of micrograd. So this value
+object will wrap the numbers themselves and then we are going to build out a mathematical expression
+here where a and b are the values that we are going to build out as part of micrograd.
+are transformed into C, D, and eventually E, F, and G.
+And I'm showing some of the functionality of micrograph
+and the operations that it supports.
+So you can add two value objects.
+You can multiply them.
+You can raise them to a constant power.
+You can offset by one, negate, squash at zero,
+square, divide by constant, divide by it, et cetera.
+And so we're building out an expression graph
+with these two inputs, A and B,
+and we're creating an output value of G.
+And micrograph will, in the background,
+build out this entire mathematical expression.
+So it will, for example, know that C is also a value.
+C was a result of an addition operation.
+And the child nodes of C are A and B
+because it will maintain pointers to A and B value objects.
+So we'll basically know exactly how all of this is laid out.
+And then not only can we do what we call the forward pass,
+where we actually,
+if we look at the value of G, of course,
+that's pretty straightforward,
+we will access that using the dot data attribute.
+And so the output of the forward pass,
+the value of G, is 24.7, it turns out.
+But the big deal is that we can also take this G value object
+and we can call dot backward.
+And this will basically initialize backpropagation at the node G.
+And what backpropagation is going to do
+is it's going to start at G
+and it's going to go backwards through that expression graph
+and it's going to recurve.
+So we're going to recursively apply the chain rule from Calculus.
+And what that allows us to do then
+is we're going to evaluate basically the derivative of G
+with respect to all the internal nodes like E, D, and C,
+but also with respect to the inputs A and B.
+And then we can actually query this derivative of G
+with respect to A, for example, that's A dot grad.
+In this case, it happens to be 138.
+And the derivative of G with respect to B,
+which also happens to be here, 645.
+And this derivative, we'll see soon,
+is very important information
+because it's telling us how A and B are affecting G
+through this mathematical expression.
+So in particular, A dot grad is 138.
+So if we slightly nudge A and make it slightly larger,
+138 is telling us that G will grow
+and the slope of that growth is going to be 138.
+And the slope of growth of B is going to be 645.
+So that's going to tell us about how G will respond,
+if A and B get tweaked a tiny amount
+in a positive direction, okay?
+Now, you might be confused about what this expression is
+that we built out here.
+And this expression, by the way, is completely meaningless.
+I just made it up.
+I'm just flexing about the kinds of operations
+that are supported by micrograd.
+What we actually really care about are neural networks.
+But it turns out that neural networks
+are just mathematical expressions, just like this one,
+but actually a slightly bit less crazy even.
+Neural networks are just a mathematical expression,
+they take the input data as an input,
+and they take the weights of a neural network as an input,
+and it's a mathematical expression,
+and the output are your predictions of your neural net
+or the loss function.
+We'll see this in a bit.
+But basically, neural networks just happen to be
+a certain class of mathematical expressions.
+But backpropagation is actually significantly more general.
+It doesn't actually care about neural networks at all.
+It only cares about arbitrary mathematical expressions.
+And then we happen to use that machinery
+for training of neural networks.
+Now, one more.
+Another note I would like to make at this stage
+is that, as you see here,
+micrograd is a scalar-valued autograd engine.
+So it's working on the level of individual scalars,
+like negative four and two.
+And we're taking neural nets
+and we're breaking them down
+all the way to these atoms of individual scalars
+and all the little pluses and times,
+and it's just excessive.
+And so, obviously,
+you would never be doing any of this in production.
+It's really just done for pedagogical reasons
+because it allows us to not have to deal
+with these n-dimensional tensors
+that you would use in a modern deep neural network library.
+So this is really done so that you understand
+and refactor out the background application
+and chain rule and understanding of neural training.
+And then, if you actually want to train bigger networks,
+you have to be using these tensors,
+but none of the math changes.
+This is done purely for efficiency.
+We are basically taking all the scalar values,
+we're packaging them up into tensors,
+which are just arrays of these scalars.
+And then, because we have these large arrays,
+we're making operations on those large arrays
+that allows us to take advantage of the parallelism
+in a computer.
+And all those operations can be done in parallel,
+and then the whole thing runs faster.
+But really, none of the math changes,
+and they're done purely for efficiency.
+So I don't think that it's pedagogically useful
+to be dealing with tensors from scratch.
+And that's why I fundamentally wrote micrograd,
+because you can understand how things work
+at the fundamental level,
+and then you can speed it up later.
+Okay, so here's the fun part.
+My claim is that micrograd is what you need
+to train neural networks,
+and everything else is just efficiency.
+So you'd think that micrograd would be
+a very complex piece of code.
+And that turns out to not be the case.
+So if we just go to micrograd,
+and you'll see that there's only two files here in micrograd.
+This is the actual engine.
+It doesn't know anything about neural nets.
+And this is the entire neural nets library
+on top of micrograd.
+So engine and nn.py.
+So the actual backpropagation autograd engine
+that gives you the power of neural networks
+is literally
+100 lines of code.
+100 lines of code.
+Of, like, very simple Python,
+which we'll understand by the end of this lecture.
+And then nn.py,
+this neural network library
+built on top of the autograd engine,
+is like a joke.
+It's like, we have to define what is a neuron,
+and then we have to define what is a layer of neurons,
+and then we define what is a multilayer perceptron,
+which is just a sequence of layers of neurons.
+And so it's just a total joke.
+So basically,
+there's a lot of power
+that comes from only 150 lines of code.
+And then we have to define what is a multilayer perceptron,
+which is 150 lines of code.
+And that's all you need to understand
+to understand neural network training.
+And everything else is just efficiency.
+And of course, there's a lot to efficiency.
+But fundamentally, that's all that's happening.
+Okay, so now let's dive right in
+and implement micrograd step by step.
+The first thing I'd like to do is I'd like to make sure
+that you have a very good understanding, intuitively,
+of what a derivative is
+and exactly what information it gives you.
+So let's start with some basic imports
+that I copy-paste in every Jupyter Notebook, always.
+And let's define a derivative.
+So let's define a function,
+a scalar-valued function,
+f of x, as follows.
+So I just made this up randomly.
+I just wanted a scalar-valued function
+that takes a single scalar x
+and returns a single scalar y.
+And we can call this function, of course,
+so we can pass in, say, 3.0
+and get 20 back.
+Now, we can also plot this function
+to get a sense of its shape.
+You can tell from the mathematical expression
+that this is probably a parabola.
+It's a quadratic.
+It's a scalar-value that we can feed in
+using, for example, a range
+from negative 5 to 5
+in steps of 0.25.
+So x is just
+from negative 5 to 5
+not including 5
+in steps of 0.25.
+And we can actually call this function
+on this numpy array as well.
+So we get a set of y's
+if we call f on x.
+And these y's are basically
+also applying the function
+on every one of these elements independently.
+Let's talk about this using Mathplotlib.
+So plt.plot, x's and y's
+and we get a nice parabola.
+So previously here we fed in 3.0
+somewhere here, and we received
+20 back, which is here
+the y coordinate.
+So now I'd like to think through
+what is the derivative of this function
+at any single input point x?
+So what is the derivative at different points x
+of this function?
+Now if you remember back to your calculus class
+you've probably derived derivatives.
+So we take this mathematical expression
+for x plus 5, and you would write it out
+on a piece of paper and you would
+apply the product rule and all the other rules
+and derive the mathematical expression
+of the great derivative of the original function.
+And then you could plug in different x's
+and see what the derivative is.
+We're not going to actually do that
+because no one in neural networks
+actually writes out the expression for the neural net.
+It would be a massive expression.
+It would be thousands, tens of thousands of terms.
+No one actually derives the derivative
+of course.
+And so we're not going to take this kind of symbolic approach
+instead what I'd like to do is I'd like to look at the
+definition of derivative and just make sure
+that we really understand what the derivative is measuring
+what it's telling you about the function.
+And so if we just look up
+derivative
+we see that
+this is not a very good definition of derivative
+this is a definition of what it means to be differentiable
+but if you remember from your calculus
+it is the limit as h goes to 0
+of f of x plus h minus f of x
+over h.
+And basically what it's saying is
+if you slightly bump up
+at some point x that you're interested in
+or a, and if you slightly bump up
+you slightly increase it by
+a small number h
+how does the function respond?
+With what sensitivity does it respond?
+What is the slope at that point?
+Does the function go up or does it go down?
+And by how much?
+And that's the slope of that function
+the slope of that response at that point.
+And so we can basically evaluate
+the derivative here numerically
+by taking a very small h
+of course the definition would ask us to take h to 0
+we're just going to pick a very small h
+0.001
+and let's say we're interested in point 3.0
+so we can look at f of x of course as 20
+and now f of x plus h
+so if we slightly nudge
+x in a positive direction
+how is the function going to respond?
+And just looking at this
+do you expect f of x plus h to be slightly greater
+than 20?
+Or do you expect it to be slightly lower than 20?
+And so since 3 is here
+and this is 20
+if we slightly go positively
+the function will respond positively
+so you'd expect this to be slightly greater than 20
+and now by how much
+is telling you the
+strength of that slope
+the size of that slope
+so f of x plus h minus f of x
+this is how much the function responded
+in a positive direction
+and we have to normalize by the run
+so we have the rise over run
+to get the slope
+so this of course is just a numerical approximation
+of the slope
+because we have to make h very very small
+to converge to the exact amount
+now if I'm doing too many zeros
+at some point
+I'm going to get an incorrect answer
+because we're using floating point arithmetic
+and the representations of all these numbers
+in computer memory is finite
+and at some point we get into trouble
+so we can converge towards the right answer
+with this approach
+but basically
+at 3 the slope is 14
+and you can see that by taking
+x squared minus 4x plus 5
+and differentiating it in our head
+so 3x squared would be
+6x minus 4
+and then we plug in x equals 3
+so that's 18 minus 4 is 14
+so this is correct
+so that's at 3
+now how about
+the slope at say negative 3
+would you expect
+what would you expect for the slope
+now telling the exact value is really hard
+but what is the sign of that slope
+so at negative 3
+if we slightly go in the positive direction
+at x
+the function would actually go down
+and so that tells you that the slope would be negative
+so we'll get a slight number below
+below 20
+and so if we take the slope
+we expect something negative
+negative 22
+and at some point here of course
+the slope would be 0
+now for this specific function
+I looked it up previously
+and it's at point 2 over 3
+so at roughly 2 over 3
+this derivative would be 0
+so basically
+at that precise point
+at that precise point
+if we nudge in a positive direction
+the function doesn't respond
+this stays the same almost
+and so that's why the slope is 0
+ok now let's look at a bit more complex case
+so we're going to start complexifying a bit
+so now we have a function
+here
+with output variable b
+that is a function of 3 scalar inputs
+so a, b and c are some specific values
+3 inputs into our expression graph
+and a single output d
+and so if we just print d
+we get 4
+and now what I'd like to do is
+I'd like to again look at the derivatives of d
+with respect to a, b and c
+and think through
+again just the intuition of what this derivative
+is telling us
+so in order to evaluate this derivative
+we're going to get a bit hacky here
+we're going to again have a very small
+value of h and then we're going to
+fix the inputs at some
+values that we're interested in
+so these are the
+this is the point a, b, c at which we're going to be evaluating
+the derivative of d
+with respect to all a, b and c
+at that point
+so there's the inputs and now we have d1
+is that expression
+and then we're going to for example look at the derivative of d
+with respect to a
+so we'll take a and we'll bump it by h
+and then we'll get d2 to be the exact same
+function
+and now we're going to print
+you know
+d1 is d1
+d2 is d2
+and print slope
+so the derivative
+or slope here
+will be of course
+d2
+minus d1 divided by h
+so d2 minus d1 is how
+much the function increased
+when we bumped
+the specific
+input that we're interested in
+by a tiny amount
+and this is then normalized by
+h to get the slope
+so
+yeah
+so this
+so I just run this
+we're going to print d1
+which we know is
+4
+now d2 will be bumped
+a will be bumped by h
+so let's just think through
+a little bit
+what d2 will be
+printed out here in particular
+d1 will be 4
+will d2 be
+a number slightly greater than 4
+or slightly lower than 4
+and that's going to tell us the
+sign of the derivative
+so
+we're bumping a by h
+b is minus 3
+c is 10
+so you can just intuitively think through
+this derivative and what it's doing
+a will be slightly more positive
+and but b is a negative
+number so if a is
+slightly more positive
+because b is negative 3
+we're actually going to be
+adding less to
+d
+so you'd actually expect that
+the value of the function will go
+down so let's
+just see this
+yeah and so we went from 4
+to 3.996
+and that tells you that the slope will
+be negative and then
+will be a negative number
+because we went down and
+then the exact number of slope
+will be the exact amount of slope
+is negative 3 and you can
+also convince yourself that negative 3 is the right
+answer mathematically and analytically
+because if you have a times b plus
+c and you are you know you have
+calculus then
+differentiating a times b plus c with
+respect to a gives you just b
+and indeed the value of b
+is negative 3 which is the derivative that we have
+so you can tell that that's correct
+so now if we do this
+with b so if we
+bump b by a little bit in a positive
+direction we'd get different
+slopes so what is the influence of b
+on the output d
+so if we bump b by a tiny amount
+in a positive direction then because a
+is positive we'll be
+adding more to d right
+so and now
+what is the sensitivity what is the
+slope of that addition and
+it might not surprise you that this should be
+2
+and why is it 2 because
+d of d by db
+differentiating with respect to b
+would be would give us a and
+the value of a is 2 so that's also
+working well and then if c
+gets bumped a tiny amount in h
+by h then
+of course a times b is unaffected and
+now c becomes slightly bit higher
+what does that do to the function it
+makes it slightly bit higher because we're simply adding
+c and it makes it slightly bit
+higher by the exact same amount that we
+added to c and so that tells you
+that the slope is 1
+that will be the
+the rate at which
+d will increase
+as we scale
+c okay so we now have some
+intuitive sense of what this derivative is telling you
+about the function and we'd like to move to
+neural networks now as i mentioned neural networks
+will be pretty massive expressions mathematical
+expressions so we need some data structures
+that maintain these expressions and that's what
+we're going to start to build out now
+so we're going to
+build out this value object that i
+showed you in the readme page
+of micrograd so let me
+copy paste a skeleton
+of the first very simple value
+object so class
+value takes a single
+scalar value that it wraps and
+keeps track of and that's
+it so we can for example
+do value of 2.0 and then we can
+get
+we can look at its content and
+python will internally
+use the wrapper function
+to return
+this string
+like that
+so this is a value object with
+data equals two that we're creating
+here now what we'd like to do is
+like we'd like to be able to
+have not just like
+two values but
+we'd like to do a plus b right we'd like
+to add them so currently
+you would get an error because python
+doesn't know how to add two value
+objects so we have to tell it
+so here's
+addition
+so
+you have to basically use these special
+double underscore methods in python to
+define these operators for these
+objects so if we call
+the
+if we use this plus
+operator python will internally
+call a dot
+add of b that's
+what will happen internally and so
+b will be the other
+and self will be
+a and so we see that what we're going
+to return is a new value object and
+it's just it's going to be wrapping
+the plus of
+their data but remember
+now because data is the actual
+like numbered python number so
+this operator here is just the
+typical floating point plus
+addition now it's not an addition of value
+objects and we'll return
+a new value so now a
+plus b should work and it should print value
+of negative one
+because that's two plus minus three
+there we go okay let's
+now implement multiply
+just so we can recreate this expression here
+so multiply i think it won't
+surprise you will be fairly similar
+so instead
+of add we're going to be using mul
+and then here of course we want to do times
+and so now we can create a
+c value object which will be 10.0
+and now we should be able to do
+a times b
+well let's just do a times b first
+um
+that's value of negative six now
+and by the way i skipped over this a little
+bit suppose that i didn't have the wrapper
+function here then
+it's just that you'll get some kind of an ugly expression
+so what wrapper is doing
+is it's providing us a way to
+print out like a nicer looking expression in
+python so we
+don't just have something cryptic we
+actually are you know it's value of
+negative six
+so this gives us a times
+and then this we should now be able
+to add c to it because we've defined and
+told the python how to do mul and add
+and so this will call
+this will basically be equivalent to a dot
+mul
+of b and then
+this new value object will be dot
+add of c
+and so let's see if that worked
+yep so that worked well that gave
+us four which is what we expect from before
+and i
+believe we can just call them manually as well
+there we go so
+yeah okay so now what we are
+missing is the connected tissue of this
+expression as i mentioned we want to keep
+these expression graphs so we need to
+know and keep pointers about
+what values produce what other values
+produce so here for example we are
+going to introduce a new variable which
+we'll call children and by default it
+will be an empty tuple and then we're
+actually going to keep a slightly
+different variable in the class which
+we'll call underscore prev which will be
+the set of children
+this is how i done i did it in the
+original micrograd looking at my code
+here i can't remember exactly the reason
+i believe it was efficiency but this
+underscore children will be a tuple for
+convenience but then when we actually
+maintain it in the class it will be just
+efficiency
+so now when
+we are creating a value like this with a
+constructor children will be empty and
+prev will be the empty set but when we
+are creating a value through addition or
+multiplication we're going to feed in
+the children of this
+value which in this case is self
+another
+so those are the children
+here
+so now we can do d dot
+prev and we'll see that
+the children of the we know
+now know are this a value of
+negative six and value of ten
+and this of course is the value resulting
+from a times b and the
+c value which is ten
+now the last piece of information
+we don't know so we know now the
+children of every single value but we don't know
+what operation created this value
+so we need one more element
+here let's call it underscore pop
+and by default this
+is the empty set for leaves
+and then we'll just maintain it here
+and now the
+operation will be just a simple string
+and in the case of addition it's
+plus in the case of multiplication
+it's times so
+now we not just have d dot
+prev we also have a d dot op
+and we know that d was produced by
+an addition of those two values
+and so now we have the full
+mathematical expression and we're
+building out this data structure and we know exactly
+how each value came to be
+by what expression and from what other values
+now because these expressions are about
+to get quite a bit larger we'd like a
+way to nicely visualize
+these expressions that we're building out
+so for that i'm going to copy paste a bunch of
+slightly scary code that's
+going to visualize this these
+expression graphs for us so here's the
+code and i'll explain it in a bit
+but first let me just show you what this code does
+basically what it does is it creates
+a new function draw dot
+that we can call on some root node
+and then it's going to visualize it
+so if we call draw dot on d
+which is this final value here
+that is a times b plus c
+it creates
+something like this so this is d
+and you see that this is a times b
+creating an interpret value
+plus c gives us this output
+node d
+so that's draw dot of d
+and i'm not going to go through this
+in complete detail you can take a look at
+graphvis and its api
+graphvis is an open source graph visualization
+software and what we're doing here
+is we're building out this graph in graphvis
+api and
+you can basically see that
+trace is this helper function that
+enumerates all the nodes and edges in the graph
+so that just builds a set of all
+the nodes and edges and then we iterate through
+all the nodes and we create special node
+objects for them in
+using dot
+node and then we also
+create edges using dot dot edge
+and the only thing that's like slightly
+tricky here is you'll notice that i
+basically add these fake nodes
+which are these operation nodes
+so for example this node here is just
+like a plus node and
+i create these
+special
+op nodes here
+and i connect them accordingly
+so these nodes of course
+are not actual nodes
+in the original graph they're not
+actually a value object the only
+value objects here are the things
+in squares those are actual value
+objects or representations thereof
+and these op nodes are just created in
+this draw dot routine so that
+it looks nice let's also
+add labels to these graphs just so we
+know what variables are where
+so let's create a special underscore
+label
+or let's just do label equals
+empty by default and save it
+in each node
+and then here
+we're going to do label is a
+label is b
+label is c
+and then
+let's create a special
+um e equals
+a times b
+and e dot label will
+be e
+it's kind of naughty and e
+will be e plus c
+and a d dot label will be
+b
+okay so nothing really changes i just
+added this new e function
+a new e variable
+and then here when we are
+printing this i'm going
+to print the label here
+so this will be a percent s
+bar and this will be n dot
+label
+and so now
+we have the label
+on the left here so it says a b
+creating e and then e plus c creates
+d just like we have it
+here and finally let's make this
+expression just one layer deeper
+so d will not be the final output
+node instead
+after d we are going to create a
+new value object called
+f we're going to start running out of
+variables soon f will be negative two
+point zero and its label
+will of course just be f
+and then l
+capital l will be the output
+of our graph and l will be
+d times f
+okay so l will be negative eight
+is the output
+uh so
+now we don't just draw a
+d we draw l
+okay
+and somehow the label of
+l is undefined oops
+the label has to be explicitly
+given to it
+there we go so l is the output
+so let's quickly recap what we've done so far
+we are able to build out mathematical
+expressions using only plus and times
+so far they are scalar
+valued along the way and we can
+do this forward pass
+and build out a mathematical expression
+so we have multiple inputs here
+a b c and f going into
+a mathematical expression that produces
+a single output l
+and this here is visualizing the
+forward pass so the output of the
+forward pass is negative eight
+that's the value now
+what we'd like to do next is we'd like to run
+back propagation and in back
+propagation we are going to start here at the end
+and we're going to reverse
+and calculate the gradient
+along all these intermediate
+values and really what we're
+computing for every single value here
+um we're going to compute
+the derivative of that node
+with respect to
+l so
+the derivative of l with respect to l
+is just one
+and then we're going to derive what is the
+derivative of l with respect to f with
+respect to d with respect to c
+with respect to e with respect
+to b and with respect to a
+and in a neural network setting you'd
+be very interested in the derivative of basically
+this loss function l
+with respect to the weights of
+a neural network and here of course
+we have just these variables a b c and f
+but some of these will eventually represent
+the weights of a neural net and so
+we'll need to know how those weights are impacting
+the loss function
+so we'll be interested basically in the derivative of
+the output with respect to some of its
+leaf nodes and those leaf nodes will
+be the weights of the neural net
+and the other leaf nodes of course will be the data
+itself but usually we will not want
+or use the derivative of the
+loss function with respect to data because
+the data is fixed but the weights
+will be iterated on
+using the gradient information
+so next we are going to create a variable inside
+the value class that maintains
+the derivative of
+l with respect to that value
+and we will call this variable
+grad so there
+is a dot data and there is a self.grad
+and initially
+it will be zero and remember that
+zero is basically means no
+effect so at initialization
+we are assuming that every value does not
+impact does not affect the
+output right because
+if the gradient is zero that means that changing
+this variable is not changing the
+loss function so by
+default we assume that the gradient is zero
+and then
+now that we have grad
+and it's zero point zero
+we are going to be able to visualize
+it here after data so here
+grad is point four f
+and this will be end of grad
+and now
+we are going to be showing both the data
+and the grad
+initialized at zero
+and we are
+just about getting ready to calculate the
+back propagation and of course this
+grad again as i mentioned is representing
+the derivative of the output in
+this case l with respect to this
+value so with respect to
+so this is the derivative of l with respect to
+f with respect to d and so on
+so let's now fill in those gradients
+and actually do back propagation manually
+so let's start filling in these gradients and
+start all the way at the end as i mentioned here
+first we are interested to fill in this
+gradient here so
+what is the derivative of l with respect to
+l in other words if i change
+l by a tiny amount h
+how much does
+l change
+it changes by h so
+it's proportional and therefore the derivative will be
+one we can of course
+measure these or estimate these numerical
+gradients numerically just like
+we've seen before so if i take this
+expression and i create a
+def lol function here
+and put this here
+now the reason i'm creating a gating function
+lol here is because i don't want
+to pollute or mess up the global scope
+here this is just kind of like a little staging
+area and as you know in python all of these
+will be local variables to this function
+so i'm not changing any of the
+global scope here so here
+l1 will be l
+and then copy pasting this expression
+we're going to add a small
+amount h
+in
+for example a
+right and this would be measuring
+the derivative of l with respect
+to a so here
+this will be l2
+and then we want to print test derivatives
+so print l2 minus
+l1 which is how much l
+changed and then normalize it
+by h so this is the rise
+over run and we have to be
+careful because l is a valid node
+so we actually want its data
+so that these are floats dividing
+by h and this should print
+the derivative of l with respect to a
+because a is the one that we bumped a
+little bit by h so what is
+the derivative of l with respect
+to a it's six
+okay and obviously
+if we change
+l by h
+then that would be
+here
+effectively
+this looks really awkward but
+changing l by h
+you see the derivative here is one
+that's kind of like the base case
+of what we are doing here
+so basically we can come up here
+and we can manually set
+l.grad to one this is our
+manual backpropagation
+l.grad is one and let's redraw
+and we'll see
+that we filled in grad is one
+for l we're now going to continue
+the backpropagation so let's here look at
+the derivatives of l with respect to
+d and f let's do
+d first so what
+we are interested in if i create a markdown on
+here is we'd like to know
+basically we have that l is d times f
+and we'd like to know what is
+d l by
+d d
+what is that and if you know
+your calculus l is d times f
+so what is d l by d d
+it would be f
+and if you don't believe me we can also
+just derive it because the proof would be
+fairly straightforward we go
+to the definition
+of the derivative which is
+f of x plus h minus f of x
+divide h
+as a limit of h goes to zero
+of this kind of expression so
+when we have l is d times f
+then increasing
+d by h would give us
+the output of d plus h times
+f that's
+basically f of x plus h right
+minus d times
+f
+and then divide h and
+symbolically expanding out here we
+would have basically d times f
+plus h times f minus
+d times f divide h
+and then you see how the df minus
+df cancels so you're left with h times
+f divide h
+which is f so
+in the limit as h goes to zero
+of you know
+derivative
+definition we just
+get f in the case of
+d times f
+so symmetrically
+d l by d f
+will just be d
+so what we have is that
+f dot grad we see now
+is just the value of d
+which is four
+and we see that
+d dot grad is just
+the value of f
+and so the value of f
+is negative two
+so we'll set those
+manually
+let me erase this markdown
+node and then let's redraw what we
+have
+okay and let's
+just make sure that these were correct
+so we seem to think that
+d l by d d is negative two so let's
+double check
+let me erase this plus h from before
+and now we want the derivative with respect to f
+so let's just come here
+when i create f and let's do a plus h here
+and this should print a derivative of
+l with respect to f so we expect
+to see four
+yeah and this is four up to
+floating point funkiness
+and then d l
+by d d should be
+f which is negative two
+grad is negative two
+so if we again
+come here and we change d
+d dot
+data plus equals h right
+here so we expect
+so we've added a little h and then we see
+how l changed and we
+expect to print
+negative two
+there we go
+so we've numerically
+verified what we're doing here is
+kind of like an inline gradient check
+gradient check is when we
+are deriving this like back propagation
+and getting the derivative with respect to all the
+intermediate results and
+then numerical gradient is just you know
+estimating it using
+small step size
+now we're getting to the crux of
+back propagation so this will be the
+most important node to understand
+because if you understand the gradient for
+this node you understand all of back
+propagation and all training of neural nets
+basically so we need
+to derive d l by
+d c in other words the derivative
+of l with respect to c
+because we've computed all these other
+gradients already now we're coming
+here and we're continuing the back propagation
+manually so we want
+d l by d c and then we'll also
+derive d l by d e
+now here's the problem
+how do we derive d l by
+d c
+we actually know the derivative l
+with respect to d so we know how
+l is sensitive to d
+but how is l sensitive to
+c so if we wiggle c how does
+that impact l through d
+so we know d l by d c
+and we
+also here know how c impacts d
+and so just very intuitively if you
+know the impact that c is having
+on d and the impact that d is having
+on l then you should be able to
+somehow put that information together to
+figure out how c impacts l
+and indeed this is what we can actually
+do so in particular we
+know just concentrating on d first
+let's look at how what is the derivative
+basically of d with respect to c
+so in other words what is d d by d
+c
+so here
+we know that d is c times
+c plus e that's what we
+know and now we're interested in d d
+by d c if you
+just know your calculus again and you remember
+then differentiating c plus e with
+respect to c you know that that gives you
+1.0 and
+we can also go back to the basics and derive
+this because again we can go to our
+f of x plus h minus f of x
+divide by h
+that's the definition of a derivative
+as h goes to zero and
+so here focusing on c
+and its effect on d
+we can basically do the f of x plus h
+will be c is
+incremented by h plus c
+that's the first evaluation of our
+function minus
+c plus e
+and then divide h
+and so what is this
+just expanding this out this will be c plus
+h plus e minus c minus
+e divide h
+and then you see here how c minus c
+cancels e minus e cancels
+we're left with h over h which is 1.0
+and so
+by symmetry also
+d d by d
+e will be
+1.0 as well
+so basically the derivative of
+a sum expression is very simple
+and this is the local derivative
+so i call this the local derivative because
+we have the final output value all the
+way at the end of this graph and we're now
+like a small node here and
+this is a little plus node and
+the little plus node doesn't know
+anything about the rest of the graph
+that it's embedded in all it knows
+is that it did a plus it took a c
+and an e added them and created
+d and this plus node
+also knows the local influence of
+c on d or rather
+the derivative of d with respect to c
+and it also knows the derivative of d
+with respect to e but
+that's not what we want that's just a local derivative
+what we actually want is
+dl by dc and
+l could l is here just one
+step away but in the general case
+this little plus node is could be
+embedded in like a massive graph
+so again
+we know how l impacts d and
+now we know how c and e impact
+d how do we put that information together
+to write dl by dc
+and the answer of course is the chain rule
+in calculus and so
+i pulled up chain rule here from wikipedia
+and i'm going
+to go through this very briefly so chain
+rule wikipedia sometimes
+can be very confusing and calculus can
+can be very confusing like
+this is the way i learned
+chain rule and it was very
+confusing like what is happening
+it's just complicated so i like
+this expression much better
+if a variable z depends
+on a variable y which itself depends
+on a variable x
+then z depends on x as well obviously
+through the intermediate variable y
+and in this case the chain rule is expressed
+as if you want
+dz by dx
+then you take the dz by dy
+and you multiply it by dy
+by dx so the chain
+rule fundamentally is telling you
+how we chain
+these derivatives
+together correctly
+so to differentiate through
+a function composition
+we have to apply a multiplication
+of those derivatives
+so that's
+really what chain rule is telling us
+and there's a nice little
+intuitive explanation here which i also think is
+kind of cute the chain rule states that
+knowing the instantaneous rate of change of z with respect
+to y and y relative to x allows
+one to calculate the instantaneous rate of change of z
+relative to x as a
+product of those two rates of change
+simply the product of those two
+so here's a good one
+if a car travels twice as fast as a bicycle
+and the bicycle is four times as
+fast as a walking man
+then the car travels two times four
+eight times as fast as a man
+and so this makes it
+very clear that the correct thing to do
+sort of is to multiply
+so car is
+twice as fast as bicycle and bicycle
+is four times as fast as man
+so the car will be eight
+times as fast as the man
+and so we can take these
+intermediate rates of change if you will
+and multiply them together
+and that justifies the
+chain rule intuitively
+so have a look at chain rule but here
+really what it means for us is
+there's a very simple recipe for deriving
+what we want
+which is dl by dc
+and what we have so far
+is we know
+want
+and we know
+what is the
+impact of d on l
+so we know dl by dd
+the derivative of l with respect to dd
+we know that that's negative two
+and now because of this local
+reasoning that we've done here
+we know dd by dc
+so how does c impact d
+and in particular
+this is a plus node so the local derivative
+is simply 1.0 it's very simple
+and so
+the chain rule tells us that dl by dc
+going through this intermediate
+variable
+will just be simply dl by
+dd
+times
+dd
+by dc that's chain rule
+so this is identical
+to what's happening here
+except
+z is rl
+y is rd and x is
+rc
+so we literally just have to multiply these
+and because
+these local derivatives like dd by dc
+are just one
+we basically just copy over
+dl by dd because this is just
+times one
+so because dl by dd
+is negative two what is dl
+by dc
+well it's the local gradient
+1.0 times dl by dd
+which is negative two so literally
+what a plus node does you can look
+at it that way is it literally just routes
+the gradient because the
+plus nodes local derivatives are just
+one and so in the chain rule
+one times dl by
+dd is
+is
+is just dl by dd
+and so that derivative just gets routed
+to both c and to e
+in this case so basically
+we have that e.grad
+or let's start with c
+since that's the one we looked at
+is negative
+two times one
+negative two
+and in the same way by
+symmetry e.grad will be negative two
+that's the claim
+so we can set those
+we can redraw
+and you see how
+we just assigned negative two negative two
+so this back propagating signal which is
+carrying the information of like what is the derivative
+of l with respect to all the intermediate nodes
+we can imagine it almost like
+flowing backwards through the graph and a
+plus node will simply distribute
+the derivative to all the leaf nodes
+sorry to all the children nodes of it
+so this is the claim
+and now let's verify it
+so let me remove the plus h here from before
+and now instead what we want to
+do is we want to increment c so
+c.data will be incremented by h
+and when i run this we expect
+to see negative two
+negative two
+and then of course for e
+so e.data plus equals h
+and we expect to see negative two
+simple
+so those are the derivatives
+of these internal nodes
+and now we're going to
+recurse our way backwards
+again and we're again
+going to apply the chain rule
+so here we go our second application of chain rule
+and we will apply it all the way through the
+graph we just happen to only have one more node
+remaining we have that
+derivative of l
+so we know that
+the derivative of l
+as we have just calculated
+is negative two
+so we know that
+so we know the derivative of l
+with respect to e
+and now we want
+dL by dA
+right
+and the chain rule is telling us
+that that's just dL by dE
+negative two
+so that's basically
+dE by dA
+we have to look at that
+so I'm a little times node
+inside a massive graph
+and I only know that I did
+a times b and I produced an e
+so now what is
+dE by dA
+and dE by dB
+that's the only thing that I sort of know about
+that's my local gradient
+so because we have that e is a times b
+we're asking what is dE
+by dA
+and of course we just did that here
+we had a times
+so I'm not going to re-derive it
+but if you want to differentiate this
+with respect to a you'll just get b
+right the value of b
+which in this case is
+negative three point zero
+so
+basically we have that dL by dA
+well let me just do it
+right here we have that a dot grad
+and we are applying chain rule here
+is dL by dE
+which we see here is
+negative two
+times
+what is dE by dA
+it's the value of b
+which is negative three
+that's it
+and then we have b dot grad
+is again dL by dE
+which is negative two
+just the same way
+times
+what is dE by dB
+is the value of a
+which is 2.0
+so these are
+our claimed derivatives
+let's
+re-draw
+and we see here that
+a dot grad turns out to be six
+because that is negative two times negative three
+and b dot grad is negative four
+times
+sorry is negative two times two
+which is negative four
+so those are our claims
+let's delete this and let's verify them
+we have
+a here
+plus equals h
+so
+the claim is that
+a dot grad is six
+let's verify
+six
+and we have b dot data
+plus equals h
+so nudging b by h
+and looking at what happens
+we claim it's negative four
+and indeed it's negative four
+plus minus again float
+oddness
+and that's it
+that was the manual
+back propagation
+all the way from here
+to all the leaf nodes
+and we've done it piece by piece
+and really all we've done is
+as you saw we iterated through all the nodes
+one by one
+and locally applied the chain rule
+we always know what is the derivative of l
+with respect to this little output
+and then we look at how this output was produced
+this output was produced through some operation
+and we have the pointers to the children nodes
+and so in this little operation
+we know what the local derivatives are
+and we just multiply them onto the derivative
+always
+so we just go through and recursively multiply on
+the local derivatives
+and that's what back propagation is
+it's just a recursive application of chain rule
+backwards through the computation graph
+let's see this power in action
+just very briefly
+what we're going to do is we're going to
+nudge our inputs to try to make l
+go up
+so in particular what we're doing is
+we're going to take that data
+we're going to change it
+and if we want l to go up
+that means we just have to go in the direction of the gradient
+so a should increase
+in the direction of gradient
+by like some small step amount
+this is the step size
+and we don't just want this for b
+but also for b
+also for c
+also for f
+those are leaf nodes
+which we usually have control over
+and if we nudge in
+the direction of the gradient
+we expect a positive influence on l
+so we expect l to go up
+positively
+so it should become less negative
+it should go up to say negative 6
+or something like that
+it's hard to tell exactly
+and we have to rerun the forward pass
+so let me just
+do that here
+this would be the forward pass
+f would be unchanged
+this is effectively the forward pass
+but now if we print l.data
+we expect
+because we nudged all the values
+all the inputs in the direction of the gradient
+we expected less negative l
+we expect it to go up
+so maybe it's negative 6 or so
+let's see what happens
+ok negative 7
+and this is basically one step
+of an optimization that we'll end up running
+and really this gradient
+just gives us some power
+because we know how to influence the final outcome
+and this will be extremely useful for training NOLETs as we'll soon see
+so now I would like to do
+one more example
+of manual backpropagation
+using a bit more complex
+and useful example
+we are going to backpropagate
+through a neuron
+so we want to
+eventually build out neural networks
+and in the simplest case these are multilayer
+perceptrons as they're called
+so this is a two layer neural net
+and it's got these hidden layers made up of neurons
+and these neurons are fully connected to each other
+now biologically neurons are very complicated
+devices but we have very simple mathematical models
+of them
+and so this is a very simple mathematical model
+of a neuron
+you have some inputs, x's
+and then you have these synapses
+that have weights on them
+so the w's are weights
+and then
+the synapse interacts with the input
+to this neuron multiplicatively
+so what flows to the cell body
+of this neuron
+is w times x
+but there's multiple inputs
+w times x is flowing to the cell body
+the cell body then has
+also like some bias
+so this is kind of like the
+innate sort of trigger happiness
+of this neuron
+so this bias can make it a bit more trigger happy
+or a bit less trigger happy regardless of the input
+but basically we're taking all the w times x
+of all the inputs
+adding the bias
+and then we take it through an activation function
+and this activation function
+is usually some kind of a squashing function
+like a sigmoid or 10H
+or something like that
+so as an example
+we're going to use the 10H in this example
+numpy has a
+np.10H
+so we can call it on a range
+and we can plot it
+this is the 10H function
+and you see that the inputs
+as they come in
+get squashed on the y coordinate here
+so right at 0
+we're going to get exactly 0
+and then as you go more positive in the input
+then you'll see that
+the activation function will only go up to 1
+and then plateau out
+and so if you pass in very positive inputs
+we're going to cap it smoothly at 1
+and on the negative side
+we're going to cap it smoothly to negative 1
+so that's 10H
+and that's the squashing function
+or an activation function
+and what comes out of this neuron
+is just the activation function applied to the
+dot product of the weights
+and the inputs
+so let's write one out
+um
+I'm going to copy paste
+because
+I don't want to type too much
+but okay so here we have the inputs
+x1, x2
+so this is a two dimensional neuron
+so two inputs are going to come in
+these are thought of as the weights of this neuron
+weights w1, w2
+and these weights again are the
+synaptic strengths for each input
+and this is the bias
+of the neuron B
+and now what we want to do
+is according to this model
+we need to multiply
+x1 times w1
+and x2 times w2
+and then we need to add bias
+on top of it
+and it gets a little messy here
+but all we are trying to do is
+x1 w1 plus x2 w2 plus B
+and these are multiplied here
+except I'm doing it in small steps
+so that we actually have pointers
+to all these intermediate nodes
+so we have x1 w1 variable
+x2 w2 variable
+and I'm also labeling them
+so that we have the
+n is now the cell body
+raw activation
+without the activation function for now
+and this should be enough
+to basically plot it
+so draw dot of n
+gives us x1 times w1
+x2 times w2
+being added
+then the bias gets added on top of this
+and this n is this sum
+so we are now going to take it through
+an activation function
+And let's say we use the tanh
+So that we produce the output. So what we'd like to do here is we'd like to do the output and I'll call it O is
+N dot tanh
+Okay, but we haven't yet written the tanh
+now the reason that we need to implement another tanh function here is that
+tanh is a
+Hyperbolic function and we've only so far implemented a plus and a times and you can't make a tanh out of just pluses and times
+You also need exponentiation. So tanh is this kind of a formula here
+You can use either one of these and you see that there are exponentiation involved
+Which we have not implemented yet for our little value node here
+So we're not going to be able to produce tanh yet and we have to go back up and implement something like it
+now one option here is
+We could actually implement
+Exponentiation right and we could return the exp of the value instead of a tanh
+Of a value because if we had exp then we have everything else that we need so
+because we know how to add and we know how to
+We know how to add and we know how to multiply so we'd be able to create tanh if we knew how to exp
+but for the purposes of this example, I specifically wanted to
+Show you that we don't necessarily need to have the most atomic pieces in
+In this value object we can actually like create functions at arbitrary
+Points of abstraction they can be complicated functions
+But they can be also very very simple functions like a plus and it's totally up to us
+The only thing that matters is that we know how to differentiate through any one function
+So we take some inputs and we make an output
+The only thing that matters it can be arbitrarily complex function as long as you know
+How to create the local derivative if you know the local derivative of how the inputs impact the output then that's all you need
+So we're going to cluster up
+all of this expression
+And we're not going to break it down to its atomic pieces. We're just going to directly implement tanh. So let's do that
+depth tanh and
+then out will be a value of
+And we need this expression here, so
+Let me actually copy paste
+Let's grab n which is a sol.theta and then this I believe is the tanh
+math.exp of
+2
+You know n minus 1 over 2n plus 1
+Maybe I can call this x
+Just so that it matches exactly
+okay, and now this will be t and
+Children of this node. There's just one child and
+I'm wrapping it in a tuple. So this is a tuple of one object just self and
+here the name of this operation will be
+10h
+And we're going to return that
+Okay
+So now value should be
+Implementing tanh and now we can scroll all the way down here and we can actually do n dot tanh
+And that's going to return the tanh output of n
+And now we should be able to draw it out of o not of n. So let's see how that worked
+There we go n went through tanh
+to produce this output
+so now tanh is a
+sort of
+our little micro grad supported node here as an operation and
+As long as we know the derivative of tanh then we'll be able to back propagate through it now
+Let's see this tanh in action. Currently. It's not squashing too much because the input to it is pretty low
+So the bias was increased to say 8
+Then we'll see that what's flowing in
+to the tanh now is 2 and
+Tanh is squashing it to 0.96
+So we're already hitting the tail of this tanh and it will sort of smoothly go up to 1 and then plateau out over there
+Okay, so I'm going to do something slightly strange. I'm going to change this bias from 8 to this number
+6.88 etc
+and I'm going to do this for specific reasons because we're about to start back propagation and
+I want to make sure that our numbers come out nice
+They're not like very
+Crazy numbers, they're nice numbers that we can sort of understand in our head. Let me also add those label
+O is short for output here
+So that's the R
+Okay, so 0.88 flows into tanh comes out 0.7. So so now we're going to do back propagation
+And we're going to fill in all the gradients
+so what is the derivative O with respect to all the
+inputs here and of course in a typical neural network setting what we really care about the most is the derivative of
+these neurons on the weights
+specifically the w2 and w1 because those are the weights that we're going to be changing part of the optimization and
+The other thing that we have to remember is here
+We have only a single neuron but in the neural net you typically have many neurons and they're connected
+So this is only like a one small neuron a piece of a much bigger puzzle and eventually there's a loss function
+That sort of measures the accuracy of the neural net and we're back propagating with respect to that accuracy and trying to increase it
+So let's start off back propagation
+Here in the end
+What is the derivative of O with respect to O the base case sort of we know always is that the gradient is just 1.0
+so let me fill it in and
+then
+Let me
+split out
+the drawing function
+Here
+And then here cell
+Clear this output here, okay
+So now when we draw O we'll see that or that grad is 1
+So now we're going to back propagate through the tanh so to back propagate through tanh
+We need to know the local derivative of tanh. So if we have that O is
+tanh of n
+Then what is do by dn?
+Now what you could do is you could come here and you could take this expression and you could do your calculus derivative taking
+and that would work but we can also just scroll down Wikipedia here into a section that hopefully tells us that derivative
+d by dx of tanh of x is
+Any of these I like this one 1 minus tanh square of x
+So this is 1 minus tanh of x squared. So basically what this is saying is that d o by dn is
+1 minus tanh
+of n
+squared. And we already have 10h of n. It's just o. So it's 1 minus o squared. So o is
+the output here. So the output is this number. o.data is this number. And then what this
+is saying is that do by dn is 1 minus this squared. So 1 minus o.data squared is 0.5
+conveniently. So the local derivative of this 10h operation here is 0.5. And so that
+would be do by dn. So we can fill in that n.grad is 0.5. We'll just fill it in. So this
+is exactly 0.5, 1 half. So now we're going to continue the backprop.
+This is 0.5. And this is a plus node. So what is backprop going to do here? And if you remember
+our previous example, a plus is just a distributor of gradient. So this gradient will simply
+flow to both of these equally. And that's because the local derivative of this operation
+is 1 for every one of its nodes. So 1 times 0.5 is 0.5. So therefore, we know that this
+node here, which we called this.
+It's grad. It's just 0.5. And we know that b.grad is also 0.5. So let's set those and
+let's draw. So those are 0.5. Continuing, we have another plus. 0.5, again, we'll just
+distribute. So 0.5 will flow to both of these. So we can set theirs. x2w2 as well. .grad is
+0.5.
+And let's redraw. Pluses are my favorite operations to backpropagate through because it's very
+simple. So now what's flowing into these expressions is 0.5. And so really, again, keep in mind
+what the derivative is telling us at every point in time along here. This is saying that
+if we want the output of this neuron to increase, then the influence on these expressions is
+positive on the output. Both of them are positive.
+So we can put a distribution to the output. So now, backpropagating to x2 and w2 first.
+This is a times node. So we know that the local derivative is the other term. So if
+we want to calculate x2.grad, then can you think through what it's going to be? So x2.grad
+will be w2.data times this x2.grad.
+.grad.
+.grad.
+w2.grad right and w2.grad will be x2.data times x2.w2.grad right so that's the little local piece
+of chain rule let's set them and let's redraw so here we see that the gradient on our weight
+2 is 0 because x2's data was 0 right but x2 will have the gradient 0.5 because data here was 1
+and so what's interesting here right is because the input x2 was 0 then because of the way the
+times works of course this gradient will be 0 and think about intuitively why that is
+derivative always tells us the influence of this on the final output if i wiggle w2
+how is the output changing
+it's not changing because we're multiplying by 0 so because it's not changing there is no
+derivative and 0 is the correct answer because we're squashing that 0 and let's do it here
+0.5 should come here and flow through this times and so we'll have that x1.grad is
+can you think through a little bit what what this should be
+local derivative of times with respect to x1
+is
+going to be w1 so w1's data times x1 w1.grad and w1.grad will be x1.data times x1 w2 w1.grad
+let's see what those came out to be so this is 0.5 so this would be negative 1.5 and this would be
+1. and we've back propagated through this expression these are the actual final derivatives so if we
+want this neurons to be negative 1.5 we're going to have to do this we're going to have to do this
+bit of elaborating so actually we can do this byаци to here so this is negative 1.5 so if we
+now want this neuron's output to increase we know that what's necessary is that
+w2 we have no gradient w2 doesn't actually matter to this neuron right now
+but this neuron this weight should go up so if this weight goes up then this neurones output
+would have gone up and proportionally because the gradient is 1. okay so doing the back propagation
+manually is obviously ridiculous so we are now going to put an end to this suffering and we're going to see how we can implement the back propagation's output Health classes method lambda.
+self attack self acquire lerud and a random entunkered router operation will be still coercion equal to 0.25éro.
+can implement the backward pass a bit more automatically. We're not going to be doing
+all of it manually out here. It's now pretty obvious to us by example how these pluses and
+times are back-propagating ingredients. So let's go up to the value object and we're going to start
+codifying what we've seen in the examples below. So we're going to do this by storing a special
+self.backward and underscore backward. And this will be a function which is going to do that
+little piece of chain rule. At each little node that took inputs and produced output,
+we're going to store how we are going to chain the outputs gradient into the inputs gradients.
+So by default, this will be a function that doesn't do anything. And you can also see that
+here in the value in my example.
+Micrograd. So we have this backward function. By default, it doesn't do anything. This is a
+empty function. And that would be sort of the case, for example, for a leaf node. For a leaf
+node, there's nothing to do. But now when we're creating these out values, these out values are
+an addition of self and other. And so we'll want to set out backward to be the function that
+propagates the gradient.
+So let's define what should happen. And we're going to store it in a closure. Let's define what
+should happen when we call out's grad. For addition, our job is to take out's grad and
+propagate it into self's grad and other.grad. So basically, we want to solve self.grad to
+something. And we want to set out's grad to something. And we want to set out's grad to
+that grad to something okay and the way we saw below how chain rule works we
+want to take the local derivative times the sort of global derivative I should
+call it which is the derivative of the final output of the expression with
+respect to out's data with respect to out so the local derivative of self in an
+addition is 1.0 so it's just 1.0 times out's grad that's the chain rule and
+others.grad will be 1.0 times out.grad and what you basically what you're seeing
+here is that out's grad will simply be copied onto self's grad and others grad
+as we saw happens for an addition operation so we're going to later call
+this function to propagate the gradient having done an addition let's now do
+multiplication
+we're going to also define and we're going to set its backward to be
+backward and we want to chain out grad into self.grad and others.grad
+and this will be a little piece of chain rule for multiplication so we'll have so
+what should this be can you think through
+scale it up a little bit more I think we can test it but okay so we've got
+thatanche squared caught or else what should it be and this is going to be
+a little better what should this be it's going to be a little bit better
+so finally see here to the other side and this will be the off part second
+time creative so where the version to copy to that I was off the plane or up
+to the -, and then target my output time so let's go to case sickness
+so here's the look of a general promotions of set for entire settings
+we want a group this isn't going to come the other way we want to set the
+You can also add in a你們 I think return method and even the previous employees
+and I'm gonna do a little bit of what we're going to say for the SQL gameplay
+to be just backward and here we need to back propagate we have out dot grad and we want to
+chain it into salt dot grad and salt dot grad will be the local derivative of this operation
+that we've done here which is 10h and so we saw that the local gradient is 1 minus the 10h of x
+squared which here is t that's the local derivative because that's t is the output of this 10h
+so 1 minus t squared is the local derivative and then gradient has to be multiplied because of the
+chain rule so out grad is chained through the local gradient into salt dot grad and that should
+be basically it so we're going to redefine our value node we're going to swing all the way down
+here and we're going to redefine our expression make sure that all the grads are zero okay but
+now we don't have to do this again we're just going to do this again and we're going to do this
+to do this manually anymore. We are going to basically be calling the dot backward
+in the right order. So first we want to call o's dot backward. So o was the
+outcome of 10h, right? So calling o's backward will be this
+function. This is what it will do. Now we have to be careful because there's a
+times out dot grad and out dot grad remember is initialized to 0. So here we see
+grad 0. So as a base case we need to set o's dot grad to 1.0 to initialize
+this with 1
+and then once this is 1, we can call o dot backward and what that should do is it should
+propagate this grad through 10h. So the local derivative times the global derivative which
+is initialized at 1. So this should
+so I thought about redoing it but I figured I should just leave the error in here because
+it's pretty funny. Why is an anti-object
+not callable? It's because I screwed up. We're trying to save these functions. So this is
+correct. This here, we don't want to call the function because that returns none. These
+functions return none. We just want to store the function. So let me redefine the value
+object and then we're going to come back in, redefine the expression, draw a dot. Everything
+is great.
+o dot grad is 1, o dot grad is 1 and now
+this should work, of course. Okay. So o dot backward should have, this grad should now
+be 0.5 if we redraw and if everything went correctly, 0.5. Yay. Okay. So now we need to
+call ns dot grad, ns dot backward, sorry, ns backward. So that seems to have worked.
+So ns dot backward routed the gradient to both of these. So this is looking great. So
+now we could, of course, call b dot grad, b dot backward, sorry. What's going to happen?
+Well b doesn't have a backward. b is backward because b is a leaf node. b is backward is
+by initialization the empty function. So nothing would happen. But we can call it on it. But
+when we call this one, it's backward.
+M Normal entire value.
+Let's do this behavior here. Then we expect this 0.5 to give further routed. Right? So
+there we go, 0.5, 0.5. And then finally, we want to call it here on x2, w2. And on
+x1, w1.
+Let's do both of those. And there we go.
+??
+and one exactly as we did before but now we've done it through calling that backward
+sort of manually so we have one last piece to get rid of which is us calling underscore
+backward manually so let's think through what we are actually doing we've laid out a mathematical
+expression and now we're trying to go backwards through that expression so going backwards through
+the expression just means that we never want to call a dot backward for any node before
+we've done sort of everything after it so we have to do everything after it before we're ever going
+to call dot backward on any one node we have to get all of its full dependencies everything that
+it depends on has to propagate to it before we can continue back-propagation so this ordering
+of graphs can be achieved using something called topological sort
+so topological
+sort is basically a laying out of a graph such that all the edges go only from left to right
+basically. So here we have a graph it's a directed acyclic graph a DAG and this is two different
+topological orders of it I believe where basically you'll see that it's a laying out of the nodes
+such that all the edges go only one way from left to right. And implementing topological sort you
+can look in wikipedia and so on I'm not going to go through it in detail but basically this is what
+builds a topological graph. We maintain a set of visited nodes and then we are going through
+starting at some root node which for us is O that's where I want to start the topological sort
+and starting at O we go through all of its children and we need to lay them out from left to
+right and basically this starts at OH.
+Oh, if it's not visited, then it marks it as visited.
+And then it iterates through all of its children and calls build topological on them.
+And then after it's gone through all the children, it adds itself.
+So basically, this node that we're going to call it on, like say, oh,
+is only going to add itself to the topo list after all of the children have been processed.
+And that's how this function is guaranteeing that you're only going to be in the list
+once all of your children are in the list.
+And that's the invariant that is being maintained.
+So if we build topo on O and then inspect this list,
+we're going to see that it ordered our value objects.
+And the last one is the value of 0.707, which is the output.
+So this is O, and then this is N, and then all the other nodes get laid out before it.
+So that builds the topological graph.
+And really what we're doing now,
+is we're just calling dot underscore backward on all of the nodes in a topological order.
+So if we just reset the gradients, they're all 0, what did we do?
+We started by setting O.grad to be 1.
+That's the base case.
+Then we built a topological order.
+And then we went for node in reversed.
+Of topo.
+Now, in the reverse order, because this list goes from, you know,
+we need to go through it in reversed order.
+So starting at O, node dot backward.
+And this should be it.
+There we go.
+Those are the correct derivatives.
+Finally, we are going to hide this functionality.
+So I'm going to copy this.
+And we're going to hide this functionality.
+And we're going to hide it inside the value class,
+because we don't want to have all that code lying around.
+So instead of an underscore backward,
+we're now going to define an actual backward.
+So that's backward, without the underscore.
+And that's going to do all the stuff that we just derived.
+So let me just clean this up a little bit.
+So we're first going to build a topological graph,
+starting at self.
+So build topo of self.
+We'll populate the topological order into the topo list,
+which is a local variable.
+Then we set self.grads to be one.
+And then for each node in the reversed list,
+so starting at S and going to all the children,
+underscore backward.
+And that should be it.
+So save.
+Come down here.
+We define.
+Okay, all the grads are zero.
+And now what we can do is odot backward without the underscore.
+And there we go.
+And that's backpropagation.
+Place for one neuron.
+Now we shouldn't be too happy with ourselves, actually,
+because we have a bad bug.
+And we have not surfaced the bug
+because of some specific conditions that we have to think about right now.
+So here's the simplest case that shows the bug.
+Say I create a single node A,
+and then I create a B that is A plus A.
+And then I call backward.
+So what's going to happen is A is three,
+and then B is A plus A.
+So there's two arrows on top of each other here.
+Then we can see that B is, of course, the forward pass works.
+B is just A plus A, which is six.
+But the gradient here is not actually correct.
+That we calculated.
+We can calculate it automatically.
+And that's because, of course, just doing calculus in your head,
+the derivative of B with respect to A should be two.
+One plus one.
+It's not one.
+Intuitively, what's happening here, right?
+So B is the result of A plus A, and then we call backward on it.
+So let's go up and see what that does.
+B is the result of addition, so out as B.
+And then when we call backward, what happened is self.grad was set to one,
+and then other.grad was set to one.
+But because we're doing A plus A, self and other are actually the exact same object.
+So we are overriding the gradient.
+We are setting it to one, and then we are setting it again to one.
+And that's why it stays at one.
+So that's a good thing.
+There's another way to see this in a little bit more complicated expression.
+So here we have A and B.
+And then D will be the multiplication of the two,
+and E will be the addition of the two.
+And then we multiply E times D to get F.
+And then we call F dot backward.
+And these gradients, if you check, will be incorrect.
+So fundamentally what's happening here, again,
+is basically we're going to see an issue any time we use a variable more than once.
+Until now, in these expressions above, every variable is used exactly once.
+So we didn't see the issue.
+But here, if a variable is used more than once,
+what's going to happen during backward pass?
+We're back-propagating from F to E to D.
+So far, so good.
+But now E calls it backward, and it deposits its gradients to A and B.
+But then we come back to D and call backward,
+and it overwrites those gradients at A and B.
+So that's obviously a problem.
+And the solution here, if you look at the multivariate case of the chain rule
+and its generalization there,
+the solution there is basically that we have to accumulate these gradients.
+These gradients add.
+And so instead of setting those gradients,
+we can simply do plus equals.
+We need to accumulate those gradients.
+Plus equals, plus equals, plus equals.
+And this will be okay, remember, because we are initializing them at zero.
+So they start at zero, and then any contribution that flows backwards will simply add.
+So now if we redefine this one, because the plus equals, this now works.
+Because A dot grad started at zero, and we called B dot backward,
+we deposit one, and then we deposit one again.
+And then we call B dot backward.
+And now this is two, which is correct.
+And here, this will also work, and we'll get correct gradients.
+Because when we call E dot backward, we will deposit the gradients from this branch,
+and then when we get to D dot backward, it will deposit its own gradients.
+And then those gradients simply add on top of each other.
+And so we just accumulate those gradients, and that fixes the issue.
+Okay, now before we move on, let me actually do a bit of cleanup here
+and delete some of this intermediate work.
+So I'm not going to need any of this.
+Now that we've derived all of it.
+We are going to keep this, because I want to come back to it.
+Delete the 10H, delete our modigating example, delete the step, delete this,
+keep the code that draws, and then delete this example,
+and leave behind only the definition of value.
+And now let's come back to this non-linearity here that we implemented, the 10H.
+Now I told you that we could have broken down 10H
+into its explicit atoms in terms of other expressions if we had the exp function.
+So if you remember, 10H is defined like this,
+and we chose to develop 10H as a single function,
+and we can do that because we know it's derivative,
+and we can backpropagate through it.
+But we can also break down 10H into an expressiveness, a function of exp.
+And I would like to do that now, because I want to prove to you
+that you get all the same results and all the same gradients,
+but also because it forces us to implement a few more expressions.
+It forces us to do exponentiation,
+addition, subtraction, division, and things like that.
+And I think it's a good exercise to go through a few more of these.
+Okay, so let's scroll up to the definition of value.
+And here, one thing that we currently can't do is,
+we can do like a value of, say, 2.0.
+But we can't do, you know, here, for example, we want to add a constant 1.
+And we can't do something like this.
+And we can't do it because it says int object has no attribute data.
+That's because a plus 1 comes right here to add,
+and then other is the integer 1.
+And then here, Python is trying to access 1.data, and that's not a thing.
+And that's because basically, 1 is not a value object,
+and we only have addition for value objects.
+So as a matter of convenience, so that we can create expressions like this
+and make them make sense, we can simply do something like this.
+Basically, we let other alone if other is an instance of value.
+But if it's not an instance of value, we're going to assume that it's a number,
+like an integer or a float, and we're going to simply
+wrap it in value.
+And then other will just become value of other,
+and then other will have a data attribute, and this should work.
+So if I just say this, redefine value, then this should work.
+There we go.
+Okay, now let's do the exact same thing for multiply,
+because we can't do something like this, again, for the exact same reason.
+So we just have to go to mol, and if other is not a value,
+then let's wrap it in value.
+Let's redefine value, and now this works.
+Now, here's a kind of, unfortunately,
+and not obvious part, a times two works, we saw that,
+but two times a, is that going to work?
+You'd expect it to, right?
+But actually, it will not.
+And the reason it won't is because Python doesn't know,
+like when you do a times two, basically, so a times two,
+Python will go and it will basically do something like a dot mol of two.
+That's basically what it will call.
+But to it, two times a is the same as two dot mol of a.
+And it doesn't, two can't multiply value.
+And so it's really confused about that.
+So instead, what happens is in Python, the way this works is you are free to define
+something called the rmol.
+And rmol is kind of like a fallback.
+So if Python can't do two times a, it will check if by any chance,
+a knows how to multiply two, and that will be called into rmol.
+So because Python can't do two times a,
+it will check, is there an rmol in value?
+And because there is, it will now call that.
+And what we'll do here is we will swap the order of the operands.
+So basically, two times a will redirect to rmol,
+and rmol will basically call a times two.
+And that's how that will work.
+So redefining that with rmol, two times a becomes four.
+Okay, now looking at the other elements that we still need,
+we need to know how to exponentiate and how to divide.
+So let's first do the exponentiation part.
+We're going to introduce
+a single function exp here.
+And exp is going to mirror 10h in the sense that it's a single function
+that transforms a single scalar value and outputs a single scalar value.
+So we pop out the Python number.
+We use math.exp to exponentiate it, create a new value object,
+everything that we've seen before.
+The tricky part, of course, is how do you backpropagate through e to the x?
+And so here you can potentially pause the video and think about what should go here.
+Okay, so basically, we need to know what is the local derivative of e to the x.
+So d by dx of e to the x is famously just e to the x.
+And we've already just calculated e to the x, and it's inside out.data.
+So we can do out.data times and out.grad, that's the chain rule.
+So we're just chaining on to the current running grad.
+And this is what the expression looks like.
+It looks a little confusing, but this is what it is.
+And that's the exponentiation.
+So redefining, we should now be able to call a.exp.
+And hopefully the backward pass works as well.
+Okay, and the last thing we'd like to do, of course, is we'd like to be able to divide.
+Now, I actually will implement something slightly more powerful than division,
+because division is just a special case of something a bit more powerful.
+So in particular, just by rearranging, if we have some kind of a b equals value of 4.0 here,
+we'd like to basically be able to do a divide b, and we'd like this to be able to give us 0.5.
+Now, division actually can be reshuffled as follows.
+If we have a divide b, that's actually the same as a multiplying 1 over b.
+And that's the same as a multiplying b to the power of negative 1.
+And so what I'd like to do instead is I basically like to implement the operation of x to the k for some constant k.
+So it's an integer or a float.
+And we would like to be able to differentiate this.
+And then as a special case, negative 1 will be division.
+And so I'm doing that.
+Just because it's more general and you might as well do it that way.
+So basically what I'm saying is we can redefine division, which we will put here somewhere.
+You know, we can put it here somewhere.
+What I'm saying is that we can redefine division.
+So self divide other.
+This can actually be rewritten as self times other to the power of negative 1.
+And now, value raised to the power of negative 1, we have to now define that.
+So here's, so we need to implement the pow function.
+Where am I going to put the pow function?
+Maybe here somewhere.
+This is the skeleton for it.
+So this function will be called when we try to raise a value to some power and other will be that power.
+Now, I'd like to make sure that other is only an int or a float.
+Usually other is some kind of a different value object.
+But here other will be forced to be an int or a float.
+Otherwise, the math won't work.
+For what we're trying to achieve in this specific case.
+That would be a different derivative expression if we wanted other to be a value.
+So here we create the other value, which is just, you know, this data raised to the power of other.
+And other here could be, for example, negative 1.
+That's what we are hoping to achieve.
+And then this is the backward stub.
+And this is the fun part, which is what is the chain rule expression here for back propagating through
+the power function where the power is to the power of some kind of a constant.
+So this is the exercise and maybe pause the video here and see if you can figure it out yourself as to what we should put here.
+Okay, so you can actually go here and look at derivative rules as an example.
+And we see lots of derivative rules that you can hopefully know from calculus.
+In particular, what we're looking for is the power rule because that's telling us that if we're trying to take
+d by dx of x to the n, which is what we're doing here, then that is just n times x to the n minus 1, right?
+Okay, so that's telling us about the local derivative of this power operation.
+So all we want here basically n is now other and self.data is x.
+And so this now becomes other which is n times self.data,
+which is now another.
+Python int or a float.
+It's not a value object.
+We're accessing the data attribute raised to the power of other minus 1 or n minus 1.
+I can put brackets around this, but this doesn't matter because power takes precedence over multiply in pyhelm.
+So that would have been okay.
+And that's the local derivative only.
+But now we have to chain it and we chain it just simply by multiplying by a path grad that's chain rule.
+And this should technically work.
+And we're going to find out soon.
+But now if we do this, this should now work.
+And we get 0.5.
+So the forward pass works, but does the backward pass work?
+And I realized that we actually also have to know how to subtract.
+So right now a minus b will not work to make it work.
+We need one more piece of code here.
+And basically this is the subtraction and the way we're going to implement subtraction is we're going to implement it by addition of a negation.
+And then to implement negation, we're going to multiply by negative one.
+So just again using the stuff we've already built and just expressing it in terms of what we have and a minus b is not working.
+Okay, so now let's scroll again to this expression here for this neuron.
+And let's just compute the backward pass here.
+Once we've defined O and let's draw it.
+So here's the gradients for all these leaf nodes for this two-dimensional neuron that has a 10h that we've seen before.
+So now what I'd like to do is I'd like to break up.
+This 10h into this expression here.
+So let me copy paste this here and now instead of will preserve the label and we will change how we define O.
+So in particular we're going to implement this formula here.
+So we need e to the 2x minus 1 over e to the x plus 1.
+So e to the 2x we need to take 2 times n and we need to exponentiate it.
+That's e to the 2x and then because we're using it twice.
+Let's create an intermediate.
+Variable e and then define O as e plus 1 over e minus 1 over e plus 1 e minus 1 over e plus 1 and that should be it.
+And then we should be able to draw dot of O.
+So now before I run this, what do we expect to see?
+Number one, we're expecting to see a much longer graph here because we've broken up 10h into a bunch of other operations.
+But those operations are mathematically equivalent.
+And so what we're expecting.
+To see is number one, the same result here.
+So the forward pass works and number two because of that mathematical equivalence.
+We expect to see the same backward pass and the same gradients on these leaf nodes.
+So these gradients should be identical.
+So let's run this.
+So number one, let's verify that instead of a single 10h node.
+We have now X and we have plus we have times negative one.
+This is the division and we end up with the same forward pass.
+Here and then the gradients.
+We have to be careful because they're in slightly different order.
+Potentially the gradients for W2 X2 should be 0 and 0.5 W2 and X2 are 0 and 0.5 and W1 X1 are 1 and negative 1.5 1 and negative 1.5.
+So that means that both our forward passes and backward passes were correct because this turned out to be equivalent to 10h before.
+And so the reason I wanted to go through this exercise is number one.
+We got to practice a few more operations.
+And writing more backwards passes and number two.
+I wanted to illustrate the point that the the level at which you implement your operations is totally up to you.
+You can implement backward passes for tiny expressions like a single individual plus or a single times.
+Or you can implement them for say 10h which is a kind of a potential.
+You can see it as a composite operation because it's made up of all these more atomic operations.
+But really all of this is kind of like a fake concept.
+All that matters is we have some kind of inputs.
+And some kind of an output and this output is a function of the inputs in some way.
+And as long as you can do forward pass and the backward pass of that little operation.
+It doesn't matter what that operation is and how composite it is.
+If you can write the local gradients you can chain the gradient and you can continue back propagation.
+So the design of what those functions are is completely up to you.
+So now I would like to show you how you can do the exact same thing but using a modern deep neural network library.
+Like for example PyTorch.
+Which I've roughly modeled.
+Micrograd by.
+And so PyTorch is something you would use in production.
+And I'll show you how you can do the exact same thing but in PyTorch API.
+So I'm just going to copy paste it in and walk you through it a little bit.
+This is what it looks like.
+So we're going to import PyTorch.
+And then we need to define these value objects like we have here.
+Now Micrograd is a scalar valued engine.
+So we only have scalar values like 2.0.
+But in PyTorch.
+We only have around tensors.
+And like I mentioned tensors are just n dimensional arrays of scalars.
+So that's why things get a little bit more complicated here.
+I just need a scalar valued tensor.
+A tensor with just a single element.
+But by default when you work with PyTorch you would use more complicated tensors like this.
+So if I import PyTorch.
+Then I can create tensors like this.
+And this tensor for example.
+Is a 2x3 array.
+Of scalars in a single compact representation.
+So we can check its shape.
+We see that it's a 2x3 array and so on.
+So this is usually what you would work with in the actual libraries.
+So here I'm creating a tensor that has only a single element 2.0.
+And then I'm casting it to be double.
+Because Python is by default using double precision for its floating point numbers.
+So I'd like everything to be identical.
+By default the data type of these tensors will be float32.
+So it's only using a single precision float.
+So I'm casting it to double.
+So that we have float64 just like in Python.
+So I'm casting to double.
+And then we get something similar to value of 2.
+The next thing I have to do is because these are leaf nodes.
+By default PyTorch assumes that they do not require gradients.
+So I need to explicitly say that all of these nodes require gradients.
+Okay.
+So this is going to construct.
+Scalar valued one element tensors.
+Make sure that PyTorch knows that they require gradients.
+Now by default these are set to false by the way because of efficiency reasons.
+Because usually you would not want gradients for leaf nodes.
+Like the inputs to the network.
+And this is just trying to be efficient in the most common cases.
+So once we've defined all of our values in PyTorch land.
+We can perform arithmetic just like we can here in micrograd land.
+So this would just work.
+And then there's a torch.10h also.
+And when we get back as a tensor again.
+And we can just like in micrograd.
+It's got a data attribute and it's got grad attributes.
+So these tensor objects just like in micrograd have a dot data and a dot grad.
+And the only difference here is that we need to call a dot item.
+Because otherwise PyTorch dot item basically takes a single tensor of one element.
+And it just returns that element stripping out the tensor.
+So let me just run this.
+And hopefully we are going to get.
+This is going to print the forward pass which is 0.707.
+And this will be the gradients which hopefully are 0.50, negative 1.5, and 1.
+So if we just run this.
+There we go.
+0.7.
+So the forward pass agrees.
+And then 0.50, negative 1.5, and 1.
+So PyTorch agrees with us.
+And just to show you here basically.
+Oh, here's a tensor with a single element.
+And it's a double.
+And we can call that item on it to just get the single number out.
+So that's what item does.
+And O is a tensor object like I mentioned.
+And it's got a backward function just like we've implemented.
+And then all of these also have a dot grad.
+So like X2 for example has a grad.
+And it's a tensor.
+And we can pop out the individual number with dot item.
+So basically Torch can do what we did in micrograd as a special case.
+When your tensors are all single element tensors.
+But the big deal with PyTorch is that everything is significantly more efficient.
+Because we are working with these tensor objects.
+And we can do lots of operations in parallel on all of these tensors.
+But otherwise what we've built very much agrees with the API of PyTorch.
+Okay, so now that we have some machinery to build out pretty complicated mathematical expressions.
+We can also start building up neural nets.
+And as I mentioned neural nets are just a specific class of mathematical expressions.
+So we're going to start building out a neural net piece by piece.
+And eventually we'll build out a two-layer multi-layer layer perceptron as it's called.
+And I'll show you exactly what that means.
+Let's start with a single individual neuron.
+We've implemented one here.
+But here I'm going to implement one that also subscribes to the PyTorch API.
+And how it designs its neural network modules.
+So just like we saw that we can like match the API of PyTorch on the autograd side.
+We're going to try to do that on the neural network modules.
+So here's class neuron.
+And just for the sake of efficiency.
+I'm going to copy paste some sections that are relatively straightforward.
+So the constructor will take number of inputs to this neuron.
+Which is how many inputs come to a neuron.
+So this one for example has three inputs.
+And then it's going to create a weight.
+That is some random number between negative one and one for every one of those inputs.
+And a bias that controls the overall trigger happiness of this neuron.
+And then we're going to implement a def underscore underscore call of self and x.
+Some input x.
+And really what we don't want to do here is w times x plus b.
+Where w times x here is a dot product specifically.
+Now if you haven't seen call.
+Let me just return 0.0 here for now.
+The way this works now is we can have an x which is say like 2.0, 3.0.
+Then we can initialize a neuron that is two-dimensional.
+Because these are two numbers.
+And then we can feed those two numbers into that neuron to get an output.
+And so when you use this notation n of x.
+Python will use call.
+So currently call just returns 0.0.
+Now we'd like to actually do the forward pass of this neuron instead.
+So we're going to do here first.
+Is we need to basically multiply all of the elements of w.
+With all of the elements of x pairwise.
+We need to multiply them.
+So the first thing we're going to do.
+Is we're going to zip up salta w and x.
+And in Python zip takes two iterators.
+And it creates a new iterator that iterates over the tuples of their corresponding entries.
+So for example, just to show you we can print this list.
+And still return 0.0 here.
+Sorry.
+I'm in life.
+So we see that these w's are paired up with the x's.
+W with x.
+And now what we want to do is.
+For wi xi in.
+We want to multiply w times wi times xi.
+And then we want to sum all of that together.
+To come up with an activation.
+And add also salta b on top.
+So that's the raw activation.
+And then of course we need to pass that through a null linearity.
+So what we're going to be returning is act dot 10h.
+And here's out.
+So now we see that we are getting some outputs.
+And we get a different output from a neuron each time.
+Because we are initializing different weights and biases.
+And then to be a bit more efficient here actually.
+Sum by the way takes a second optional parameter.
+Which is the start.
+And by default the start is 0.
+So these elements of this sum.
+Will be added on top of 0 to begin with.
+But actually we can just start with salta b.
+And then we just have an expression like this.
+And then the generator expression here must be parenthesized in python.
+There we go.
+Yep so now we can forward a single neuron.
+Next up we're going to define a layer of neurons.
+So here we have a schematic for a MLP.
+So we see that.
+These MLPs each layer.
+This is one layer.
+Has actually a number of neurons.
+And they're not connected to each other.
+But all of them are fully connected to the input.
+So what is a layer of neurons?
+It's just it's just a set of neurons evaluated independently.
+So in the interest of time.
+I'm going to do something fairly straightforward here.
+It's literally a layer is just a list of neurons.
+And then how many neurons do we have?
+We take that as an input argument here.
+How many neurons do you want in your layer number of outputs in this layer?
+And so we just initialize completely independent neurons with this given dimensionality.
+And we call on it.
+We just independently evaluate them.
+So now instead of a neuron we can make a layer of neurons.
+They are two dimensional neurons and let's have three of them.
+And now we see that we have three independent evaluations of three different neurons, right?
+Okay.
+And finally, let's complete this picture and define an entire multi-layer.
+Perceptron or MLP.
+And as we can see here in an MLP, these layers just feed into each other sequentially.
+So let's come here and I'm just going to copy the code here in interest of time.
+So an MLP is very similar.
+We're taking the number of inputs as before.
+But now instead of saying taking a single and out which is number of neurons in a single layer.
+We're going to take a list of an outs and this list defines the sizes of all the layers that we want in our MLP.
+So here we just put them all together and then iterate.
+Over consecutive pairs of these sizes and create a layer objects for them.
+And then in the call function, we are just calling them sequentially.
+So that's an MLP really.
+And let's actually re-implement this picture.
+So we want three input neurons and then two layers of four and an output unit.
+So we want three dimensional input.
+Say this is an example input.
+We want three inputs into two layers of four and one output.
+And this of course is an MLP.
+And there we go.
+That's a forward pass of an MLP.
+To make this a little bit nicer.
+You see how we have just a single element, but it's wrapped in a list because layer always returns lists.
+So for convenience, return outs at zero if len outs is exactly a single element.
+Else return fullest.
+And this will allow us to just get a single value out at the last layer that only has a single neuron.
+And finally, we should be able to draw a dot of N of X.
+As you might imagine, these expressions are now getting relatively involved.
+So this is an entire MLP that we're defining now.
+All the way until a single output.
+Okay, and so obviously you would never differentiate on pen and paper these expressions.
+But with micrograd, we will be able to back propagate all the way through this and back propagate into these weights of all these neurons.
+So let's see how that works.
+Okay, so let's create ourselves a very simple example data set here.
+So this data set has four examples.
+And so we have four possible inputs into the neural net.
+And we have four desired targets.
+So we'd like the neural net to assign or output 1.0 when it's fed this example.
+Negative one when it's fed these examples.
+And one when it's fed this example.
+So it's a very simple binary classifier neural net basically that we would like here.
+Now let's think what the neural net currently thinks about these four examples.
+We can just get their predictions.
+Basically, we can just call N of X for X and Xs.
+And then we can print.
+So these are the outputs of the neural net on those four examples.
+So the first one is 0.91, but we'd like it to be one.
+So we should push this one higher.
+This one we want to be higher.
+This one says 0.88, and we want this to be negative one.
+This is 0.88, we want it to be negative one.
+And this one is 0.88, we want it to be one.
+So how do we make the neural net?
+And how do we tune the weights to better predict the desired targets?
+And the trick used in deep learning to achieve this is to calculate a single number
+that somehow measures the total performance of your neural net.
+And we call this single number the loss.
+So the loss first is a single number
+that we're going to define that basically measures how well the neural net is performing.
+Right now, we have the intuitive sense that it's not performing very well
+because we're not very much close to this.
+So the loss will be high, and we'll want to minimize the loss.
+So in particular, in this case, what we're going to do is we're going to implement the mean squared error loss.
+So what this is doing is we're going to basically iterate
+for Y ground truth and Y output in zip of Ys and Ybred.
+So we're going to pair up
+the ground truths with the predictions and the zip iterates over tuples of them.
+And for each Y ground truth and Y output,
+we're going to subtract them and square them.
+So let's first see what these losses are. These are individual loss components.
+And so basically for each one of the four,
+we are taking the prediction and the ground truth.
+We are subtracting them and squaring them.
+So because this one is so close to its target,
+0.91 is almost 1, subtracting them gives a very small number.
+So here we would get like a negative 0.1,
+and then squaring it just makes sure that regardless of
+whether we are more negative or more positive,
+we always get a positive number.
+Instead of squaring, we could also take,
+for example, the absolute value. We need to discard the sign.
+And so you see that the expression is ranged so that you
+only get 0 exactly when Y out is equal to Y ground truth.
+When those two are equal,
+so your prediction is exactly the target,
+you are going to get 0. And if your prediction is not the target,
+you are going to get some other number.
+So here, for example, we are way off.
+And so that's why the loss is quite high.
+And the more off we are, the greater the loss will be.
+So we don't want high loss, we want low loss.
+And so the final loss here will be just the sum,
+all of these numbers.
+So you see that this should be 0 roughly plus 0 roughly,
+but plus 7.
+So loss should be about 7 here.
+And now we want to minimize the loss.
+We want the loss to be low because if loss is low,
+then every one of the predictions is equal to its target.
+So the loss, the lowest it can be is 0,
+and the greater it is, the worse off the neural net is,
+and the higher the risk of shifting.
+So now, of course, if we do loss.backward,
+something magical happened when I hit enter.
+And the magical thing, of course, that happened is that we can look at
+n.layers.neuron, n.layers at, say, like the first layer,
+that neurons at 0,
+because remember that MLP has the layers, which is a list,
+and each layer has neurons, which is a list,
+and that gives us an individual neuron,
+and that gives us some weights.
+And so we can, for example, look at the weights at 0.
+Oops, it's not called weights, it's called w.
+And that's a value, but now this value also has a grad
+because of the backward pass.
+And so we see that because this gradient here
+on this particular weight of this particular neuron
+of this particular layer is negative,
+we see that its influence on the loss is also negative.
+So slightly increasing this particular weight of this neuron of this layer
+would make the loss go down.
+And we actually have this information for every single one of our neurons
+and all of their parameters.
+Actually, it's worth looking at also the draw dot of loss, by the way.
+So previously, we looked at the draw dot of a single neuron forward pass,
+and that was already a large expression.
+But what is this expression?
+We actually forwarded every one of those four examples,
+and then we have the loss on top of them,
+with the mean squared error.
+And so this is a really massive graph
+because this graph that we've built up now,
+oh my gosh,
+this graph that we've built up now,
+which is kind of excessive,
+it's excessive because it has four forward passes of a neural net
+for every one of the examples,
+and then it has the loss on top,
+and it ends with the value of the loss, which was 7.12.
+And this loss will now back propagate through all the four forward passes
+all the way through,
+just every single intermediate value of the neural net,
+all the way back to,
+of course, the parameters of the weights,
+which are the input.
+So these weight parameters here are inputs to this neural net,
+and these numbers here,
+these scalars,
+are inputs to the neural net.
+So if we went around here,
+we will probably find some of these examples,
+this 1.0,
+potentially maybe this 1.0,
+or, you know, some of the others.
+And you'll see that they all have gradients as well.
+The thing is these gradients on the input data
+are not that useful to us,
+and that's because the input data seems to be not changeable.
+It's a given to the problem,
+and so it's a fixed input.
+We're not going to be changing it or messing with it,
+even though we do have gradients for it.
+But some of these gradients here
+will be for the neural network parameters,
+the w's and the b's,
+and those we, of course, we want to change.
+Okay, so now we're going to want
+some convenience codes to gather up
+all of the parameters of the neural net
+so that we can operate on all of them simultaneously.
+And every one of them,
+we will nudge a tiny amount
+based on the gradient information.
+So let's collect the parameters of the neural net
+all in one array.
+So let's create a parameters of self
+that just returns
+self.w, which is a list,
+concatenated with a list of self.b.
+So this will just return a list.
+List plus list just gives you a list.
+So that's parameters of neuron,
+and I'm calling it this way
+because also PyTorch has parameters
+on every single NN module,
+and it does exactly what we're doing here.
+It just returns the parameter tensors.
+For us, it's the parameter scalars.
+Now, layer is also a module,
+so it will have parameters, self,
+and basically what we want to do here is
+something like this, like
+params is here,
+and then for neuron in self.neurons,
+we want to get neuron.parameters,
+and we want to params.extend.
+So these are the parameters of this neuron,
+and then we want to put them on top of params,
+so params.extend of piece,
+and then we want to return params.
+So this is way too much code,
+so actually there's a way to simplify this,
+which is return p for neuron in self.neurons
+for p in neuron.parameters.
+So it's a single list comprehension.
+In Python, you can sort of nest them like this,
+and you can then create the desired array.
+So these are identical.
+We can take this out.
+And then let's do the same here.
+dev.parameters self
+and return a parameter for layer in self.layers
+for p in layer.parameters.
+And that should be good.
+Now let me pop out this
+so we don't reinitialize our network,
+because we need to reinitialize our...
+Okay, so unfortunately,
+we will have to probably reinitialize the network
+because we just added functionality.
+Because this class, of course,
+I want to get all the end.parameters,
+but that's not going to work
+because this is the old class.
+Okay.
+So unfortunately,
+we do have to reinitialize the network,
+which will change some of the numbers.
+But let me do that so that we pick up the new API.
+We can now do end.parameters.
+And these are all the weights and biases
+inside the entire neural net.
+So in total, this MLP has 41 parameters.
+And now we'll be able to change them.
+If we recalculate the loss here,
+we see that unfortunately,
+we have slightly different predictions
+and slightly different loss.
+But that's okay.
+Okay, so we see that this neuron's gradient
+is slightly negative.
+We can also look at its data right now,
+which is 0.85.
+So this is the current value of this neuron,
+and this is its gradient on the loss.
+So what we want to do now
+is we want to iterate for every p in end.parameters.
+So for all the 41 parameters in this neural net,
+we actually want to change p.data slightly
+according to the gradient information.
+Okay, so dot dot dot to do here.
+But this will be basically a tiny update
+in this gradient descent scheme.
+And gradient descent,
+we are thinking of the gradient
+as a vector pointing in the direction
+of increased loss.
+And so in gradient descent,
+we are modifying p.data
+by a small step size
+in the direction of the gradient.
+So the step size as an example
+could be like a very small number,
+like 0.01 is the step size,
+times p.grad, right?
+But we have to think through
+some of the signs here.
+So in particular,
+working with this specific example here,
+we see that if we just left it like this,
+then this neuron's value
+would be currently increased
+by a tiny amount of the gradient.
+The gradient is negative,
+so this value of this neuron
+would go slightly down.
+It would become like 0.84
+or something like that.
+But if this neuron's value goes lower,
+that would actually increase the loss.
+That's because the derivative
+of this neuron is negative.
+So increasing this
+makes the loss go down.
+So increasing it is what we want to do
+instead of decreasing it.
+So basically what we're missing here
+is we're actually missing a negative sign.
+And again, this other interpretation,
+and that's because we want to minimize the loss.
+We don't want to maximize the loss.
+We want to decrease it.
+And the other interpretation, as I mentioned,
+is you can think of the gradient vector,
+so basically just the vector of all the gradients,
+as pointing in the direction
+of increasing the loss.
+But then we want to decrease it.
+So we actually want to go in the opposite direction.
+And so you can convince yourself
+that this does the right thing here with the negative
+because we want to minimize the loss.
+So if we nudge all the parameters by a tiny amount,
+then we'll see that this data
+will have changed a little bit.
+So now this neuron is a tiny amount greater value.
+So 0.854 went to 0.857.
+And that's a good thing
+because slightly increasing this neuron data
+makes the loss go down according to the gradient.
+And so the correcting has happened sign-wise.
+And so now what we would expect, of course,
+is that because we've changed all these parameters,
+we expect that the loss should have gone down a bit.
+So we want to reevaluate the loss.
+Let me basically...
+This is just a data definition that hasn't changed.
+But the forward pass here,
+of the network,
+we can recalculate.
+And actually, let me do it outside here
+so that we can compare the two loss values.
+So here, if I recalculate the loss,
+we'd expect the new loss now
+to be slightly lower than this number.
+So hopefully, what we're getting now
+is a tiny bit lower than 4.84.
+4.36.
+And remember, the way we've arranged this
+is that low loss means that
+our predictions are matching the targets.
+So our predictions now
+are probably slightly closer to the targets.
+And now all we have to do
+is we have to iterate this process.
+So again, we've done the forward pass,
+and this is the loss.
+Now we can loss that backward.
+Let me take these out.
+And we can do a step size.
+And now we should have a slightly lower loss.
+4.36 goes to 3.9.
+And okay, so we've done the forward pass.
+Here's the backward pass.
+Nudge.
+And now the loss is 3.66.
+3.47.
+And you get the idea.
+We just continue doing this.
+And this is gradient descent.
+We're just iteratively doing forward pass,
+backward pass, update.
+Forward pass, backward pass, update.
+And the neural net is improving its predictions.
+So here, if we look at ypred now,
+ypred,
+we see that this value should be getting closer to 1.
+So this value should be getting more positive.
+These should be getting more negative.
+And this one should be also getting more positive.
+So if we just iterate this a few more times,
+actually, we may be able to afford to go a bit faster.
+Let's try a slightly higher learning rate.
+Oops, okay, there we go.
+So now we're at 0.31.
+If you go too fast, by the way,
+if you try to make it too big of a step,
+you may actually overstep.
+It's overconfidence.
+Because again, remember,
+we don't actually know exactly about the loss function.
+The loss function has all kinds of structure.
+And we only know about the very local dependence
+of all these parameters on the loss.
+But if we step too far,
+we may step into, you know,
+a part of the loss that is completely different.
+And that can destabilize training
+and make your loss actually blow up even.
+So the loss is now 0.04.
+So actually, the predictions should be really quite close.
+Let's take a look.
+So you see how this is almost one,
+almost negative one, almost one.
+We can continue going.
+So, yep, backward, update.
+Oops, there we go.
+So we went way too fast.
+And we actually overstepped.
+So we got too eager.
+Where are we now?
+Oops.
+Okay.
+7E-9.
+So this is very, very low loss.
+And the predictions are basically perfect.
+So somehow we...
+Basically, we were doing way too big updates
+and we briefly exploded,
+but then somehow we ended up getting into a really good spot.
+So usually this learning rate
+and the tuning of it is a subtle art.
+You want to set your learning rate.
+If it's too low,
+you're going to take way too long to converge.
+But if it's too high,
+the whole thing gets unstable
+and you might actually even explode the loss,
+depending on your loss function.
+So finding the step size to be just right,
+it's a pretty subtle art sometimes
+when you're using sort of vanilla gradient descent.
+But we happened to get into a good spot.
+We can look at n.parameters.
+So this is the setting of weights and biases
+that makes our network
+predict the desired targets
+very, very close.
+And basically,
+we've successfully trained a neural net.
+Okay, let's make this a tiny bit more respectable
+and implement an actual training loop
+and what that looks like.
+So this is the data definition that stays.
+This is the forward pass.
+So for k in range,
+we're going to take a bunch of steps.
+First, we do the forward pass.
+We validate the loss.
+Let's reinitialize the neural net from scratch.
+And here's the data.
+And we first do the forward pass.
+Then we do the backward pass.
+And then we do an update.
+That's gradient descent.
+And then we should be able to iterate this
+and we should be able to print the current step,
+the current loss.
+Let's just print the sort of
+number of the loss.
+And that should be it.
+And then the learning rate,
+0.01 is a little too small.
+0.1 we saw is like a little bit dangerous
+and too high.
+Let's go somewhere in between.
+And we'll optimize this for
+not 10 steps,
+but let's go for say 20 steps.
+Let me erase all of this junk.
+And let's run the optimization.
+And you see how we've actually converged slower
+in a more controlled manner
+and got to a loss that is very low.
+So I expect YPred to be quite good.
+There we go.
+And that's it.
+Okay, so this is kind of embarrassing,
+but we actually have a really terrible bug in here.
+And it's a subtle bug
+and it's a very common bug.
+And I can't believe I've done it
+for the 20th time in my life,
+especially on camera.
+And I could have reshot the whole thing,
+but I think it's pretty funny.
+And you get to appreciate a bit
+what working with neural nets
+maybe is like sometimes.
+We are guilty of
+a common bug.
+I've actually tweeted
+the most common neural net mistakes
+a long time ago now.
+And I'm not really
+going to explain any of these,
+but remember we are guilty of number three.
+You forgot to zero grad
+before dot backward.
+What is that?
+Basically what's happening,
+and it's a subtle bug
+and I'm not sure if you saw it,
+is that all of these weights here
+have a dot data and a dot grad.
+And dot grad starts at zero.
+And then we do backward
+and we fill in the gradients.
+And then we do an update on the data,
+but we don't flush the grad.
+It stays there.
+So when we do the second forward pass
+and we do backward again,
+remember that all the backward operations
+do a plus equals on the grad.
+And so these gradients just add up
+and they never get reset to zero.
+So basically we didn't zero grad.
+So here's how we zero grad
+before backward.
+We need to iterate over all the parameters.
+And we need to make sure that
+p dot grad is set to zero.
+We need to reset it to zero.
+Just like it is in the constructor.
+So remember all the way here
+for all these value nodes,
+grad is reset to zero.
+And then all these backward passes
+do a plus equals from that grad.
+But we need to make sure that
+we reset these grads to zero
+so that when we do backward,
+all of them start at zero
+and the actual backward pass
+accumulates the loss derivatives
+into the grads.
+So this is zero grad in PyTorch.
+And
+we will get a slightly different optimization.
+Let's reset the neural net.
+The data is the same.
+This is now, I think, correct.
+And we get a much more
+slower descent.
+We still end up with pretty good results.
+And we can continue this a bit more
+to get down lower
+and lower
+and lower.
+Yeah.
+So the only reason that the previous thing worked,
+it's extremely buggy.
+The only reason that worked
+is that
+this is a very, very simple problem.
+And it's very easy for this neural net
+to fit this data.
+And so the grads ended up accumulating
+and it effectively gave us
+a massive step size.
+And it made us converge extremely fast.
+But basically now we have to do more steps
+to get to very low values of loss
+and get YPRED to be really good.
+We can try to
+step a bit greater.
+Yeah.
+We're going to get closer and closer
+to one minus one and one.
+So
+working with neural nets is sometimes
+tricky because
+you may have lots of bugs in the code
+and
+your network might actually work
+just like ours worked.
+But chances are is that
+if we had a more complex problem
+then actually this bug would have
+made us not optimize the loss very well.
+And we were only able to get away with it
+because
+the problem is very simple.
+So let's now bring everything together
+and summarize what we learned.
+What are neural nets?
+Neural nets are these mathematical expressions.
+Fairly simple mathematical expressions
+in the case of multi-layer perceptron
+that take input as the data
+and they take input the weights
+and the parameters of the neural net.
+Mathematical expression for the forward pass
+followed by a loss function.
+And the loss function tries to measure
+the accuracy of the predictions.
+And usually the loss will be low
+when your predictions are matching your targets
+or where the network is basically behaving well.
+So we manipulate the loss function
+so that when the loss is low
+the network is doing what you want it to do
+on your problem.
+And then we backward the loss.
+Use back propagation to get the gradient
+and then we know how to tune all the parameters
+to decrease the loss locally.
+But then we have to iterate that process
+many times in what's called the gradient descent.
+So we simply follow the gradient information
+and that minimizes the loss
+and the loss is arranged so that
+when the loss is minimized
+the network is doing what you want it to do.
+And yeah, so we just have a blob of neural stuff
+and we can make it do arbitrary things.
+And that's what gives neural nets their power.
+It's, you know, this is a very tiny network
+with 41 parameters.
+But you can build significantly more complicated
+neural nets with billions
+at this point almost trillions of parameters.
+And it's a massive blob of neural tissue
+simulated neural tissue
+roughly speaking.
+And you can make it do extremely complex problems.
+And these neural nets then
+have all kinds of very fascinating emergent properties
+in when you try to make them do
+significantly hard problems.
+As in the case of GPT for example
+we have massive amounts of text from the internet
+and we're trying to get a neural net to predict
+to take like a few words
+and try to predict the next word in a sequence.
+That's the learning problem.
+And it turns out that when you train this
+on all of internet
+the neural net actually has like really remarkable
+emergent properties.
+But that neural net would have
+hundreds of billions of parameters.
+But it works on fundamentally the exact same principles.
+The neural net of course will be a bit more complex.
+But otherwise the evaluating the gradient
+is there and will be identical.
+And the gradient descent would be there
+and basically identical.
+But people usually use slightly different updates.
+This is a very simple stochastic gradient descent update.
+And the loss function would not be a mean squared error.
+They would be using something called the cross entropy loss
+for predicting the next token.
+So there's a few more details
+but fundamentally the neural network setup
+and neural network training
+is identical and pervasive.
+And now you understand intuitively
+how that works under the hood.
+In the beginning of this video
+I told you that by the end of it
+you would understand everything in MicroGrad
+and then we'd slowly build it up.
+Let me briefly prove that to you.
+So I'm going to step through all the code
+that is in MicroGrad as of today.
+Actually potentially some of the code will change
+by the time you watch this video
+because I intend to continue developing MicroGrad.
+But let's look at what we have so far at least.
+Init.py is empty.
+When you go to engine.py that has the value.
+Everything here you should mostly recognize.
+So we have the data.data.grad attributes.
+We have the backward function.
+We have the previous set of children
+and the operation that produced this value.
+We have addition, multiplication
+and raising to a scalar power.
+We have the ReLU non-linearity
+which is a slightly different type of non-linearity
+than tanh that we used in this video.
+Both of them are non-linearities
+and notably tanh is not actually present
+in MicroGrad as of right now
+but I intend to add it later.
+We have the backward which is identical
+and then all of these other operations
+which are built up on top of operations here.
+So values should be very recognizable
+except for the non-linearity used in this video.
+There's no massive difference between ReLU and tanh
+and sigmoid and these other non-linearities.
+They're all roughly equivalent
+and can be used in MLPs.
+So I use tanh because it's a bit smoother
+and because it's a little bit more complicated than ReLU
+and therefore it's stressed a little bit more
+the local gradients
+and working with those derivatives
+which I thought would be useful.
+Init.py is the neural networks library
+as I mentioned.
+So you should recognize identical implementation
+of neuron, layer and MLP.
+Notably, or not so much
+we have a class module here
+that is a parent class of all these modules.
+I did that because there's an nn.module class
+in PyTorch
+and so this exactly matches that API
+and nn.module in PyTorch has also a 0 grad
+which I refactored out here.
+So that's the end of MicroGrad really.
+Then there's a test
+which you'll see basically creates
+two chunks of code
+one in MicroGrad and one in PyTorch
+and we'll make sure that the forward
+and the backward pass agree identically.
+For a slightly less complicated expression
+and slightly more complicated expression
+everything agrees
+so we agree with PyTorch on all of these operations.
+And finally there's a demo.pypyymb
+here and it's a bit more
+complicated binary classification demo
+than the one I covered in this lecture.
+So we only had a tiny data set of four examples.
+Here we have a bit more
+complicated example with lots of
+blue points and lots of red points
+and we're trying to again build a binary classifier
+to distinguish two-dimensional
+points as red or blue.
+It's a bit more complicated MLP here
+with it's a bigger MLP.
+The loss is a bit more complicated
+because it supports batches
+so because our data set
+was so tiny we always did a forward pass
+on the entire data set of four examples.
+But when your data set is like a million
+examples what we usually do in practice
+is we basically
+pick out some random subset, we call that a batch
+and then we only process the batch
+forward, backward and update.
+So we don't have to forward the entire training set.
+So this is
+something that supports batching
+because there's a lot more examples here.
+We do a forward pass.
+The loss is slightly more different.
+This is a max margin loss that I implement here.
+The one that we used was
+the mean squared error loss
+because it's the simplest one.
+There's also the binary cross entropy loss.
+All of them can be used for binary classification
+and don't make too much of a difference
+in the simple examples that we looked at so far.
+There's something called L2 regularization
+used here.
+This has to do with generalization of the neural net
+that controls the overfitting in machine learning setting
+but I did not cover these concepts
+in this video, potentially later.
+And the training loop you should recognize.
+So forward, backward,
+with, zero grad
+and update and so on.
+You'll notice that in the update here
+the learning rate is scaled as a function of
+number of iterations and it
+shrinks.
+And this is something called learning rate decay.
+So in the beginning you have a high learning rate
+and as the network sort of stabilizes near the end
+you bring down the learning rate
+to get to some of the fine details in the end.
+And in the end we see
+the decision surface of the neural net
+and we see that it learned to separate out the red
+and the blue area based on
+the data points.
+So that's the slightly more complicated example
+in the demo.hypiYMB
+that you're free to go over.
+But yeah, as of today, that is MicroGrad.
+I also wanted to show you a little bit of real stuff
+so that you get to see how this is actually implemented
+in a production grade library like PyTorch.
+So in particular I wanted to show
+I wanted to find and show you
+the backward pass for 10h in PyTorch.
+So here in MicroGrad
+we see that the backward pass for 10h
+is 1 minus t squared
+where t is the output of the 10h
+of x
+times of that grad
+which is the chain rule.
+So we're looking for something that looks like this.
+Now, I went to PyTorch
+which has
+an open source GitHub codebase
+and I looked through a lot of its code
+and honestly
+I spent about 15 minutes
+and I couldn't find 10h.
+And that's because these libraries, unfortunately
+they grow in size and entropy.
+And if you just search for 10h
+you get apparently 2,800 results
+and 406 files.
+So I don't know what these files
+are doing, honestly.
+And why there are
+so many mentions of 10h.
+But unfortunately these libraries are quite complex
+they're meant to be used, not really inspected.
+Eventually I did
+stumble on someone
+who tries to change
+the 10h backward code for some reason
+and someone here pointed to the
+CPU kernel and the CUDA kernel for
+10h backward.
+So basically it depends on if you're using
+PyTorch on a CPU device or on a GPU
+which these are different devices
+and I haven't covered this.
+But this is the 10h backward kernel
+for CPU
+and the reason it's so large
+is that
+number one, this is like if you're using a complex type
+which we haven't even talked about
+you're using a specific data type of bfloat16
+which we haven't talked about
+and then if you're not
+then this is the kernel
+and deep here we see something that resembles
+our backward pass.
+So they have a times one minus
+b square
+so this b here
+must be the output of the 10h
+and this is the out.grad
+so here we found it
+deep inside
+PyTorch on this location
+for some reason inside binary ops kernel
+10h is not actually binary op
+and then this is the
+GPU kernel
+we're not complex
+we're here
+and here we go with one line of code
+so we did find it
+but basically unfortunately
+these code bases are very large
+and micrograd is very very simple
+but if you actually want to use real stuff
+finding the code for it
+you'll actually find that difficult
+I also wanted to show you
+a little example here where PyTorch is showing you
+you can register a new type of function
+that you want to add to PyTorch
+as a lego building block
+so here if you want to for example add
+a gender polynomial 3
+here's how you could do it
+you will register it
+as a class that
+subclass says torch.rgrad.function
+and then you have to tell PyTorch how to forward
+your new function
+and how to backward through it
+so as long as you can do the forward pass
+of this little function piece that you want to add
+and as long as you know the local
+derivative, the local gradients
+which are implemented in the backward
+PyTorch will be able to back propagate through your function
+and then you can use this as a lego block
+in a larger lego castle
+of all the different lego blocks that PyTorch already has
+and so that's the only thing
+you have to tell PyTorch and everything will just work
+and you can register new types of functions
+in this way following this example
+and that is everything that I wanted to cover
+in this lecture
+so I hope you enjoyed building out micrograd with me
+I hope you find it interesting, insightful
+and yeah
+I will post a lot of the links
+that are related to this video
+in the video description below
+I will also probably post a link to a discussion forum
+or discussion group where you can ask
+questions related to this video
+and then I can answer or someone else can answer
+your questions
+and I may also do a follow up video
+that answers some of the most common questions
+but for now that's it
+I hope you enjoyed it
+if you did then please like and subscribe
+so that YouTube knows to feature this video to more people
+and that's it for now, I'll see you later
+bye
+I know what happened there
