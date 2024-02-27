@@ -1,0 +1,1953 @@
+start	end	text
+240	6400	hi everyone hope you're well and next up what i'd like to do is i'd like to build out make more like
+6400	12960	micrograd before it make more is a repository that i have on my github webpage you can look at it but
+12960	17680	just like with micrograd i'm going to build it out step by step and i'm going to spell everything out
+17680	23520	so we're going to build it out slowly and together now what is make more make more as the name
+23520	31040	suggests makes more of things that you give it so here's an example names.txt is an example data set
+31040	38400	to make more and when you look at names.txt you'll find that it's a very large data set of names so
+40160	44880	here's lots of different types of names in fact i believe there are 32 000 names that i've sort
+44880	50720	of found randomly on the government website and if you train make more on this data set
+50720	53360	it will learn to make more of things like
+53520	60640	this and in particular in this case that will mean more things that sound name-like but are
+60640	65200	actually unique names and maybe if you have a baby and you're trying to assign a name maybe
+65200	70080	you're looking for a cool new sounding unique name make more might help you so here are some
+70080	77200	example generations from the neural network once we train it on our data set so here's some example
+77760	82240	unique names that it will generate don't tell i wrote
+83520	89200	zendy and so on and so all these sort of sound name-like but they're not of course names
+90640	94720	so under the hood make more is a character level language model
+94720	100320	so what that means is that it is treating every single line here as an example and within each
+100320	108880	example it's treating them all as sequences of individual characters so r e e s e is this example
+108880	113200	and that's the sequence of characters and that's the level on which we are building out make more
+113840	117520	and what it means to be a character level language model then is that it's just
+118160	121920	sort of modeling those sequences of characters and it knows how to predict the next character
+121920	127120	in the sequence now we're actually going to implement a large number of character level
+127120	131200	language models in terms of the neural networks that are involved in predicting the next character
+131200	137120	in a sequence so very simple bigram and bag of root models multilevel perceptrons recurring
+137120	143200	neural networks all the way to modern transformers in fact the transformer that we will build will be
+144480	150000	basically the equivalent transformer to gpt2 if you have heard of gpt so that's kind of a big
+150000	154800	deal it's a modern network and by the end of this series you will actually understand how that works
+155440	161440	on the level of characters now to give you a sense of the extensions here after characters
+161440	165200	we will probably spend some time on the word level so that we can generate documents of
+165200	170880	words not just little you know segments of characters but we can generate entire large much
+170880	172000	larger documents
+172000	178720	go into images and image text networks such as DALI stable diffusion and so on but for now we
+178720	184560	have to start here character level language modeling let's go so like before we are starting
+184560	189280	with a completely blank Jupyter notebook page the first thing is i would like to basically load up
+189280	196880	the data set names.txt so we're going to open up names.txt for reading and we're going to read in
+196880	202640	everything into a massive string and then because it's a massive string we only like the individual
+202640	209280	words and put them in the list so let's call split lines on that string to get all of our words as a
+209280	217040	python list of strings so basically we can look at for example the first 10 words and we have that
+217040	225600	it's a list of emma olivia ava and so on and if we look at the top of the page here that is indeed
+225600	226160	what we see
+227040	233920	um so that's good this list actually makes me feel that this is probably sorted by frequency
+235600	241040	but okay so these are the words now we'd like to actually like learn a little bit more about this
+241040	246880	data set let's look at the total number of words we expect this to be roughly 32 000 and then what
+246880	255440	is the for example shortest word so min of length of each word for w in words so the shortest word
+255440	256400	will be length
+257040	264000	two and max of one w for w in words so the longest word will be 15 characters
+264560	269040	so let's now think through our very first language model as i mentioned a character level language
+269040	274640	model is predicting the next character in a sequence given already some concrete sequence
+274640	279440	of characters before it now what we have to realize here is that every single word here
+279440	286560	like isabella is actually quite a few examples packed in to that single word because what is an
+286880	292000	instance of a word like isabella in the data set telling us really it's saying that the character
+292000	300800	i is a very likely character to come first in the sequence of a name the character s is likely to
+300800	309600	come after i the character a is likely to come after is the character b is very likely to come
+309600	316160	after isa and so on all the way to a following as a bell and then there's one more example actually
+316160	316800	packed in here
+317280	325040	and that is that after there's isabella the word is very likely to end so that's one more sort of
+325040	330720	explicit piece of information that we have here that we have to be careful with and so there's
+330720	335040	a lot packed into a single individual word in terms of the statistical structure of what's
+335040	339600	likely to follow in these character sequences and then of course we don't have just an individual
+339600	343840	word we actually have 32 000 of these and so there's a lot of structure here to model
+344800	346560	now in the beginning what i'd like to start with
+346880	349920	is I'd like to start with building a bigram language model.
+351060	352660	Now, in a bigram language model,
+352860	356000	we're always working with just two characters at a time.
+356560	360020	So we're only looking at one character that we are given,
+360420	362960	and we're trying to predict the next character in the sequence.
+363840	367000	So what characters are likely to follow R,
+367360	369700	what characters are likely to follow A, and so on.
+369740	372300	And we're just modeling that kind of a little local structure.
+372860	376520	And we're forgetting the fact that we may have a lot more information
+376520	379840	if we're always just looking at the previous character to predict the next one.
+380120	381980	So it's a very simple and weak language model,
+382200	383480	but I think it's a great place to start.
+384040	387040	So now let's begin by looking at these bigrams in our data set
+387040	387880	and what they look like.
+387980	390340	And these bigrams, again, are just two characters in a row.
+390960	395500	So for W in words, each W here is an individual word, a string.
+396100	403060	We want to iterate this word with consecutive characters.
+403700	406300	So two characters at a time, sliding it through the word.
+406520	410880	Now, an interesting, nice way, cute way to do this in Python, by the way,
+411080	412520	is doing something like this.
+412900	418140	For character1, character2, in, zip, off, W, and W at 1.
+419860	420560	One column.
+421720	423960	Print, character1, character2.
+424620	425740	And let's not do all the words.
+425840	427180	Let's just do the first three words.
+427380	429380	And I'm going to show you in a second how this works.
+429980	433960	But for now, basically, as an example, let's just do the very first word alone, MR.
+433960	440220	You see how we have a M up, and this will just print EM, MM, MA.
+440740	444980	And the reason this works is because W is the string M up,
+445440	447720	W at 1 column is the string MMA,
+448500	453080	and zip takes two iterators, and it pairs them up
+453080	456760	and then creates an iterator over the tuples of their consecutive entries.
+457400	460120	And if any one of these lists is shorter than the other,
+460120	462860	then it will just halt and return.
+462860	469340	So basically, that's why we return EM, MM, MM, MA.
+470000	473680	But then, because this iterator's second one here runs out of elements,
+474160	477200	zip just ends, and that's why we only get these tuples.
+477780	478440	So pretty cute.
+479520	482600	So these are the consecutive elements in the first word.
+483080	485600	Now, we have to be careful because we actually have more information here
+485600	487760	than just these three examples.
+487760	492120	As I mentioned, we know that E is very likely to come first,
+492860	495080	but that A, in this case, is coming last.
+496000	498080	So one way to do this is, basically,
+498080	502640	we're going to create a special array here, all characters,
+503320	507240	and we're going to hallucinate a special start token here.
+508760	511980	I'm going to call it like, special start.
+512780	517440	This is a list of one element plus W,
+518060	520520	and then plus a special end character.
+520520	525300	And the reason I'm wrapping the list of w here is because w is a string, Emma.
+525780	529780	List of w will just have the individual characters in the list.
+530560	536840	And then doing this again now, but not iterating over w's, but over the characters,
+537540	539240	will give us something like this.
+540180	544440	So e is likely, so this is a bigram of the start character and e,
+544640	548340	and this is a bigram of the a and the special end character.
+548340	553160	And now we can look at, for example, what this looks like for Olivia or Ava.
+554420	557780	And indeed, we can actually potentially do this for the entire dataset,
+558140	559160	but we won't print that.
+559220	560020	That's going to be too much.
+560800	564120	But these are the individual character bigrams, and we can print them.
+565000	569440	Now, in order to learn the statistics about which characters are likely to follow other characters,
+569740	573800	the simplest way in the bigram language models is to simply do it by counting.
+574220	578320	So we're basically just going to count how often any one of these combinations
+578440	581240	occurs in the training set in these words.
+581700	585320	So we're going to need some kind of a dictionary that's going to maintain some counts
+585320	586940	for every one of these bigrams.
+586940	591940	So let's use a dictionary b, and this will map these bigrams.
+592860	595060	So bigram is a tuple of character1, character2.
+595820	603700	And then b at bigram will be b.get of bigram, which is basically the same as b at bigram.
+604520	608280	But in the case that bigram is not in the dictionary b,
+608320	612360	we would like to, by default, return a 0, plus 1.
+612920	617560	So this will basically add up all the bigrams and count how often they occur.
+618140	619220	Let's get rid of printing.
+620000	625960	Or rather, let's keep the printing, and let's just inspect what b is in this case.
+626900	629940	And we see that many bigrams occur just a single time.
+630220	632300	This one allegedly occurred three times.
+633160	637300	So a was an ending character three times, and that's true for all of these words.
+637300	640660	All of Emma, Olivia, and Ava end with a.
+641760	644060	So that's why this occurred three times.
+646340	648540	Now let's do it for all the words.
+651040	653200	Oops, I should not have printed.
+654820	656080	I meant to erase that.
+656740	657800	Let's kill this.
+658720	659960	Let's just run.
+660640	663120	And now b will have the statistics of the entire dataset.
+663860	667120	So these are the counts across all the words of the individual bigrams.
+667300	671940	And we could, for example, look at some of the most common ones and least common ones.
+673240	676960	This kind of grows in Python, but the way to do this, the simplest way I like,
+677220	678880	is we just use b.items.
+679540	685020	b.items returns the tuples of key value.
+685320	690020	And in this case, the keys are the character bigrams, and the values are the counts.
+690660	696820	And so then what we want to do is we want to do sorted of this.
+698240	705280	But by default, sort is on the first item of a tuple.
+705580	709840	But we want to sort by the values, which are the second element of a tuple, that is the key value.
+710460	716500	So we want to use the key equals lambda that takes the key value
+716500	723620	and returns the key value at 1, not at 0, but at 1, which is the count.
+723620	725960	So we want to sort by the count.
+727300	728500	Well, these elements.
+730200	731960	And actually, we want it to go backwards.
+732800	737600	So here what we have is the bigram QNR occurs only a single time.
+738600	740180	DZ occurred only a single time.
+740620	745900	And when we sort this the other way around, we're going to see the most likely bigrams.
+746240	751420	So we see that N was very often an ending character, many, many times.
+751420	756380	And apparently, N almost always follows an A, and that's a very likely combination as well.
+757300	762680	So this is kind of the individual counts that we achieve over the entirely.
+762840	769040	Now it's actually going to be significantly more convenient for us to keep this information in one
+769060	770180	two-dimensional array
+772720	779340	So we're going to sort this information in two D array and the rose are going to be the
+779340	784000	first character of the Bank and the columns are going to be the second character,
+784000	786600	and each entry in this two-dimensional array will tell us.
+786600	787260	Um,
+787260	793420	us how often that first character follows the second character in the data set. So in particular
+793420	799540	the array representation that we're going to use or the library is that of PyTorch and PyTorch is
+799540	805900	a deep learning neural network framework but part of it is also this torch.tensor which allows us
+805900	811940	to create multi-dimensional arrays and manipulate them very efficiently. So let's import PyTorch
+811940	819720	which you can do by import torch and then we can create arrays. So let's create an array of zeros
+819720	830060	and we give it a size of this array. Let's create a 3x5 array as an example and this is a 3x5 array
+830060	837000	of zeros and by default you'll notice a.d type which is short for data type is float 32. So these
+837000	841440	are single precision floating point numbers. Because we are going to represent counts
+841440	841920	we're going to use a single precision floating point number. So we're going to use a single
+841920	848660	precision floating point number. Let's actually use d type as torch.in32. So these are 32-bit
+848660	856300	integers. So now you see that we have integer data inside this tensor. Now tensors allow us to really
+856300	862100	manipulate all the individual entries and do it very efficiently. So for example if we want to
+862100	869240	change this bit we have to index into the tensor and in particular here this is the first row
+869380	871900	and the because it's
+871920	880880	zero indexed. So this is row index one and column index zero one two three. So a at one comma three
+880880	888780	we can set that to one and then a will have a one over there. We can of course also do things like
+888780	896480	this. So now a will be two over there or three and also we can for example say a zero zero is five
+896960	901900	and then a will have a five over here. So that's how we can index into.
+901920	906840	the arrays. Now of course the array that we are interested in is much much bigger. So for our
+906840	915200	purposes we have 26 letters of the alphabet and then we have two special characters s and e. So we
+915200	922080	want 26 plus 2 or 28 by 28 array and let's call it the capital N because it's going to represent
+922080	929880	sort of the counts. Let me erase this stuff. So that's the array that starts at zeros 28 by 28 and
+929880	931880	now let's copy paste that into the array. So that's the array that starts at zeros 28 by 28 and now let's copy paste the
+931880	941280	this here. But instead of having a dictionary b which we're going to erase we now have an n. Now
+941280	946240	the problem here is that we have these characters which are strings but we have to now basically
+946240	952680	index into a array and we have to index using integers. So we need some kind of a lookup table
+952680	958780	from characters to integers. So let's construct such a character array and the way we're going
+958780	961860	to do this is we're going to take all the words which is a list of strings and we're going to
+961880	967680	concatenate all of it into a massive string. So this is just simply the entire data set as a single
+967680	973840	string. We're going to pass this to the set constructor which takes this massive string
+974400	980480	and throws out duplicates because sets do not allow duplicates. So set of this will just be
+980480	986160	the set of all the lowercase characters and there should be a total of 26 of them.
+988560	990640	And now we actually don't want a set we want a list.
+991880	996600	But we don't want a list sorted in some weird arbitrary way we want it to be sorted
+997560	1003000	from a to z. So sorted list. So those are our characters.
+1005560	1011080	Now what we want is this lookup table as I mentioned. So let's create a special s to i
+1011080	1021560	I will call it. s is string or character and this will be an s to i mapping for is in enumerate
+1021880	1029960	of these characters. So enumerate basically gives us this iterator over the integer index and the
+1029960	1037000	actual element of the list and then we are mapping the character to the integer. So s to i is a
+1037000	1045640	mapping from a to 0 b to 1 etc all the way from z to 25. And that's going to be useful here but we
+1045640	1051240	actually also have to specifically set that s will be 26 and s to i at e.
+1052040	1059320	Will be 27 right because z was 25. So those are the lookups and now we can come here and we can map
+1059880	1064600	both character 1 and character 2 to their integers. So this will be s to i at character 1
+1065240	1073080	and i x 2 will be s to i of character 2. And now we should be able to do this line
+1073080	1081560	but using our array. So n at i x 1 i x 2 this is the two-dimensional array indexing I've shown you before and honestly just plus equals 1.
+1082840	1092120	Because everything starts at 0. So this should work and give us a large 28 by 28 array
+1092920	1100760	of all these counts. So if we print n this is the array but of course it looks ugly. So let's erase
+1100760	1106280	this ugly mess and let's try to visualize it a bit more nicer. So for that we're going to use
+1106280	1111160	a library called matplotlib. So matplotlib allows us to create figures. So we can do things like this.
+1111880	1120920	We can do things like plti and show of the count array. So this is the 28 by 28 array and this is the structure.
+1120920	1126040	But even this I would say is still pretty ugly. So we're going to try to create a much nicer
+1126040	1131160	visualization of it and I wrote a bunch of code for that. The first thing we're going to need is
+1131880	1140360	we're going to need to invert this array here, this dictionary. So s to i is a mapping from s to i and in i to s we're going to reverse the array.
+1141880	1148440	So iterating over all the items and just reverse that array. So i to s maps inversely from 0 to a,
+1148440	1155000	1 to b, etc. So we'll need that. And then here's the code that I came up with to try to make this a little bit nicer.
+1157080	1163640	We create a figure, we plot n and then we visualize a bunch of things later.
+1163640	1166200	Let me just run it so you get a sense of what this is.
+1169880	1170840	So we're going to do this.
+1171880	1174200	Okay, so you see here that we have
+1175240	1181640	the array spaced out and every one of these is basically like b follows g 0 times.
+1182280	1189880	b follows h 41 times. So a follows j 175 times. What you can see that I'm doing here is
+1189880	1195640	first I show that entire array and then I iterate over all the individual little cells here
+1196680	1201640	and I create a character string here which is the inverse mapping, i to s,
+1201880	1204740	of the integer i and the integer j.
+1204740	1207800	So those are the bigrams in a character representation.
+1208660	1212200	And then I plot just the bigram text.
+1212200	1214220	And then I plot the number of times
+1214220	1216160	that this bigram occurs.
+1216160	1218440	Now, the reason that there's a dot item here
+1218440	1221080	is because when you index into these arrays,
+1221080	1223100	these are torch tensors,
+1223100	1226080	you see that we still get a tensor back.
+1226080	1227740	So the type of this thing,
+1227740	1229780	you'd think it would be just an integer, 149,
+1229780	1232040	but it's actually a torch dot tensor.
+1232040	1234460	And so if you do dot item,
+1234460	1237320	then it will pop out that individual integer.
+1238540	1240740	So it'll just be 149.
+1240740	1242480	So that's what's happening there.
+1242480	1245380	And these are just some options to make it look nice.
+1245380	1247280	So what is the structure of this array?
+1249340	1250180	We have all these counts
+1250180	1251980	and we see that some of them occur often
+1251980	1254080	and some of them do not occur often.
+1254080	1256080	Now, if you scrutinize this carefully,
+1256080	1258740	you will notice that we're not actually being very clever.
+1258740	1259780	That's because when you come over here
+1259780	1261700	you'll notice that, for example,
+1261700	1264720	we have an entire row of completely zeros.
+1264720	1267100	And that's because the end character
+1267100	1269120	is never possibly going to be the first character
+1269120	1269960	of a bigram,
+1269960	1271980	because we're always placing these end tokens
+1271980	1274380	all at the end of the bigram.
+1274380	1277480	Similarly, we have entire columns of zeros here
+1277480	1280200	because the S character
+1280200	1283420	will never possibly be the second element of a bigram
+1283420	1285800	because we always start with S and we end with E
+1285800	1287780	and we only have the words in between.
+1287780	1289440	So we have an entire column of zeros,
+1289440	1291800	an entire row of zeros,
+1291800	1294120	and in this little two by two matrix here as well,
+1294120	1296060	the only one that can possibly happen
+1296060	1298620	is if S directly follows E.
+1298620	1303140	That can be non-zero if we have a word that has no letters.
+1303140	1304720	So in that case, there's no letters in the word,
+1304720	1307640	it's an empty word, and we just have S follows E.
+1307640	1310220	But the other ones are just not possible.
+1310220	1311760	And so we're basically wasting space.
+1311760	1312600	And not only that,
+1312600	1315680	but the S and the E are getting very crowded here.
+1315680	1316920	I was using these brackets
+1316920	1319320	because there's convention in natural language processing,
+1319320	1323340	to use these kinds of brackets to denote special tokens.
+1323340	1325280	But we're going to use something else.
+1325280	1328340	So let's fix all this and make it prettier.
+1328340	1330420	We're not actually going to have two special tokens.
+1330420	1333040	We're only going to have one special token.
+1333040	1337840	So we're going to have n by n array of 27 by set 27 instead.
+1338880	1341660	Instead of having two, we will just have one,
+1341660	1343180	and I will call it a dot.
+1344880	1345720	Okay.
+1347420	1348960	Let me swing this over here.
+1349320	1351980	Now, one more thing that I would like to do
+1351980	1354480	is I would actually like to make this special character
+1354480	1356340	have position zero.
+1356340	1359040	And I would like to offset all the other letters off.
+1359040	1361280	I find that a little bit more pleasing.
+1362620	1367220	So we need a plus one here so that the first character,
+1367220	1369920	which is A, will start at one.
+1369920	1374920	So S to I will now be A starts at one and dot is zero.
+1375920	1378960	And I to S, of course, we're not changing this,
+1378960	1381020	because I to S just creates a reverse mapping
+1381020	1382280	and this will work fine.
+1382280	1385240	So one is A, two is B, zero is dot.
+1386680	1389160	So we've reversed that here.
+1389160	1391520	We have a dot and a dot.
+1393040	1394880	This should work fine.
+1394880	1396220	Make sure I start at zeros.
+1397900	1398860	Count.
+1398860	1401700	And then here, we don't go up to 28, we go up to 27.
+1402660	1404820	And this should just work.
+1408960	1413580	Okay, so we see that dot dot never happened.
+1413580	1416520	It's at zero because we don't have empty words.
+1416520	1419480	Then this row here now is just very simply
+1419480	1423560	the counts for all the first letters.
+1423560	1428560	So J starts a word, H starts a word, I starts a word, etc.
+1429620	1433020	And then these are all the ending characters.
+1433020	1434580	And in between, we have the structure
+1434580	1437120	of what characters follow each other.
+1437120	1438820	So this is the counts array.
+1438820	1441740	This is the counts array of our entire data set.
+1441740	1444460	So this array actually has all the information necessary
+1444460	1446040	for us to actually sample
+1446040	1449720	from this bigram character-level language model.
+1449720	1452200	And roughly speaking, what we're going to do
+1452200	1454680	is we're just going to start following these probabilities
+1454680	1456860	and these counts, and we're going to start sampling
+1456860	1458900	from the model.
+1458900	1461860	So in the beginning, of course, we start with the dot,
+1461860	1464640	the start token dot.
+1464640	1468180	So to sample the first character of a name,
+1468180	1468380	we're looking at this right here.
+1468380	1468640	So we're looking at this right here.
+1468640	1470600	So we're looking at this right here.
+1470600	1472740	So we see that we have the counts,
+1472740	1474680	and those counts externally are telling us
+1474680	1479580	how often any one of these characters is to start a word.
+1479580	1483980	So if we take this N and we grab the first row,
+1484880	1488460	we can do that by using just indexing a zero,
+1488460	1491080	and then using this notation, colon,
+1491080	1493700	for the rest of that row.
+1493700	1498200	So N zero colon is indexing into the zero,
+1498200	1501960	and then it's grabbing all the columns.
+1501960	1505240	And so this will give us a one-dimensional array
+1505240	1506140	of the first row.
+1506140	1508440	So zero, four, four, 10.
+1508440	1510400	You know, it's zero, four, four, 10,
+1510400	1512940	one, three, oh, six, one, five, four, two, et cetera.
+1512940	1514400	It's just the first row.
+1514400	1517140	The shape of this is 27.
+1517140	1519840	It's just the row of 27.
+1519840	1521940	And the other way that you can do this also is you just,
+1521940	1523760	you don't actually give this,
+1523760	1526260	you just grab the zeroth row like this.
+1526260	1527260	This is equivalent.
+1528200	1530000	Now, these are the counts.
+1530000	1531640	And now what we'd like to do
+1531640	1535060	is we'd like to basically sample from this.
+1535060	1536140	Since these are the raw counts,
+1536140	1539160	we actually have to convert this to probabilities.
+1539160	1541860	So we create a probability vector.
+1542960	1545060	So we'll take N of zero,
+1545060	1548960	and we'll actually convert this to float first.
+1550100	1552900	Okay, so these integers are converted to float,
+1552900	1554140	floating point numbers.
+1554140	1555700	And the reason we're creating floats
+1555700	1558100	is because we're about to normalize these counts.
+1558200	1560860	So to create a probability distribution here,
+1560860	1562060	we want to divide,
+1562060	1566060	we basically want to do p, p divide, p.sum.
+1568960	1571460	And now we get a vector of smaller numbers,
+1571460	1573040	and these are now probabilities.
+1573040	1575300	So of course, because we divided by the sum,
+1575300	1578200	the sum of p now is one.
+1578200	1580440	So this is a nice proper probability distribution.
+1580440	1581600	It sums to one.
+1581600	1582940	And this is giving us the probability
+1582940	1587140	for any single character to be the first character of a word.
+1587140	1588100	So we can do this.
+1588100	1590860	So now we can try to sample from this distribution.
+1590860	1592260	To sample from these distributions,
+1592260	1594260	we're going to use torch.multinomial,
+1594260	1596300	which I've pulled up here.
+1596300	1601040	So torch.multinomial returns samples
+1601040	1603400	from the multinomial probability distribution,
+1603400	1605240	which is a complicated way of saying,
+1605240	1608140	you give me probabilities and I will give you integers,
+1608140	1611760	which are sampled according to the probability distribution.
+1611760	1613340	So this is the signature of the method.
+1613340	1614860	And to make everything deterministic,
+1614860	1617960	we're going to use a generator object in PyTorch.
+1618100	1620960	So this makes everything deterministic.
+1620960	1622600	So when you run this on your computer,
+1622600	1624660	you're going to get the exact same results
+1624660	1627240	that I'm getting here on my computer.
+1627240	1629040	So let me show you how this works.
+1632760	1634400	Here's the deterministic way
+1634400	1638100	of creating a torch generator object,
+1638100	1641260	seeding it with some number that we can agree on.
+1641260	1644940	So that seeds a generator, gives us an object g.
+1644940	1647260	And then we can pass that g to a function,
+1647260	1651860	a function that creates here random numbers.
+1651860	1655320	torch.rand creates random numbers, three of them.
+1655320	1657660	And it's using this generator object
+1657660	1660400	as a source of randomness.
+1660400	1666600	So without normalizing it, I can just print.
+1666600	1669020	This is sort of like numbers between 0 and 1
+1669020	1671260	that are random according to this thing.
+1671260	1673520	And whenever I run it again, I'm always
+1673520	1675300	going to get the same result because I keep
+1675300	1677160	using the same generator object, which I'm
+1677160	1678860	seeding here.
+1678860	1682920	And then if I divide to normalize,
+1682920	1685220	I'm going to get a nice probability distribution
+1685220	1687600	of just three elements.
+1687600	1689400	And then we can use torch.multinomial
+1689400	1691220	to draw samples from it.
+1691220	1693760	So this is what that looks like.
+1693760	1698420	torch.multinomial will take the torch tensor
+1698420	1701100	of probability distributions.
+1701100	1704600	Then we can ask for a number of samples, let's say 20.
+1704600	1707060	Replacement equals true means that when
+1707060	1710720	we draw an element, we can draw it,
+1710720	1714360	and then we can put it back into the list of eligible indices
+1714360	1715960	to draw again.
+1715960	1717820	And we have to specify replacement as true
+1717820	1721700	because by default, for some reason, it's false.
+1721700	1725800	And I think it's just something to be careful with.
+1725800	1727440	And the generator is passed in here.
+1727440	1730180	So we are going to always get deterministic results,
+1730180	1731460	the same results.
+1731460	1734180	So if I run these two, we're going
+1734180	1736860	to get a bunch of samples from this distribution.
+1736860	1739600	Now, you'll notice here that the probability
+1739600	1744600	for the first element in this tensor is 60%.
+1744600	1750800	So in these 20 samples, we'd expect 60% of them to be 0.
+1750800	1754420	We'd expect 30% of them to be 1.
+1754420	1759520	And because the element index 2 has only 10% probability,
+1759520	1762320	very few of these samples should be 2.
+1762320	1765560	And indeed, we only have a small number of 2s.
+1765560	1766520	And we can sample as many as we want.
+1766520	1771820	And the more we sample, the more these numbers
+1771820	1775920	should roughly have the distribution here.
+1775920	1782580	So we should have lots of 0s, half as many 1s.
+1782580	1788960	And we should have three times as few 1s and three times
+1788960	1791840	as few 2s.
+1791840	1793420	So you see that we have very few 2s.
+1793420	1795780	We have some 1s, and most of them are 0s.
+1795780	1796300	So that's what we're going to do.
+1796300	1796500	Thank you.
+1796520	1798900	So that's what Torchlight Multinomial is doing.
+1798900	1802460	For us here, we are interested in this row.
+1802460	1806940	We've created this p here.
+1806940	1809760	And now we can sample from it.
+1809760	1813800	So if we use the same seed, and then we
+1813800	1818200	sample from this distribution, and let's just get one sample,
+1818200	1822720	then we see that the sample is, say, 13.
+1822720	1825300	So this will be the index.
+1825300	1826300	And let's see.
+1826300	1828860	See how it's a tensor that wraps 13?
+1828860	1833060	We again have to use .item to pop out that integer.
+1833060	1837540	And now index would be just the number 13.
+1837540	1842960	And of course, we can map the i2s of ix
+1842960	1846120	to figure out exactly which character we're sampling here.
+1846120	1848120	We're sampling m.
+1848120	1851280	So we're saying that the first character is m
+1851280	1853200	in our generation.
+1853200	1856080	And just looking at the row here, m was drawn.
+1856080	1860180	And we can see that m actually starts a large number of words.
+1860180	1864780	m started 2,500 words out of 32,000 words.
+1864780	1869200	So almost a bit less than 10% of the words start with m.
+1869200	1871580	So this was actually a fairly likely character to draw.
+1875380	1877160	So that would be the first character of our word.
+1877160	1879800	And now we can continue to sample more characters,
+1879800	1884840	because now we know that m is already sampled.
+1884840	1885880	So now to draw the next character, we're going to use m.
+1885880	1885960	m is already sampled. So now to draw the next character, we're going to use m.
+1885960	1886040	m is already sampled. So now to draw the next character, we're going to use m.
+1886080	1892760	And we'll come back here, and we will look for the row that starts with m.
+1892760	1896800	So you see m, and we have a row here.
+1896800	1900760	So we see that m dot is 516,
+1900760	1903820	m a is this many, m b is this many, etc.
+1903820	1905660	So these are the counts for the next row,
+1905660	1908720	and that's the next character that we are going to now generate.
+1908720	1911260	So I think we are ready to actually just write out the loop,
+1911260	1914560	because I think you're starting to get a sense of how this is going to go.
+1914560	1915960	The...
+1915960	1920780	We always begin at index zero because that's the start token and
+1922200	1924200	Then while true
+1924640	1930400	We're going to grab the row corresponding to index that we're currently on so that's P
+1930840	1933440	So that's n array at IX
+1934400	1936500	Converted to float is our P
+1938820	1942580	Then we normalize the speed to sum to one
+1942580	1944580	I
+1945540	1952240	Accidentally ran the infinite loop we normalize P to sum to one then we need this generator object
+1953600	1957640	Now we're going to initialize up here and we're going to draw a single sample from this distribution
+1959120	1960700	And
+1960700	1964660	Then this is going to tell us what index is going to be next
+1966200	1971420	If the index sampled is zero then that's now the end token
+1972580	1974580	So we will break
+1975260	1979560	Otherwise we are going to print s2i of ix
+1982300	1984300	i2s of ix
+1985700	1989100	That's pretty much it we're just this should work
+1990140	1991840	Okay more
+1991840	1999440	So that's the that's the name that we've sampled. We started with M. The next step was O then R and then dot
+2001340	2002400	And this dot is
+2002400	2004400	We printed here as well, so
+2006220	2008220	Let's not do this a few times
+2009720	2014640	So let's actually create an out list here
+2016140	2021740	And instead of printing we're going to append so out dot append this character
+2022900	2024180	and
+2024180	2026640	Then here let's just print it at the end
+2026640	2032240	So let's just join up all the outs, and we're just going to print more okay now
+2032240	2036800	always getting the same result because of the generator so if we want to do this a few times
+2036800	2043760	we can go for high in range 10 we can sample 10 names and we can just do that 10 times
+2045600	2049200	and these are the names that we're getting out let's do 20.
+2054160	2058480	i'll be honest with you this doesn't look right so i started a few minutes to convince myself
+2058480	2064160	that it actually is right the reason these samples are so terrible is that bigram language model
+2064800	2069040	is actually just like really terrible we can generate a few more here
+2070000	2073840	and you can see that they're kind of like their name like a little bit like yanu
+2073840	2080880	riley etc but they're just like totally messed up and i mean the reason that this is so bad like
+2080880	2086400	we're generating h as a name but you have to think through it from the model's eyes
+2086400	2088400	it doesn't know that this h is different
+2088480	2095940	very first h all it knows is that h was previously and now how likely is h the last character well
+2095940	2100540	it's somewhat likely and so it just makes it last character it doesn't know that there were other
+2100540	2105500	things before it or there were not other things before it and so that's why it's generating all
+2105500	2113260	these like some nonsense names another way to do this is to convince yourself that it's actually
+2113260	2120220	doing something reasonable even though it's so terrible is these little piece here are 27 right
+2120220	2128200	like 27 so how about if we did something like this instead of p having any structure whatsoever
+2128720	2132440	how about if p was just torch dot ones
+2132440	2140940	of 27 by default this is a float 32 so this is fine divide 27
+2140940	2143260	so what i'm
+2143260	2148560	doing here is this is the uniform distribution which will make everything equally likely
+2148560	2156580	and we can sample from that so let's see if that does any better okay so it's this is what you
+2156580	2161100	have from a model that is completely untrained where everything is equally likely so it's
+2161100	2167500	obviously garbage and then if we have a trained model which is trained on just bigrams this is
+2167500	2172560	what we get so you can see that it is more name like it is actually working it's just
+2172560	2178620	bigram is so terrible and we have to do better now next i would like to fix an inefficiency that
+2178620	2184220	we have going on here because what we're doing here is we're always fetching a row of n from
+2184220	2188980	the counts matrix up ahead and then we're always doing the same things we're converting to float
+2188980	2193420	and we're dividing and we're doing this every single iteration of this loop and we just keep
+2193420	2196780	renormalizing these rows over and over again and it's extremely inefficient and wasteful
+2196780	2197480	so we're doing this every single iteration of this loop and we just keep renormalizing these rows over
+2197480	2202360	so what i'd like to do is i'd like to actually prepare a matrix capital p that will just have
+2202360	2207100	the probabilities in it so in other words it's going to be the same as the capital n matrix here
+2207100	2212700	of counts but every single row will have the row of probabilities that is normalized to one
+2212700	2217500	indicating the probability distribution for the next character given the character before it
+2217500	2223920	as defined by which row we're in so basically what we'd like to do is we'd like to just do
+2223920	2227220	it up front here and then we would like to just use that row here
+2227480	2236020	so here we would like to just do p equals p of i x instead okay the other reason i want to do this
+2236020	2241360	is not just for efficiency but also i would like us to practice these n-dimensional tensors and
+2241360	2245180	i'd like us to practice their manipulation and especially something that's called broadcasting
+2245180	2249220	that we'll go into in a second we're actually going to have to become very good at these
+2249220	2253520	tensor manipulations because if we're going to build out all the way to transformers we're going
+2253520	2257460	to be doing some pretty complicated array operations for efficiency and we're going to have to do some
+2257480	2259720	pretty complicated array operations for efficiency and we need to really understand that and be very
+2259720	2265460	good at it so intuitively what we want to do is we first want to grab the floating point
+2265460	2272800	copy of n and i'm mimicking the line here basically and then we want to divide all the rows
+2272800	2278820	so that they sum to one so we'd like to do something like this p divide p dot sum
+2278820	2286440	but now we have to be careful because p dot sum actually produces a sum
+2287480	2297040	sorry p equals n dot float copy p dot sum produces a um sums up all of the counts of this entire
+2297040	2302280	matrix n and gives us a single number of just the summation of everything so that's not the way we
+2302280	2308240	want to define divide we want to simultaneously and in parallel divide all the rows by their
+2308240	2314760	respective sums so what we have to do now is we have to go into documentation for torch.sum
+2314760	2317460	and we can scroll down here to a definition of the sum and we can see that the sum is
+2317480	2322240	a definition that is relevant to us which is where we don't only provide an input array
+2322240	2327540	that we want to sum but we also provide the dimension along which we want to sum and in
+2327540	2333940	particular we want to sum up over rows right now one more argument that i want you to pay
+2333940	2340980	attention to here is the keep them is false if keep them is true then the output tensor
+2340980	2345020	is of the same size as input except of course the dimension along which you summed which
+2345020	2347400	will become just one
+2347480	2355700	but if you pass in uh keep them as false then this dimension is squeezed out and so torch.sum
+2355700	2360140	not only does the sum and collapses dimension to be of size one but in addition it does
+2360140	2366360	what's called a squeeze where it squeeze out it squeezes out that dimension so basically
+2366360	2372140	what we want here is we instead want to do p dot sum of sum axis and in particular notice
+2372140	2377420	that p dot shape is 27 by 27 so when we sum up across axis 0
+2377480	2379780	then we would be taking the 0th dimension
+2379780	2381480	and we would be summing across it
+2381480	2383900	so when keep dim is true
+2383900	2385900	then this thing
+2385900	2388000	will not only give us the counts
+2388000	2388560	across
+2388560	2390940	along the columns
+2390940	2393980	but notice that basically the shape of this
+2393980	2395220	is 1 by 27
+2395220	2396460	we just get a row vector
+2396460	2399320	and the reason we get a row vector here again
+2399320	2400600	is because we passed in 0 dimension
+2400600	2402740	so this 0th dimension becomes 1
+2402740	2404000	and we've done a sum
+2404000	2405520	and we get a row
+2405520	2407360	and so basically we've done the sum
+2407360	2409740	this way, vertically
+2409740	2412180	and arrived at just a single 1 by 27
+2412180	2413760	vector of counts
+2413760	2416800	what happens when you take out keep dim
+2416800	2419060	is that we just get 27
+2419060	2420500	so it squeezes out
+2420500	2421300	that dimension
+2421300	2424680	and we just get a 1 dimensional vector
+2424680	2425760	of size 27
+2425760	2429960	now we don't actually want
+2429960	2432640	1 by 27 row vector
+2432640	2434180	because that gives us the
+2434180	2435660	counts or the sums
+2435660	2436340	across
+2436340	2437340	0th
+2437360	2439600	the columns
+2439600	2441340	we actually want to sum the other way
+2441340	2442860	along dimension 1
+2442860	2445800	and you'll see that the shape of this is 27 by 1
+2445800	2447500	so it's a column vector
+2447500	2450020	it's a 27 by 1
+2450020	2453980	vector of counts
+2453980	2456980	and that's because what's happened here is that we're going horizontally
+2456980	2459960	and this 27 by 27 matrix becomes a
+2459960	2463680	27 by 1 array
+2463680	2466360	now you'll notice by the way that
+2466360	2467340	the actual numbers
+2467360	2469600	of these counts are identical
+2469600	2473140	and that's because this special array of counts here
+2473140	2474420	comes from bigram statistics
+2474420	2476180	and actually it just so happens
+2476180	2477180	by chance
+2477180	2479720	or because of the way this array is constructed
+2479720	2481480	that the sums along the columns
+2481480	2482500	or along the rows
+2482500	2483900	horizontally or vertically
+2483900	2484940	is identical
+2484940	2487700	but actually what we want to do in this case
+2487700	2489480	is we want to sum across the
+2489480	2490500	rows
+2490500	2491720	horizontally
+2491720	2493540	so what we want here
+2493540	2494560	is p.sum of 1
+2494560	2495760	with keep dim true
+2497360	2499600	27 by 1 column vector
+2499600	2502000	and now what we want to do is we want to divide by that
+2502000	2506300	now we have to be careful here again
+2506300	2508840	is it possible to take
+2508840	2511420	what's a p.shape you see here
+2511420	2512800	is 27 by 27
+2512800	2516260	is it possible to take a 27 by 27 array
+2516260	2521400	and divide it by what is a 27 by 1 array
+2521400	2523920	is that an operation that you can do
+2523920	2527200	and whether or not you can perform this operation is determined by what's called broadcasting
+2527200	2528040	rules
+2528040	2531800	so if you just search broadcasting semantics in torch
+2531800	2534160	you'll notice that there's a special definition for
+2534160	2535660	what's called broadcasting
+2535660	2538000	that for whether or not
+2538000	2543660	these two arrays can be combined in a binary operation like division
+2543660	2546500	so the first condition is each tensor has at least one dimension
+2546500	2548300	which is the case for us
+2548300	2550240	and then when iterating over the dimension sizes
+2550240	2552200	starting at the trailing dimension
+2552200	2554400	the dimension sizes must either be equal
+2554400	2555400	one of them is 1
+2555400	2557200	or one of them does not exist
+2557200	2558760	okay
+2558760	2560340	so let's do that
+2560340	2563000	we need to align the two arrays
+2563000	2564100	and their shapes
+2564100	2566640	which is very easy because both of these shapes have two elements
+2566640	2568000	so they're aligned
+2568000	2569500	then we iterate over
+2569500	2570660	from the right
+2570660	2572100	and going to the left
+2572100	2575200	each dimension must be either equal
+2575200	2576340	one of them is a 1
+2576340	2577660	or one of them does not exist
+2577660	2579340	so in this case they're not equal
+2579340	2580500	but one of them is a 1
+2580500	2581700	so this is fine
+2581700	2583700	and then this dimension they're both equal
+2583700	2585560	so this is fine
+2585560	2587040	so all the dimensions
+2587040	2593200	are fine and therefore this operation is broadcastable. So that means that this operation
+2593200	2600380	is allowed. And what is it that these arrays do when you divide 27 by 27 by 27 by 1? What it does
+2600380	2608360	is that it takes this dimension 1 and it stretches it out. It copies it to match 27 here in this case.
+2608760	2615660	So in our case, it takes this column vector, which is 27 by 1, and it copies it 27 times
+2615660	2623000	to make these both be 27 by 27 internally. You can think of it that way. And so it copies those
+2623000	2629480	counts and then it does an element-wise division, which is what we want because these counts we
+2629480	2635520	want to divide by them on every single one of these columns in this matrix. So this actually
+2635520	2642240	we expect will normalize every single row. And we can check that this is true by taking the first
+2642240	2644820	row, for example, and taking its sum.
+2644820	2653000	We expect this to be 1 because it's now normalized. And then we expect this now because
+2653000	2657400	if we actually correctly normalize all the rows, we expect to get the exact same result here.
+2657800	2664060	So let's run this. It's the exact same result. So this is correct. So now I would like to scare
+2664060	2668660	you a little bit. You actually have to like, I basically encourage you very strongly to read
+2668660	2673220	through broadcasting semantics. And I encourage you to treat this with respect. And it's not
+2674820	2678200	something you should do with it. It's something to really respect, really understand and look up
+2678200	2682600	maybe some tutorials for broadcasting and practice it and be careful with it because you can very
+2682600	2689240	quickly run into bugs. Let me show you what I mean. You see how here we have p dot sum of 1,
+2689240	2695820	keep them as true. The shape of this is 27 by 1. Let me take out this line just so we have the n,
+2695820	2703800	and then we can see the counts. We can see that this is all the counts across all the rows. And
+2703800	2704760	it's 27 by 1.
+2704820	2711640	vector right now suppose that I tried to do the following but I erase keep them
+2711640	2717360	just true here what does that do if keep them is not true it's false then
+2717360	2721440	remember according to documentation it gets rid of this dimension one it
+2721440	2726000	squeezes it out so basically we just get all the same counts the same result
+2726000	2732060	except the shape of it is not 27 by 1 it's just 27 the one disappears but all
+2732060	2739300	the counts are the same so you'd think that this divide that would would work
+2739300	2744300	first of all can we even write this and will it even is it even is it even
+2744300	2747720	expected to run is it broadcastable let's determine if this result is
+2747720	2757340	broadcastable p.summit1 is shape is 27 this is 27 by 27 so 27 by 27
+2757340	2762040	broadcasting into 27 so now rules of
+2762040	2766480	broadcasting number one align all the dimensions on the right done now
+2766480	2769180	iteration over all the dimensions starting from the right going to the
+2769180	2774920	left all the dimensions must either be equal one of them must be one or one then
+2774920	2779200	does not exist so here they are all equal here the dimension does not exist
+2779200	2786100	so internally what broadcasting will do is it will create a one here and then we
+2786100	2790480	see that one of them is a one and this will get copied and this will run this
+2790480	2790980	will broadcast
+2792040	2802100	okay so you'd expect this to work because we we are this broadcast and
+2802100	2806800	this we can divide this now if I run this you'd expect it to work but it
+2806800	2811220	doesn't you actually get garbage you get a wrong result because this is actually
+2811220	2821380	a bug this keep them equals true makes it work this is a bug
+2822040	2826480	but it's actually we are this in both cases we are doing the correct counts we
+2826480	2831760	are summing up across the rows but keep them is saving us and making it work so
+2831760	2835040	in this case I'd like you to encourage you to potentially like pause this video
+2835040	2839360	at this point and try to think about why this is buggy and why the keep dem was
+2839360	2846540	necessary here okay so the reason to do for this is I'm trying to hint at here
+2846540	2851980	when I was sort of giving you a bit of a hint on how this works this 27 factor is
+2852040	2859800	internally inside the broadcasting this becomes a 1 by 27 and 1 by 27 is a row vector right and
+2859800	2866980	now we are dividing 27 by 27 by 1 by 27 and torch will replicate this dimension so basically
+2866980	2876940	it will take it will take this row vector and it will copy it vertically now 27 times so the 27 by
+2876940	2884760	27 lines exactly and element wise divides and so basically what's happening here is we're actually
+2884760	2891440	normalizing the columns instead of normalizing the rows so you can check that what's happening
+2891440	2899920	here is that P at 0 which is the first row of P dot sum is not 1 it's 7 it is the first column
+2899920	2906920	as an example that sums to 1 so to summarize where does the issue come from the issue
+2906920	2911960	comes from the silent adding of a dimension here because in broadcasting rules you align on the
+2911960	2916820	right and go from right to left and if dimension doesn't exist you create it so that's where the
+2916820	2921900	problem happens we still did the counts correctly we did the counts across the rows and we got the
+2921900	2928460	counts on the right here as a column vector but because the keep dims was true this this this
+2928460	2933200	dimension was discarded and now we just have a vector 27 and because of broadcasting the way
+2933200	2936380	it works this vector of 27 suddenly becomes a row vector
+2936920	2941080	and then this row vector gets replicated vertically and at every single point we
+2941080	2951400	are dividing by the by the count in the opposite direction so so this thing just doesn't work
+2951400	2958360	this needs to be keep dims equals true in this case so then then we have that P at 0 is normalized
+2959800	2963160	and conversely the first column you'd expect to potentially not be normalized
+2964520	2965960	and this is what makes it work
+2967560	2973560	so pretty subtle and hopefully this helps to scare you that you should have respect for
+2973560	2978840	broadcasting be careful check your work and understand how it works under the hood and make
+2978840	2982360	sure that it's broadcasting in the direction that you like otherwise you're going to introduce very
+2982360	2988600	subtle bugs very hard to find bugs and just be careful one more note on efficiency we don't want
+2988600	2993640	to be doing this here because this creates a completely new tensor that we store into p
+2994280	2996840	we prefer to use in place operations if possible
+2997560	3002520	uh so this would be an in-place operation it has the potential to be faster it doesn't create new
+3002520	3012680	memory under the hood and then let's erase this we don't need it and let's also um just do fewer
+3012680	3017640	just so i'm not wasting space okay so we're actually in a pretty good spot now we trained
+3017640	3023720	a bigram language model and we trained it really just by counting uh how frequently any pairing
+3023720	3026840	occurs and then normalizing so that we get a nice property distribution
+3027300	3031600	so really these elements of this array p are really the
+3031600	3036160	parameters of our bigram language model giving us in summarizing the statistics of these bigrams
+3036160	3040080	so we train the model and then we know how to sample from the model
+3040080	3046000	we just iteratively uh sample the next character and feed it in each time and get the next character
+3046960	3051040	now what i'd like to do is i'd like to somehow evaluate the quality of this model
+3051040	3051820	we'd like to somehow summarize the quality of this model into a single number how good is it at predicting the quality of the data and we can use that here to kind of write out which is not what we want to use here but like to do keep in front of a table for FARM
+3051820	3052140	summarize the quality of this model into a single number how good is it at predicting the number of Bana
+3052140	3056580	summarize the quality of this model into a single number. How good is it at predicting
+3056580	3062920	the training set? And as an example, so in the training set, we can evaluate now the training
+3062920	3068500	loss. And this training loss is telling us about sort of the quality of this model in a single
+3068500	3074080	number, just like we saw in micrograd. So let's try to think through the quality of the model
+3074080	3079440	and how we would evaluate it. Basically, what we're going to do is we're going to copy paste
+3079440	3086220	this code that we previously used for counting. And let me just print these bigrams first. We're
+3086220	3090860	going to use fstrings, and I'm going to print character one followed by character two. These
+3090860	3094680	are the bigrams. And then I don't want to do it for all the words, just do the first three words.
+3095860	3102260	So here we have Emma, Olivia, and Ava bigrams. Now what we'd like to do is we'd like to basically
+3102260	3108800	look at the probability that the model assigns to every one of these bigrams. So in other words,
+3108840	3109420	we can look at the probability of the model, and we can look at the probability of the model,
+3109420	3109440	and we can look at the probability of the model, and we can look at the probability of the model,
+3109440	3118860	which is summarized in the matrix B of Ix1, Ix2. And then we can print it here as probability.
+3120520	3127860	And because these probabilities are way too large, let me percent or colon .4f to truncate it a bit.
+3129000	3132840	So what do we have here, right? We're looking at the probabilities that the model assigns to every
+3132840	3139200	one of these bigrams in the dataset. And so we can see some of them are 4%, 3%, etc. Just to have a
+3139200	3145420	measuring stick in our mind, by the way. We have 27 possible characters or tokens. And if everything
+3145420	3153320	was equally likely, then you'd expect all these probabilities to be 4% roughly. So anything above
+3153320	3158460	4% means that we've learned something useful from these bigram statistics. And you see that roughly
+3158460	3164700	some of these are 4%, but some of them are as high as 40%, 35%, and so on. So you see that the model
+3164700	3169060	actually assigned a pretty high probability to whatever's in the training set. And so that's a
+3169060	3169180	good thing. And so we can look at the probability of the model, and we can look at the probability
+3169180	3173580	of the model. Basically, if you have a very good model, you'd expect that these probabilities
+3173580	3178140	should be near one, because that means that your model is correctly predicting what's going to come
+3178140	3184580	next, especially on the training set where you trained your model. So now we'd like to think
+3184580	3189440	about how can we summarize these probabilities into a single number that measures the quality
+3189440	3194380	of this model. Now, when you look at the literature into maximum likelihood estimation
+3194380	3199040	and statistical modeling and so on, you'll see that what's typically used here
+3199040	3203980	is something called the likelihood. And the likelihood is the product of all of these
+3203980	3209760	probabilities. And so the product of all of these probabilities is the likelihood. And it's really
+3209760	3217140	telling us about the probability of the entire data set assigned by the model that we've trained.
+3217600	3223600	And that is a measure of quality. So the product of these should be as high as possible when you
+3223600	3227680	are training the model and when you have a good model. Your product of these probabilities should
+3227680	3228300	be very high.
+3229040	3234700	Now, because the product of these probabilities is an unwieldy thing to work with, you can see
+3234700	3238760	that all of them are between zero and one. So your product of these probabilities will be a very tiny
+3238760	3245440	number. So for convenience, what people work with usually is not the likelihood, but they work with
+3245440	3251580	what's called the log likelihood. So the product of these is the likelihood. To get the log
+3251580	3256420	likelihood, we just have to take the log of the probability. And so the log of the probability
+3256420	3258620	here, I have the log of x from zero to one.
+3259720	3267320	The log is a, you see here, monotonic transformation of the probability, where if you pass in one, you
+3267320	3273320	get zero. So probability one gets you log probability of zero. And then as you go lower and
+3273320	3278920	lower probability, the log will grow more and more negative until all the way to negative infinity at
+3278920	3279420	zero.
+3281800	3287560	So here we have a log prob, which is really just a torch.log of probability. Let's print it out to get a sense of what that looks like.
+3287560	3288160	Let's print it out to get a sense of what that looks like.
+3288160	3288660	Let's print it out to get a sense of what that looks like.
+3290000	3292040	Log prob, also, 0.4f.
+3296600	3302880	So as you can see, when we plug in numbers that are very close to some of our higher numbers, we get closer and closer to zero.
+3303520	3308100	And then if we plug in very bad probabilities, we get more and more negative number that's bad.
+3309540	3316940	So, and the reason we work with this is for a large extent, convenience, because we have, mathematically, that if
+3316940	3318380	you have some product A x B x C analyze a function and add some product, you've got a set method.
+3318380	3318960	Yes.
+3318960	3324560	all these probabilities right the likelihood is the product of all these probabilities
+3325360	3331280	then the log of these is just log of a plus log of b
+3333760	3340320	plus log of c if you remember your logs from your high school or undergrad and so on so we have that
+3340320	3344640	basically the likelihood of the product probabilities the log likelihood is just
+3344640	3353440	the sum of the logs of the individual probabilities so log likelihood starts at zero
+3354560	3361680	and then log likelihood here we can just accumulate simply and then the end we can print this
+3365360	3366560	print the log likelihood
+3369520	3372720	f strings maybe you're familiar with this
+3373840	3374640	so log likelihood
+3374640	3376240	is negative 38
+3379840	3390080	okay now we actually want um so how high can log likelihood get it can go to zero so when
+3390080	3394160	all the probabilities are one log likelihood will be zero and then when all the probabilities
+3394160	3400080	are lower this will grow more and more negative now we don't actually like this because what we'd
+3400080	3403840	like is a loss function and a loss function has the semantics that low
+3403840	3409040	is good because we're trying to minimize the loss so we actually need to invert this
+3409040	3412880	and that's what gives us something called the negative log likelihood
+3414880	3418800	negative log likelihood is just negative of the log likelihood
+3422720	3427040	these are f strings by the way if you'd like to look this up negative log likelihood equals
+3428320	3433040	so negative log likelihood now is just negative of it and so the negative log likelihood is a negative
+3433040	3440660	likelihood, is a very nice loss function because the lowest it can get is zero. And the higher it
+3440660	3446160	is, the worse off the predictions are that you're making. And then one more modification to this
+3446160	3451740	that sometimes people do is that for convenience, they actually like to normalize by, they like to
+3451740	3460400	make it an average instead of a sum. And so here, let's just keep some counts as well. So n plus
+3460400	3466800	equals one starts at zero. And then here, we can have sort of like a normalized log likelihood.
+3470240	3476120	If we just normalize it by the count, then we will sort of get the average log likelihood. So this
+3476120	3483660	would be usually our loss function here. This is what we would use. So our loss function for the
+3483660	3489560	training set assigned by the model is 2.4. That's the quality of this model. And the lower it is,
+3489560	3490380	the better off we are.
+3490420	3497460	And the higher it is, the worse off we are. And the job of our, you know, training is to find the
+3497460	3504300	parameters that minimize the negative log likelihood loss. And that would be like a high
+3504300	3509800	quality model. Okay, so to summarize, I actually wrote it out here. So our goal is to maximize
+3509800	3516080	likelihood, which is the product of all the probabilities assigned by the model. And we want
+3516080	3520240	to maximize this likelihood with respect to the model parameters. And in our case, we want to
+3520240	3521100	maximize the likelihood of all the probabilities assigned by the model. And in our case, the model
+3521100	3527380	parameters here are defined in the table. These numbers, the probabilities are the model parameters
+3527380	3532340	sort of in our diagram language model so far. But you have to keep in mind that here we are storing
+3532340	3537460	everything in a table format, the probabilities. But what's coming up as a brief preview is that
+3537460	3542100	these numbers will not be kept explicitly, but these numbers will be calculated by a neural
+3542100	3547280	network. So that's coming up. And we want to change and tune the parameters of these neural
+3547280	3550220	networks. We want to change these parameters to maximize the likelihood of all the probabilities
+3550240	3555700	the likelihood, the product of the probabilities. Now, maximizing the likelihood is equivalent to
+3555700	3562260	maximizing the log likelihood, because log is a monotonic function. Here's the graph of log. And
+3562260	3568260	basically, all it is doing is it's just scaling your, you can look at it as just a scaling of the
+3568260	3574500	loss function. And so the optimization problem here, and here are actually equivalent, because
+3574500	3579160	this is just scaling, you can look at it that way. And so these are two identical optimization
+3579160	3579720	problems.
+3580240	3586420	Maximizing the log likelihood is equivalent to minimizing the negative log likelihood.
+3586420	3590540	And then in practice, people actually minimize the average negative log likelihood to get
+3590540	3596860	numbers like 2.4. And then this summarizes the quality of your model. And we'd like to
+3596860	3602680	minimize it and make it as small as possible. And the lowest it can get is zero. And the
+3602680	3607440	lower it is, the better off your model is because it's assigning it's assigning high
+3607440	3609720	probabilities to your data.
+3609720	3610240	Now let's estimate.
+3610240	3614240	The probability over the entire training set just to make sure that we get something around 2.4.
+3614800	3618720	Let's run this over the entire oops, let's take out the print statement as well.
+3620640	3622880	Okay, 2.45 for the entire training set.
+3624400	3627600	Now what I'd like to show you is that you can actually evaluate the probability for any word
+3627600	3633520	that you want. Like for example, if we just test a single word Andre, and bring back the print
+3633520	3639520	statement, then you see that Andre is actually kind of like an unlikely word or like on average,
+3640240	3647280	we take three log probability to represent it. And roughly, that's because EJ apparently is very
+3647280	3656160	uncommon as an example. Now, think through this. When I take Andre and I append Q, and I test the
+3656160	3664800	probability of it Andre q, we actually get infinity. And that's because J Q has a 0%
+3664800	3665200	probability according to our model. So the log likelihood, so the log of 0% is 0% which is the
+3665200	3669360	probability of actually dancing. And then what happens when I take Andre, I take Andre q, and I test the
+3669360	3671680	So the log of 0 will be negative infinity.
+3672040	3673780	We get infinite loss.
+3674340	3675780	So this is kind of undesirable, right?
+3675780	3678840	Because we plugged in a string that could be like a somewhat reasonable name.
+3678840	3685760	But basically what this is saying is that this model is exactly 0% likely to predict this name.
+3686620	3689080	And our loss is infinity on this example.
+3689840	3696360	And really the reason for that is that j is followed by q 0 times.
+3697000	3697600	Where is q?
+3697600	3698780	jq is 0.
+3699180	3701440	And so jq is 0% likely.
+3702100	3704840	So it's actually kind of gross and people don't like this too much.
+3704960	3710320	To fix this, there's a very simple fix that people like to do to sort of like smooth out your model a little bit.
+3710360	3711300	And it's called model smoothing.
+3711900	3715500	And roughly what's happening is that we will add some fake counts.
+3716140	3719700	So imagine adding a count of 1 to everything.
+3720780	3724020	So we add a count of 1 like this.
+3724360	3725960	And then we recalculate the probabilities.
+3727600	3728820	And that's model smoothing.
+3728960	3730160	And you can add as much as you like.
+3730220	3732220	You can add 5 and that will give you a smoother model.
+3732700	3737260	And the more you add here, the more uniform model you're going to have.
+3737840	3741740	And the less you add, the more peaked model you are going to have, of course.
+3742300	3745240	So 1 is like a pretty decent count to add.
+3745600	3749700	And that will ensure that there will be no zeros in our probability matrix P.
+3750780	3753140	And so this will, of course, change the generations a little bit.
+3753640	3754500	In this case, it didn't.
+3754600	3755880	But in principle, it could.
+3756540	3757580	But what that's going to do...
+3757600	3760340	What it's going to do now is that nothing will be infinity unlikely.
+3761260	3764500	So now our model will predict some other probability.
+3764880	3767160	And we see that jq now has a very small probability.
+3767580	3771220	So the model still finds it very surprising that this was a word or a bigram.
+3771440	3772720	But we don't get negative infinity.
+3773320	3775760	So it's kind of like a nice fix that people like to apply sometimes.
+3775800	3776660	And it's called model smoothing.
+3777100	3781060	Okay, so we've now trained a respectable bigram character-level language model.
+3781320	3787380	And we saw that we both sort of trained the model by looking at the counts of all the bigrams.
+3787600	3790480	And normalizing the rows to get probability distributions.
+3791200	3797920	We saw that we can also then use those parameters of this model to perform sampling of new words.
+3799260	3801680	So we sample new names according to those distributions.
+3802100	3804860	And we also saw that we can evaluate the quality of this model.
+3805320	3809400	And the quality of this model is summarized in a single number, which is the negative log likelihood.
+3809880	3812700	And the lower this number is, the better the model is.
+3813140	3817060	Because it is giving high probabilities to the actual next characters.
+3817060	3818900	And all the bigrams in our training set.
+3819960	3821600	So that's all well and good.
+3821860	3825980	But we've arrived at this model explicitly by doing something that felt sensible.
+3826220	3827620	We were just performing counts.
+3827860	3830080	And then we were normalizing those counts.
+3830860	3833760	Now what I would like to do is I would like to take an alternative approach.
+3834000	3836200	We will end up in a very, very similar position.
+3836440	3837840	But the approach will look very different.
+3838180	3843360	Because I would like to cast the problem of bigram character-level language modeling into the neural network framework.
+3844020	3847040	And in the neural network framework, we're going to approach things.
+3847280	3850160	Slightly differently, but again, end up in a very similar spot.
+3850360	3851260	I'll go into that later.
+3852060	3856960	Now, our neural network is going to be a still a bigram character-level language model.
+3857360	3859860	So it receives a single character as an input.
+3860460	3863460	Then there's neural network with some weights or some parameters w.
+3864260	3869060	And it's going to output the probability distribution over the next character in a sequence.
+3869260	3874660	It's going to make guesses as to what is likely to follow this character that was input to the model.
+3876060	3876960	And then in addition to that,
+3877260	3881060	we're going to be able to evaluate any setting of the parameters of the neural net.
+3881260	3884860	Because we have the loss function, the negative log likelihood.
+3885060	3887160	So we're going to take a look at its probability distributions.
+3887360	3888960	And we're going to use the labels,
+3889160	3894160	which are basically just the identity of the next character in that bigram, the second character.
+3894360	3899360	So knowing what the second character actually comes next in the bigram allows us to then look at
+3899560	3903260	how high of probability the model assigns to that character.
+3903460	3906160	And then we, of course, want the probability to be very high.
+3907060	3909860	And that is another way of saying that the loss is low.
+3910860	3915060	So we're going to use gradient-based optimization then to tune the parameters of this network.
+3915460	3918260	Because we have the loss function and we're going to minimize it.
+3918460	3923660	So we're going to tune the weights so that the neural net is correctly predicting the probabilities for the next character.
+3924460	3925460	So let's get started.
+3925660	3929460	The first thing I want to do is I want to compile the training set of this neural network, right?
+3929660	3934260	So create the training set of all the bigrams.
+3934260	3945860	Okay, and here I'm going to copy-paste this code because this code iterates over all the bigrams.
+3946060	3950260	So here we start with the words, we iterate over all the bigrams.
+3950460	3952860	And previously, as you recall, we did the counts.
+3953060	3954460	But now we're not going to do counts.
+3954660	3956060	We're just creating a training set.
+3956260	3959860	Now this training set will be made up of two lists.
+3960060	3963860	We have the...
+3964260	3969060	inputs and the targets, the labels.
+3969260	3971060	And these bigrams will denote x, y.
+3971260	3973060	Those are the characters, right?
+3973260	3977060	And so we're given the first character of the bigram and then we're trying to predict the next one.
+3977260	3979060	Both of these are going to be integers.
+3979260	3984060	So here we'll take xs.append is just x1.
+3984260	3987060	ys.append is x2.
+3987260	3991060	And then here we actually don't want lists of integers.
+3991260	3994060	We will create tensors out of these.
+3994260	3997060	xs is torch.tensor of xs.
+3997260	4001060	And ys is torch.tensor of ys.
+4001260	4007060	And then we don't actually want to take all the words just yet because I want everything to be manageable.
+4007260	4011060	So let's just do the first word, which is Emma.
+4011260	4015060	And then it's clear what these xs and ys would be.
+4015260	4021060	Here let me print character1, character2, just so you see what's going on here.
+4021260	4024060	So the bigrams of these characters is...
+4024260	4034060	So this single word, as I mentioned, has one, two, three, four, five examples for our neural network.
+4034260	4037060	There are five separate examples in Emma.
+4037260	4039060	And those examples I'll summarize here.
+4039260	4047060	When the input to the neural network is integer 0, the desired label is integer 5, which corresponds to e.
+4047260	4052060	When the input to the neural network is 5, we want its weights to be arranged,
+4052060	4054860	so that 13 gets a very high probability.
+4055060	4058860	When 13 is put in, we want 13 to have a high probability.
+4059060	4062860	When 13 is put in, we also want 1 to have a high probability.
+4063060	4066860	When 1 is input, we want 0 to have a very high probability.
+4067060	4072860	So there are five separate input examples to a neural net in this dataset.
+4075060	4080860	I wanted to add a tangent of a note of caution to be careful with a lot of the APIs of some of these frameworks.
+4080860	4087660	You saw me silently use torch.tensor with a lowercase t, and the output looked right.
+4087860	4091660	But you should be aware that there's actually two ways of constructing a tensor.
+4091860	4096660	There's a torch.lowercase tensor, and there's also a torch.capitalTensor class,
+4096860	4099660	which you can also construct, so you can actually call both.
+4099860	4104660	You can also do torch.capitalTensor, and you get an x as in y as well.
+4104860	4107660	So that's not confusing at all.
+4107860	4110660	There are threads on what is the difference between these two.
+4110860	4115660	And unfortunately, the docs are just not clear on the difference.
+4115860	4118660	And when you look at the docs of lowercase tensor,
+4118860	4122660	constructs tensor with no autograd history by copying data.
+4122860	4125660	It's just like, it doesn't make sense.
+4125860	4130660	So the actual difference, as far as I can tell, is explained eventually in this random thread that you can Google.
+4130860	4135660	And really it comes down to, I believe, that...
+4135860	4137660	Where is this?
+4137860	4140660	Torch.tensor infers the D type, the data type,
+4140860	4143660	automatically, while torch.tensor just returns a float tensor.
+4143860	4146660	I would recommend to stick to torch.lowercase tensor.
+4146860	4152660	So indeed, we see that when I construct this with a capital T,
+4152860	4156660	the data type here of x is float32.
+4156860	4159660	But torch.lowercase tensor,
+4159860	4165660	you see how it's now x.dtype is now integer.
+4165860	4170660	So it's advised that you use lowercase t
+4170860	4173660	and you can read more about it if you like in some of these threads.
+4173860	4177660	But basically, I'm pointing out some of these things
+4177860	4182660	because I want to caution you and I want you to get used to reading a lot of documentation
+4182860	4186660	and reading through a lot of Q&As and threads like this.
+4186860	4190660	And some of this stuff is unfortunately not easy and not very well documented
+4190860	4192660	and you have to be careful out there.
+4192860	4196660	What we want here is integers because that's what makes sense.
+4196860	4200660	And so lowercase tensor is what we are using.
+4200860	4205660	OK, now we want to think through how we're going to feed in these examples into a neural network.
+4205860	4209660	Now, it's not quite as straightforward as plugging it in
+4209860	4211660	because these examples right now are integers.
+4211860	4214660	So there's like a 0, 5 or 13.
+4214860	4216660	It gives us the index of the character.
+4216860	4219660	And you can't just plug an integer index into a neural net.
+4219860	4223660	These neural nets are sort of made up of these neurons
+4223860	4226660	and these neurons have weights.
+4226860	4230660	And as you saw in microGRAD, these weights act multiplicatively on the inputs.
+4230860	4233660	WX plus B, there's 10 Hs and so on.
+4233860	4237660	And so it doesn't really make sense to make an input neuron take on integer values
+4237860	4241660	that you feed in and then multiply on with weights.
+4241860	4246660	So instead, a common way of encoding integers is what's called one-hot encoding.
+4246860	4250660	In one-hot encoding, we take an integer like 13
+4250860	4255660	and we create a vector that is all zeros except for the 13th dimension,
+4255860	4257660	which we turn to a 1.
+4257860	4260660	And then that vector can feed into a neural net.
+4260860	4267660	Now, conveniently, PyTorch actually has something called the one-hot function
+4267860	4269660	inside torch and then functional.
+4269860	4273660	It takes a tensor made up of integers.
+4273860	4277660	Long is an integer.
+4277860	4281660	And it also takes a number of classes,
+4281860	4286660	which is how large you want your tensor, your vector to be.
+4286860	4290660	So here, let's import torch.nn.func.
+4290860	4293660	This is a common way of importing it.
+4293860	4296660	And then let's do f.one-hot.
+4296860	4299660	And we feed in the integers that we want to encode.
+4299860	4303660	So we can actually feed in the entire array of Xs.
+4303860	4307660	And we can tell it that numclasses is 27.
+4307860	4309660	So it doesn't have to try to guess it.
+4309860	4313660	It may have guessed that it's only 13 and would give us an incorrect result.
+4313860	4315660	So this is the one-hot.
+4315860	4319660	Let's call this xinc for xencoded.
+4320860	4325660	And then we see that xencoded.shape is 5 by 27.
+4325860	4331660	And we can also visualize it, plt.imshow of xinc,
+4331860	4334660	to make it a little bit more clear because this is a little messy.
+4334860	4339660	So we see that we've encoded all the five examples into vectors.
+4339860	4342660	We have five examples, so we have five rows,
+4342860	4345660	and each row here is now an example into a neural net.
+4345860	4349660	And we see that the appropriate bit is turned on as a one,
+4349660	4351460	and everything else is zero.
+4351660	4356460	So here, for example, the zeroth bit is turned on.
+4356660	4358460	The fifth bit is turned on.
+4358660	4361460	Thirteenth bits are turned on for both of these examples.
+4361660	4364460	And then the first bit here is turned on.
+4364660	4369460	So that's how we can encode integers into vectors.
+4369660	4372460	And then these vectors can feed into neural nets.
+4372660	4375460	One more issue to be careful with here, by the way, is
+4375660	4377460	let's look at the data type of xincoding.
+4377660	4379460	We always want to be careful with data types.
+4379460	4382260	What would you expect xincoding's data type to be?
+4382460	4384260	When we're plugging numbers into neural nets,
+4384460	4386260	we don't want them to be integers.
+4386460	4390260	We want them to be floating-point numbers that can take on various values.
+4390460	4393260	But the dtype here is actually a 64-bit integer.
+4393460	4395260	And the reason for that, I suspect,
+4395460	4399260	is that one hot received a 64-bit integer here,
+4399460	4401260	and it returned the same data type.
+4401460	4403260	And when you look at the signature of one hot,
+4403460	4406260	it doesn't even take a dtype, a desired data type,
+4406460	4408260	of the output tensor.
+4408260	4411060	And so we can't, in a lot of functions in Torch,
+4411260	4414060	we'd be able to do something like dtype equals torch.float32,
+4414260	4418060	which is what we want, but one hot does not support that.
+4418260	4423060	So instead, we're going to want to cast this to float like this.
+4423260	4426060	So that these, everything is the same,
+4426260	4428060	everything looks the same,
+4428260	4430060	but the dtype is float32.
+4430260	4433060	And floats can feed into neural nets.
+4433260	4436060	So now let's construct our first neuron.
+4436260	4438060	This neuron will look at
+4438060	4439860	these input vectors.
+4440060	4441860	And as you remember from micrograd,
+4442060	4443860	these neurons basically perform a very simple function,
+4444060	4445860	wx plus b,
+4446060	4448860	where wx is a dot product, right?
+4449060	4451860	So we can achieve the same thing here.
+4452060	4454860	Let's first define the weights of this neuron, basically.
+4455060	4457860	What are the initial weights at initialization for this neuron?
+4458060	4460860	Let's initialize them with torch.random.
+4461060	4466860	torch.random fills a tensor with random numbers
+4466860	4468660	drawn from a normal distribution.
+4468860	4473660	And a normal distribution has a probability density function like this.
+4473860	4476660	And so most of the numbers drawn from this distribution
+4476860	4478660	will be around zero,
+4478860	4481660	but some of them will be as high as almost three and so on.
+4481860	4485660	And very few numbers will be above three in magnitude.
+4485860	4489660	So we need to take a size as an input here.
+4489860	4493660	And I'm going to use size to be 27 by one.
+4493860	4496660	So 27 by one
+4496660	4498460	and then let's visualize w.
+4498660	4502460	So w is a column vector of 27 numbers.
+4502660	4508460	And these weights are then multiplied by the inputs.
+4508660	4510460	So now to perform this multiplication,
+4510660	4514460	we can take x encoding and we can multiply it with w.
+4514660	4519460	This is a matrix multiplication operator in PyTorch.
+4519660	4523460	And the output of this operation is five by one.
+4523660	4525460	The reason it's five by one is the following.
+4525660	4526460	We took x encoding
+4526660	4528460	which is five by 27
+4528660	4532460	and we multiplied it by 27 by one.
+4532660	4535460	And in matrix multiplication,
+4535660	4539460	you see that the output will become five by one
+4539660	4543460	because these 27 will multiply and add.
+4543660	4546460	So basically what we're seeing here
+4546660	4548460	out of this operation
+4548660	4553460	is we are seeing the five activations
+4553660	4555460	of this neuron
+4555460	4557260	on these five inputs.
+4557460	4560260	And we've evaluated all of them in parallel.
+4560460	4563260	We didn't feed in just a single input to the single neuron.
+4563460	4567260	We fed in simultaneously all the five inputs into the same neuron.
+4567460	4569260	And in parallel,
+4569460	4572260	PyTorch has evaluated the wx plus b.
+4572460	4574260	But here is just wx.
+4574460	4575260	There's no bias.
+4575460	4580260	It has value w times x for all of them independently.
+4580460	4582260	Now instead of a single neuron though,
+4582460	4584260	I would like to have 27 neurons.
+4584260	4587060	And I'll show you in a second why I want 27 neurons.
+4587260	4589060	So instead of having just a one here,
+4589260	4592060	which is indicating this presence of one single neuron,
+4592260	4594060	we can use 27.
+4594260	4597060	And then when w is 27 by 27,
+4597260	4603060	this will in parallel evaluate all the 27 neurons
+4603260	4605060	on all the five inputs,
+4605260	4609060	giving us a much bigger result.
+4609260	4613060	So now what we've done is five by 27 multiplied 27 by 27.
+4613060	4616860	And the output of this is now five by 27.
+4617060	4622860	So we can see that the shape of this is five by 27.
+4623060	4626860	So what is every element here telling us, right?
+4627060	4631860	It's telling us for every one of 27 neurons that we created,
+4632060	4638860	what is the firing rate of those neurons on every one of those five examples?
+4639060	4641860	So the element, for example,
+4641860	4644660	three comma 13,
+4644860	4648660	is giving us the firing rate of the 13th neuron
+4648860	4651660	looking at the third input.
+4651860	4655660	And the way this was achieved is by a dot product
+4655860	4660660	between the third input and the 13th column
+4660860	4664660	of this w matrix here.
+4664860	4667660	So using matrix multiplication,
+4667860	4671660	we can very efficiently evaluate the dot product
+4671660	4674460	between lots of input examples in a batch
+4674660	4678460	and lots of neurons where all of those neurons have weights
+4678660	4680460	in the columns of those w's.
+4680660	4682460	And in matrix multiplication,
+4682660	4685460	we're just doing those dot products in parallel.
+4685660	4687460	Just to show you that this is the case,
+4687660	4691460	we can take xank and we can take the third row.
+4691660	4696460	And we can take the w and take its 13th column.
+4696660	4701460	And then we can do xank at three
+4701660	4706460	element-wise multiply with w at 13
+4706660	4707460	and sum that up.
+4707660	4709460	That's wx plus b.
+4709660	4712460	Well, there's no plus b, it's just wx dot product.
+4712660	4714460	And that's this number.
+4714660	4717460	So you see that this is just being done efficiently
+4717660	4720460	by the matrix multiplication operation
+4720660	4722460	for all the input examples
+4722660	4725460	and for all the output neurons of this first layer.
+4725660	4728460	Okay, so we fed our 27 dimensional inputs
+4728660	4730460	into a first layer of a neural net
+4730460	4732260	that has 27 neurons, right?
+4732460	4736260	So we have 27 inputs and now we have 27 neurons.
+4736460	4739260	These neurons perform w times x.
+4739460	4740260	They don't have a bias
+4740460	4742260	and they don't have a nonlinearity like tanh.
+4742460	4745260	We're going to leave them to be a linear layer.
+4745460	4747260	In addition to that,
+4747460	4749260	we're not going to have any other layers.
+4749460	4750260	This is going to be it.
+4750460	4752260	It's just going to be the dumbest, smallest,
+4752460	4753260	simplest neural net,
+4753460	4755260	which is just a single linear layer.
+4755460	4757260	And now I'd like to explain
+4757460	4760260	what I want those 27 outputs to be.
+4760460	4762260	Intuitively, what we're trying to produce here
+4762460	4764260	for every single input example
+4764460	4765260	is we're trying to produce
+4765460	4767260	some kind of a probability distribution
+4767460	4769260	for the next character in a sequence.
+4769460	4771260	And there's 27 of them.
+4771460	4773260	But we have to come up with precise semantics
+4773460	4775260	for exactly how we're going to interpret
+4775460	4779260	these 27 numbers that these neurons take on.
+4779460	4781260	Now intuitively, you see here
+4781460	4783260	that these numbers are negative
+4783460	4785260	and some of them are positive, etc.
+4785460	4787260	And that's because these are coming out
+4787460	4788260	of the neural net layer
+4788460	4790260	initialized with these
+4790460	4793260	normal distribution parameters.
+4793460	4795260	But what we want is
+4795460	4797260	we want something like we had here.
+4797460	4800260	Like each row here told us the counts
+4800460	4802260	and then we normalize the counts
+4802460	4803260	to get probabilities.
+4803460	4805260	And we want something similar
+4805460	4806260	to come out of the neural net.
+4806460	4808260	But what we just have right now
+4808460	4810260	is just some negative and positive numbers.
+4810460	4812260	Now we want those numbers
+4812460	4814260	to somehow represent the probabilities
+4814460	4815260	for the next character.
+4815460	4817260	But you see that probabilities,
+4817460	4819260	they have a special structure.
+4819260	4821060	They're positive numbers
+4821260	4822060	and they sum to one.
+4822260	4824060	And so that doesn't just come out
+4824260	4825060	of a neural net.
+4825260	4827060	And then they can't be counts
+4827260	4830060	because these counts are positive
+4830260	4832060	and counts are integers.
+4832260	4834060	So counts are also not really a good thing
+4834260	4836060	to output from a neural net.
+4836260	4838060	So instead, what the neural net
+4838260	4839060	is going to output
+4839260	4841060	and how we are going to interpret
+4841260	4843060	the 27 numbers
+4843260	4845060	is that these 27 numbers
+4845260	4848060	are giving us log counts, basically.
+4848060	4852860	So instead of giving us counts directly,
+4853060	4853860	like in this table,
+4854060	4855860	they're giving us log counts.
+4856060	4857060	And to get the counts,
+4857260	4858860	we're going to take the log counts
+4859060	4860860	and we're going to exponentiate them.
+4861060	4865860	Now, exponentiation takes the following form.
+4866060	4869860	It takes numbers that are negative
+4870060	4870860	or they are positive.
+4871060	4872860	It takes the entire real line.
+4873060	4874860	And then if you plug in negative numbers,
+4875060	4876860	you're going to get e to the x,
+4876860	4879660	which is always below one.
+4879860	4882660	So you're getting numbers lower than one.
+4882860	4885660	And if you plug in numbers greater than zero,
+4885860	4887660	you're getting numbers greater than one
+4887860	4890660	all the way growing to the infinity.
+4890860	4892660	And this here grows to zero.
+4892860	4894660	So basically, we're going to
+4894860	4899660	take these numbers here
+4899860	4903660	and instead of them being positive
+4903860	4905660	and negative in all their place,
+4905660	4908460	we're going to interpret them as log counts.
+4908660	4910460	And then we're going to element-wise
+4910660	4912460	exponentiate these numbers.
+4912660	4915460	Exponentiating them now gives us something like this.
+4915660	4917460	And you see that these numbers now,
+4917660	4919460	because they went through an exponent,
+4919660	4922460	all the negative numbers turned into numbers below one,
+4922660	4924460	like 0.338.
+4924660	4926460	And all the positive numbers, originally,
+4926660	4928460	turned into even more positive numbers,
+4928660	4930460	sort of greater than one.
+4930660	4932460	So like, for example,
+4932660	4934460	seven
+4934460	4938260	is some positive number over here
+4938460	4940260	that is greater than zero.
+4940460	4944260	But exponentiated outputs here
+4944460	4947260	basically give us something that we can use and interpret
+4947460	4950260	as the equivalent of counts originally.
+4950460	4952260	So you see these counts here?
+4952460	4955260	1, 12, 7, 51, 1, etc.
+4955460	4959260	The neural net is kind of now predicting
+4959460	4961260	counts.
+4961460	4964260	And these counts are positive numbers.
+4964460	4967260	They're probably below zero, so that makes sense.
+4967460	4970260	And they can now take on various values
+4970460	4974260	depending on the settings of W.
+4974460	4976260	So let me break this down.
+4976460	4981260	We're going to interpret these to be the log counts.
+4981460	4983260	In other words for this, that is often used,
+4983460	4985260	is so-called logits.
+4985460	4988260	These are logits, log counts.
+4988460	4991260	And these will be sort of the counts.
+4991460	4993260	Logits exponentiated.
+4993260	4996060	And this is equivalent to the n matrix,
+4996260	5000060	sort of the n array that we used previously.
+5000260	5002060	Remember this was the n?
+5002260	5004060	This is the array of counts.
+5004260	5012060	And each row here are the counts for the next character, sort of.
+5012260	5014060	So those are the counts.
+5014260	5019060	And now the probabilities are just the counts normalized.
+5019260	5023060	And so I'm not going to find the same,
+5023060	5025860	but basically I'm not going to scroll all over the place.
+5026060	5027860	We've already done this.
+5028060	5031860	We want to counts.sum along the first dimension.
+5032060	5034860	And we want to keep dims as true.
+5035060	5036860	We've went over this.
+5037060	5039860	And this is how we normalize the rows of our counts matrix
+5040060	5042860	to get our probabilities.
+5043060	5044860	Props.
+5045060	5047860	So now these are the probabilities.
+5048060	5050860	And these are the counts that we have currently.
+5050860	5053660	And now when I show the probabilities,
+5053860	5058660	you see that every row here, of course,
+5058860	5062660	will sum to one because they're normalized.
+5062860	5066660	And the shape of this is 5 by 27.
+5066860	5069660	And so really what we've achieved is
+5069860	5071660	for every one of our five examples,
+5071860	5074660	we now have a row that came out of a neural net.
+5074860	5077660	And because of the transformations here,
+5077860	5080660	we made sure that this output of this neural net now
+5080660	5082460	can be interpreted to be probabilities
+5082660	5085460	or we can interpret to be probabilities.
+5085660	5088460	So our WX here gave us logits.
+5088660	5091460	And then we interpret those to be log counts.
+5091660	5094460	We exponentiate to get something that looks like counts.
+5094660	5096460	And then we normalize those counts
+5096660	5098460	to get a probability distribution.
+5098660	5100460	And all of these are differentiable operations.
+5100660	5103460	So what we've done now is we are taking inputs.
+5103660	5105460	We have differentiable operations
+5105660	5107460	that we can back propagate through.
+5107660	5109460	And we're getting out probability distributions.
+5109460	5114260	So for example, for the zeroth example that fed in,
+5114460	5118260	which was the zeroth example here,
+5118460	5120260	was a one-hot vector of zero.
+5120460	5127260	And it basically corresponded to feeding in this example here.
+5127460	5130260	So we're feeding in a dot into a neural net.
+5130460	5132260	And the way we fed the dot into a neural net
+5132460	5134260	is that we first got its index.
+5134460	5136260	Then we one-hot encoded it.
+5136460	5138260	Then it went into the neural net.
+5138260	5143060	And out came this distribution of probabilities.
+5143260	5147060	And its shape is 27.
+5147260	5149060	There's 27 numbers.
+5149260	5152060	And we're going to interpret this as the neural net's assignment
+5152260	5156060	for how likely every one of these characters,
+5156260	5159060	the 27 characters, are to come next.
+5159260	5162060	And as we tune the weights W,
+5162260	5165060	we're going to be, of course, getting different probabilities out
+5165260	5167060	for any character that you input.
+5167060	5168860	And so now the question is just,
+5169060	5170860	can we optimize and find a good W
+5171060	5173860	such that the probabilities coming out are pretty good?
+5174060	5176860	And the way we measure pretty good is by the loss function.
+5177060	5178860	Okay, so I organized everything into a single summary
+5179060	5180860	so that hopefully it's a bit more clear.
+5181060	5181860	So it starts here.
+5182060	5183860	We have an input data set.
+5184060	5185860	We have some inputs to the neural net.
+5186060	5189860	And we have some labels for the correct next character in a sequence.
+5190060	5191860	And these are integers.
+5192060	5194860	Here I'm using torch generators now
+5195060	5196860	so that you see the same numbers
+5197060	5197860	that I see.
+5198060	5201860	And I'm generating 27 neurons' weights.
+5202060	5207860	And each neuron here receives 27 inputs.
+5208060	5210860	Then here we're going to plug in all the input examples,
+5211060	5212860	x's, into a neural net.
+5213060	5214860	So here, this is a forward pass.
+5215060	5217860	First, we have to encode all of the inputs
+5218060	5219860	into one-hot representations.
+5220060	5221860	So we have 27 classes.
+5222060	5223860	We pass in these integers.
+5224060	5226860	And xinc becomes an array
+5227060	5228860	that is 5 by 27.
+5229060	5231860	Zeros except for a few ones.
+5232060	5234860	We then multiply this in the first layer of a neural net
+5235060	5236860	to get logits.
+5237060	5239860	Exponentiate the logits to get fake counts, sort of.
+5240060	5243860	And normalize these counts to get probabilities.
+5244060	5246860	So these last two lines, by the way, here
+5247060	5249860	are called the softmax,
+5250060	5251860	which I pulled up here.
+5252060	5255860	Softmax is a very often used layer in a neural net
+5255860	5258660	that takes these z's, which are logits,
+5258860	5260660	exponentiates them,
+5260860	5262660	and divides and normalizes.
+5262860	5265660	It's a way of taking outputs of a neural net layer.
+5265860	5268660	And these outputs can be positive or negative.
+5268860	5271660	And it outputs probability distributions.
+5271860	5274660	It outputs something that is always
+5274860	5276660	sums to one and are positive numbers,
+5276860	5278660	just like probabilities.
+5278860	5280660	So it's kind of like a normalization function
+5280860	5282660	if you want to think of it that way.
+5282860	5284660	And you can put it on top of any other linear layer
+5284660	5285460	inside a neural net.
+5285660	5288460	And it basically makes a neural net output probabilities
+5288660	5290460	that's very often used.
+5290660	5293460	And we used it as well here.
+5293660	5294460	So this is the forward pass,
+5294660	5297460	and that's how we made a neural net output probability.
+5297660	5302460	Now, you'll notice that
+5302660	5305460	all of these, this entire forward pass
+5305660	5307460	is made up of differentiable layers.
+5307660	5310460	Everything here we can backpropagate through.
+5310660	5313460	And we saw some of the backpropagation in micrograd.
+5313460	5316260	This is just multiplication and addition.
+5316460	5318260	All that's happening here is just multiply and add.
+5318460	5320260	And we know how to backpropagate through them.
+5320460	5323260	Exponentiation, we know how to backpropagate through.
+5323460	5326260	And then here, we are summing.
+5326460	5329260	And sum is easily backpropagatable as well.
+5329460	5331260	And division as well.
+5331460	5334260	So everything here is a differentiable operation.
+5334460	5337260	And we can backpropagate through.
+5337460	5339260	Now, we achieve these probabilities,
+5339460	5341260	which are 5 by 27.
+5341460	5343260	For every single example,
+5343260	5346060	we have a vector of probabilities that sum to 1.
+5346260	5348060	And then here, I wrote a bunch of stuff
+5348260	5351060	to sort of like break down the examples.
+5351260	5356060	So we have 5 examples making up Emma, right?
+5356260	5360060	And there are 5 bigrams inside Emma.
+5360260	5363060	So bigram example 1
+5363260	5366060	is that E is the beginning character
+5366260	5368060	right after dot.
+5368260	5371060	And the indexes for these are 0 and 5.
+5371260	5373060	So then we feed in a 0
+5373260	5376060	that's the input to the neural net.
+5376260	5378060	We get probabilities from the neural net
+5378260	5381060	that are 27 numbers.
+5381260	5383060	And then the label is 5
+5383260	5386060	because E actually comes after dot.
+5386260	5388060	So that's the label.
+5388260	5391060	And then we use this label 5
+5391260	5394060	to index into the probability distribution here.
+5394260	5397060	So this index 5 here
+5397260	5400060	is 0, 1, 2, 3, 4, 5.
+5400260	5402060	It's this number here,
+5402060	5403860	and this number here.
+5404060	5405860	So that's basically the probability
+5406060	5406860	assigned by the neural net
+5407060	5408860	to the actual correct character.
+5409060	5410860	You see that the network currently thinks
+5411060	5411860	that this next character,
+5412060	5413860	that E following dot,
+5414060	5415860	is only 1% likely,
+5416060	5417860	which is of course not very good, right?
+5418060	5419860	Because this actually is a training example,
+5420060	5421860	and the network thinks that this is currently
+5422060	5422860	very, very unlikely.
+5423060	5424860	But that's just because we didn't get very lucky
+5425060	5426860	in generating a good setting of W.
+5427060	5429860	So right now this network thinks this is unlikely,
+5430060	5431860	and 0.01 is not a good outcome.
+5432060	5433860	So the log likelihood then
+5434060	5435860	is very negative.
+5436060	5438860	And the negative log likelihood is very positive.
+5439060	5442860	And so 4 is a very high negative log likelihood,
+5443060	5444860	and that means we're going to have a high loss.
+5445060	5446860	Because what is the loss?
+5447060	5449860	The loss is just the average negative log likelihood.
+5451060	5453860	So the second character is E .
+5454060	5455860	And you see here that also the network thought
+5456060	5458860	that M following E is very unlikely, 1%.
+5458860	5463660	For M following M, it thought it was 2%.
+5463860	5465660	And for A following M,
+5465860	5467660	it actually thought it was 7% likely.
+5467860	5469660	So just by chance,
+5469860	5471660	this one actually has a pretty good probability,
+5471860	5474660	and therefore a pretty low negative log likelihood.
+5474860	5477660	And finally here, it thought this was 1% likely.
+5477860	5480660	So overall, our average negative log likelihood,
+5480860	5481660	which is the loss,
+5481860	5484660	the total loss that summarizes basically
+5484860	5486660	how well this network currently works,
+5486860	5488660	at least on this one word,
+5488860	5490660	not on the full data set, just the one word,
+5490860	5491660	is 3.76,
+5491860	5493660	which is actually a fairly high loss.
+5493860	5496660	This is not a very good setting of Ws.
+5496860	5498660	Now here's what we can do.
+5498860	5500660	We're currently getting 3.76.
+5500860	5503660	We can actually come here and we can change our W.
+5503860	5505660	We can resample it.
+5505860	5508660	So let me just add one to have a different seed.
+5508860	5510660	And then we get a different W.
+5510860	5512660	And then we can rerun this.
+5512860	5514660	And with this different seed,
+5514860	5516660	with this different setting of Ws,
+5516860	5518660	we now get 3.37.
+5518860	5520660	So this is a much better W, right?
+5520860	5522660	And it's better because the probabilities
+5522860	5525660	just happen to come out higher
+5525860	5528660	for the characters that actually are next.
+5528860	5531660	And so you can imagine actually just resampling this.
+5531860	5534660	We can try 2.
+5534860	5536660	Okay, this was not very good.
+5536860	5538660	Let's try one more.
+5538860	5540660	We can try 3.
+5540860	5542660	Okay, this was a terrible setting
+5542860	5544660	because we have a very high loss.
+5544860	5547660	So anyway, I'm going to erase this.
+5548860	5550660	What I'm doing here,
+5550860	5552660	which is just guess and check
+5552860	5554660	of randomly assigning parameters
+5554860	5556660	and seeing if the network is good,
+5556860	5558660	that is amateur hour.
+5558860	5560660	That's not how you optimize in neural net.
+5560860	5562660	The way you optimize in neural net
+5562860	5564660	is you start with some random guess
+5564860	5566660	and we're going to commit to this one,
+5566860	5568660	even though it's not very good.
+5568860	5570660	But now the big deal is we have a loss function.
+5570860	5573660	So this loss is made up only of differentiable operations.
+5573860	5576660	And we can minimize the loss by tuning Ws
+5576660	5580460	by computing the gradients of the loss
+5580660	5583460	with respect to these W matrices.
+5583660	5586460	And so then we can tune W to minimize the loss
+5586660	5588460	and find a good setting of W
+5588660	5590460	using gradient based optimization.
+5590660	5592460	So let's see how that will work.
+5592660	5594460	Now things are actually going to look
+5594660	5596460	almost identical to what we had with micrograd.
+5596660	5600460	So here I pulled up the lecture from micrograd,
+5600660	5602460	the notebook that's from this repository.
+5602660	5604460	And when I scroll all the way to the end
+5604660	5606460	where we left off with micrograd,
+5606460	5608260	we had something very, very similar.
+5608460	5610260	We had a number of input examples.
+5610460	5613260	In this case, we had four input examples inside Xs.
+5613460	5617260	And we had their targets, desired targets.
+5617460	5619260	Just like here, we have our Xs now,
+5619460	5620260	but we have five of them.
+5620460	5623260	And they're now integers instead of vectors.
+5623460	5626260	But we're going to convert our integers to vectors,
+5626460	5629260	except our vectors will be 27 large
+5629460	5631260	instead of three large.
+5631460	5634260	And then here what we did is first we did a forward pass
+5634460	5636260	where we ran a neural net
+5636260	5640060	from all of the inputs to get predictions.
+5640260	5642060	Our neural net at the time, this NFX,
+5642260	5645060	was a multi-layer perceptron.
+5645260	5647060	Our neural net is going to look different
+5647260	5650060	because our neural net is just a single layer,
+5650260	5653060	single linear layer followed by a softmax.
+5653260	5655060	So that's our neural net.
+5655260	5658060	And the loss here was the mean squared error.
+5658260	5660060	So we simply subtracted the prediction
+5660260	5662060	from the ground truth and squared it
+5662260	5663060	and summed it all up.
+5663260	5664060	And that was the loss.
+5664260	5666060	And loss was the single number
+5666060	5668860	that summarized the quality of the neural net.
+5669060	5671860	And when loss is low, like almost zero,
+5672060	5675860	that means the neural net is predicting correctly.
+5676060	5677860	So we had a single number
+5678060	5681860	that summarized the performance of the neural net.
+5682060	5683860	And everything here was differentiable
+5684060	5686860	and was stored in a massive compute graph.
+5687060	5689860	And then we iterated over all the parameters.
+5690060	5691860	We made sure that the gradients are set to zero.
+5692060	5693860	And we called loss.backward.
+5694060	5695860	And loss.backward
+5695860	5697660	and we iterated backpropagation
+5697860	5699660	at the final output node of loss.
+5699860	5701660	So remember these expressions?
+5701860	5703660	We had loss all the way at the end.
+5703860	5706660	We start backpropagation and we went all the way back.
+5706860	5708660	And we made sure that we populated
+5708860	5710660	all the parameters .grad.
+5710860	5712660	So .grad started at zero,
+5712860	5714660	but backpropagation filled it in.
+5714860	5715660	And then in the update,
+5715860	5717660	we iterated over all the parameters
+5717860	5719660	and we simply did a parameter update
+5719860	5723660	where every single element of our parameters
+5723660	5727460	was notched in the opposite direction of the gradient.
+5727660	5731660	And so we're going to do the exact same thing here.
+5731860	5738460	So I'm going to pull this up on the side here
+5738660	5739860	so that we have it available.
+5740060	5742060	And we're actually going to do the exact same thing.
+5742260	5744060	So this was the forward pass.
+5744260	5746860	So we did this.
+5747060	5748860	And props is our YPred.
+5749060	5750460	So now we have to evaluate the loss,
+5750660	5752460	but we're not using the mean squared error.
+5752460	5754060	We're using the negative log likelihood
+5754260	5755460	because we are doing classification.
+5755660	5758860	We're not doing regression as it's called.
+5759060	5762260	So here we want to calculate loss.
+5762460	5764460	Now, the way we calculate it is just
+5764660	5767060	this average negative log likelihood.
+5767260	5770580	Now, this props here
+5770780	5773140	has a shape of five by twenty seven.
+5773340	5774860	And so to get all that,
+5775060	5777540	we basically want to pluck out the probabilities
+5777740	5779940	at the correct indices here.
+5780140	5782260	So in particular, because the labels are
+5782460	5786340	stored here in the array wise, basically what we're after is for the first
+5786540	5790820	example, we're looking at probability of five right at index five.
+5791020	5796100	For the second example, at the second row or row index one,
+5796300	5800140	we are interested in the probability assigned to index 13.
+5800340	5803300	At the second example, we also have 13.
+5803500	5807260	At the third row, we want one.
+5807460	5811140	And at the last row, which is four, we want zero.
+5811340	5812460	So these are the probabilities.
+5812660	5813940	We're interested in.
+5814140	5818580	And you can see that they're not amazing as we saw above.
+5818780	5820100	So these are the probabilities we want,
+5820300	5824380	but we want like a more efficient way to access these probabilities,
+5824580	5826940	not just listing them out in a tuple like this.
+5827140	5829180	So it turns out that the way to do this in PyTorch,
+5829380	5835140	one of the ways, at least, is we can basically pass in all of these
+5836820	5839580	sorry about that, all of these
+5839780	5842140	integers in the vectors.
+5842660	5847020	So these ones, you see how they're just zero, one, two, three, four.
+5847220	5852740	We can actually create that using MP, not MP, sorry, torch.arrange of five.
+5852940	5854300	Zero, one, two, three, four.
+5854500	5858180	So we can index here with torch.arrange of five.
+5858380	5861060	And here we index with wise.
+5861260	5865540	And you see that that gives us exactly these numbers.
+5869100	5871780	So that plucks up the probabilities of that.
+5871780	5876140	That the neural network assigns to the correct next character.
+5876340	5879700	Now we take those probabilities and we don't we actually look at the log
+5879900	5883340	probability, so we want to dot log
+5883540	5886620	and then we want to just average that up.
+5886820	5889100	So take the mean of all of that and then
+5889300	5894100	it's the negative average log likelihood that is the loss.
+5894300	5897860	So the loss here is three point seven something.
+5898060	5901780	And you see that this loss, three point seven six, three point seven six is
+5901980	5906300	exactly as we've obtained before, but this is a vectorized form of that expression.
+5906500	5912900	So we get the same loss and the same loss we can consider sort of as part of this
+5913100	5916180	forward pass and we've achieved here now loss.
+5916380	5918380	OK, so we made our way all the way to loss.
+5918580	5919900	We've defined the forward pass.
+5920100	5922100	We forwarded the network and the loss.
+5922300	5924180	Now we're ready to do the backward pass.
+5924380	5926420	So backward pass.
+5928100	5930780	We want to first make sure that all the gradients are reset.
+5930980	5931580	So they're at zero.
+5931980	5935980	Now, in PyTorch, you can set the gradients to be zero,
+5936180	5939940	but you can also just set it to none and setting it to none is more efficient.
+5940140	5945300	And PyTorch will interpret none as like a lack of a gradient and is the same as zeros.
+5945500	5949500	So this is a way to set to zero the gradient.
+5949700	5953700	And now we do loss.backward.
+5953900	5956900	Before we do loss.backward, we need one more thing.
+5957100	5960780	If you remember from micrograd, PyTorch actually requires
+5960780	5965020	that we pass in requires grad is true
+5965220	5969740	so that we tell PyTorch that we are interested in calculating gradients
+5969940	5973340	for this leaf tensor by default, this is false.
+5973540	5980340	So let me recalculate with that and then set to none and loss.backward.
+5980740	5984260	Now, something magical happened when loss.backward was run
+5984460	5989900	because PyTorch, just like micrograd, when we did the forward pass here, it keeps
+5989900	5992140	track of all the operations under the hood.
+5992340	5994620	It builds a full computational graph,
+5994820	5997660	just like the graphs we produced in micrograd.
+5997860	6000580	Those graphs exist inside PyTorch.
+6000780	6002740	And so it knows all the dependencies
+6002740	6004860	and all the mathematical operations of everything.
+6005060	6009380	And when you then calculate the loss, we can call a dot.backward on it.
+6009580	6015460	And dot.backward then fills in the gradients of all the intermediates all
+6015660	6019740	the way back to w's, which are the parameters of our neural net.
+6020020	6023780	So now we can do w.grad and we see that it has structure.
+6023980	6025980	There's stuff inside it.
+6029100	6033260	And these gradients, every single element here,
+6033460	6040460	so w.shape is 27 by 27, w.grad's shape is the same, 27 by 27.
+6040660	6048540	And every element of w.grad is telling us the influence of that weight on the loss function.
+6048740	6049540	So, for example,
+6049540	6055380	this number all the way here, if this element, the 00 element of w,
+6055580	6060100	because the gradient is positive, it's telling us that this has a positive
+6060300	6066780	influence on the loss, slightly nudging w, slightly taking w00
+6066980	6072300	and adding a small h to it would increase the loss
+6072500	6075580	mildly because this gradient is positive.
+6075780	6078460	Some of these gradients are also negative.
+6078660	6079500	So that's telling us
+6079700	6081140	about the gradient information.
+6081340	6083220	And we can use this gradient information
+6083420	6086580	to update the weights of this neural network.
+6086780	6088140	So let's now do the update.
+6088340	6090660	It's going to be very similar to what we had in micrograd.
+6090860	6093420	We need no loop over all the parameters
+6093620	6097020	because we only have one parameter tensor and that is w.
+6097220	6102060	So we simply do w.data plus equals.
+6102260	6108300	We can actually copy this almost exactly negative 0.1 times w.grad.
+6109700	6114420	And that would be the update to the tensor.
+6114620	6118500	So that updates the tensor.
+6118700	6120980	And because the tensor is updated,
+6121180	6124140	we would expect that now the loss should decrease.
+6124340	6129380	So here, if I print loss,
+6129580	6131100	that item,
+6131300	6132980	it was 3.76, right?
+6133180	6135820	So we've updated the w here.
+6136020	6138900	So if I recalculate forward pass,
+6138900	6141260	the loss now should be slightly lower.
+6141460	6145540	So 3.76 goes to 3.74.
+6145740	6152380	And then we can again set grad to none and backward, update.
+6152580	6154740	And now the parameters changed again.
+6154940	6161900	So if we recalculate the forward pass, we expect a lower loss again, 3.72.
+6162260	6167660	OK, and this is again doing the, we're now doing gradient descent.
+6167660	6170220	And when we achieve a low loss,
+6170420	6175140	that will mean that the network is assigning high probabilities to the correct next characters.
+6175340	6179340	OK, so I rearranged everything and I put it all together from scratch.
+6179540	6183220	So here is where we construct our data set of bigrams.
+6183420	6186860	You see that we are still iterating only over the first word, Emma.
+6187060	6188980	I'm going to change that in a second.
+6189180	6193380	I added a number that counts the number of elements in Xs
+6193580	6196820	so that we explicitly see that number of examples is five,
+6196820	6200420	because currently we're just working with Emma and there's five bigrams there.
+6200620	6203500	And here I added a loop of exactly what we had before.
+6203700	6208780	So we had ten iterations of gradient descent of forward pass, backward pass and update.
+6208980	6212620	And so running these two cells, initialization and gradient descent
+6212820	6217980	gives us some improvement on the loss function.
+6218180	6221460	But now I want to use all the words
+6221660	6226380	and there's not five, but 228,000 bigrams now.
+6226820	6229460	However, this should require no modification whatsoever.
+6229660	6232900	Everything should just run because all the code we wrote doesn't care if there's
+6233100	6237260	five bigrams or 228,000 bigrams and with everything, we should just work.
+6237460	6240260	So you see that this will just run.
+6240460	6244500	But now we are optimizing over the entire training set of all the bigrams.
+6244700	6247380	And you see now that we are decreasing very slightly.
+6247580	6251580	So actually, we can probably afford a larger learning rate.
+6252460	6256260	And probably afford even larger learning rate.
+6256820	6263700	Even 50 seems to work on this very, very simple example, right?
+6263900	6267660	So let me re-initialize and let's run 100 iterations.
+6267860	6270060	See what happens.
+6270260	6273260	Okay.
+6273460	6280780	We seem to be coming up to some pretty good losses here.
+6280980	6282100	2.47.
+6282300	6283940	Let me run 100 more.
+6284140	6286660	What is the number that we expect, by the way, in the loss?
+6286860	6290700	We expect to get something around what we had originally, actually.
+6290900	6294500	So all the way back, if you remember in the beginning of this video,
+6294700	6302700	when we optimized just by counting, our loss was roughly 2.47 after we added smoothing.
+6302900	6309020	But before smoothing, we had roughly 2.45 loss.
+6309220	6313420	And so that's actually roughly the vicinity of what we expect to achieve.
+6313620	6315700	But before we achieved it by counting.
+6315900	6316700	And here we are.
+6316860	6320820	We're achieving roughly the same result, but with gradient based optimization.
+6321020	6326140	So we come to about 2.46, 2.45, etc.
+6326340	6327860	And that makes sense because fundamentally,
+6327860	6329780	we're not taking in any additional information.
+6329980	6331460	We're still just taking in the previous
+6331460	6333460	character and trying to predict the next one.
+6333660	6338060	But instead of doing it explicitly by counting and normalizing,
+6338260	6339940	we are doing it with gradient based learning.
+6340140	6342060	And it just so happens that the explicit
+6342260	6346660	approach happens to very well optimize the loss function without any need
+6346860	6350180	for gradient based optimization, because the setup for bigram language
+6350380	6354500	models is so straightforward and so simple, we can just afford to estimate
+6354700	6358740	those probabilities directly and maintain them in a table.
+6358940	6362820	But the gradient based approach is significantly more flexible.
+6363020	6366540	So we've actually gained a lot because
+6366740	6369020	what we can do now is
+6369220	6372740	we can expand this approach and complexify the neural net.
+6372940	6375940	So currently we're just taking a single character and feeding into a neural net.
+6375940	6377660	And the neural net is extremely simple,
+6377860	6380300	but we're about to iterate on this substantially.
+6380500	6383820	We're going to be taking multiple previous characters and we're going
+6384020	6387340	to be feeding them into increasingly more complex neural nets.
+6387540	6392460	But fundamentally, the output of the neural net will always just be logits.
+6392660	6395340	And those logits will go through the exact same transformation.
+6395540	6397780	We are going to take them through a softmax,
+6397980	6400900	calculate the loss function and the negative log likelihood,
+6401100	6405860	and do gradient based optimization. And so actually, as we complexify,
+6406060	6409580	the neural nets and work all the way up to transformers,
+6409780	6411900	none of this will really fundamentally change.
+6411980	6413500	None of this will fundamentally change.
+6413700	6417300	The only thing that will change is the way we do the forward pass,
+6417500	6421180	where we take in some previous characters and calculate logits for the next
+6421380	6424900	character in a sequence that will become more complex.
+6425100	6428620	And we'll use the same machinery to optimize it.
+6428820	6430300	And
+6430700	6435580	it's not obvious how we would have extended this bigram approach into
+6436060	6439100	a space where there are many more characters at the input,
+6439300	6443060	because eventually these tables would get way too large because there's way too
+6443260	6447740	many combinations of what previous characters could be.
+6447940	6449540	If you only have one previous character,
+6449740	6451980	we can just keep everything in a table that counts.
+6452180	6454220	But if you have the last 10 characters
+6454220	6457300	that are input, we can't actually keep everything in the table anymore.
+6457500	6459700	So this is fundamentally an unscalable approach.
+6459900	6462900	And the neural network approach is significantly more scalable.
+6463100	6465820	And it's something that actually we can improve on
+6466060	6468380	over time. So that's where we will be digging next.
+6468580	6470980	I wanted to point out two more things.
+6471180	6476620	Number one, I want you to notice that this X-ENG here,
+6476820	6478780	this is made up of one-hot vectors.
+6478980	6483020	And then those one-hot vectors are multiplied by this W matrix.
+6483220	6485860	And we think of this as multiple neurons
+6486060	6488580	being forwarded in a fully connected manner.
+6488780	6491820	But actually what's happening here is that, for example,
+6492020	6495700	if you have a one-hot vector here that has a one
+6495700	6499300	at, say, the fifth dimension, then because of the way the matrix
+6499500	6503300	multiplication works, multiplying that one-hot vector with W
+6503500	6507420	actually ends up plucking out the fifth row of W.
+6507620	6511180	Logits would become just the fifth row of W.
+6511380	6515580	And that's because of the way the matrix multiplication works.
+6516940	6519860	So that's actually what ends up happening.
+6520060	6525660	So but that's actually exactly what happened before, because remember all the way up here,
+6525860	6530380	we have a bigram, we took the first character and then that first character
+6530580	6536620	indexed into a row of this array here, and that row gave us the probability
+6536820	6541140	distribution for the next character. So the first character was used as a lookup
+6541340	6546220	into a matrix here to get the probability distribution.
+6546420	6549300	Well, that's actually exactly what's happening here, because we're taking
+6549500	6553380	the index, we're encoding it as one-hot and multiplying it by W.
+6553580	6555300	So logits literally becomes
+6555860	6560660	the appropriate row of W.
+6560860	6562660	And that gets just as before,
+6562860	6567340	exponentiated to create the counts and then normalized and becomes probability.
+6567540	6574900	So this W here is literally the same as this array here.
+6575100	6578820	But W, remember, is the log counts, not the counts.
+6579020	6585660	So it's more precise to say that W exponentiated, W dot exp, is this array.
+6585860	6591860	But this array was filled in by counting and by basically
+6592060	6595740	populating the counts of bigrams, whereas in the gradient-based framework,
+6595940	6603060	we initialize it randomly and then we let the loss guide us to arrive at the exact same array.
+6603260	6609980	So this array exactly here is basically the array W at the end of optimization,
+6610180	6614860	except we arrived at it piece by piece by following the loss.
+6615020	6617740	And that's why we also obtain the same loss function at the end.
+6617940	6620340	And the second note is if I come here,
+6620540	6625780	remember the smoothing where we added fake counts to our counts in order to
+6625980	6630860	smooth out and make more uniform the distributions of these probabilities.
+6631060	6634820	And that prevented us from assigning zero probability to
+6635020	6636980	to any one bigram.
+6637180	6642820	Now, if I increase the count here, what's happening to the probability?
+6643020	6644820	As I increase the count,
+6645020	6648180	probability becomes more and more uniform, right?
+6648380	6651540	Because these counts go only up to like 900 or whatever.
+6651740	6654940	So if I'm adding plus a million to every single number here,
+6655140	6659700	you can see how the row and its probability then when you divide is just going to
+6659900	6665060	become more and more close to exactly even probability, uniform distribution.
+6665260	6670580	It turns out that the gradient-based framework has an equivalent to smoothing.
+6670780	6672580	In particular,
+6673180	6674820	think through these W's here.
+6675020	6677380	Which we initialize randomly.
+6677580	6681260	We could also think about initializing W's to be zero.
+6681460	6683980	If all the entries of W are zero,
+6684180	6688060	then you'll see that logits will become all zero.
+6688260	6691100	And then exponentiating those logits becomes all one.
+6691300	6694860	And then the probabilities turn out to be exactly uniform.
+6695060	6699140	So basically, when W's are all equal to each other or say,
+6699340	6703380	especially zero, then the probabilities come out completely uniform.
+6703580	6704780	So
+6704980	6712500	trying to incentivize W to be near zero is basically equivalent to label smoothing.
+6712700	6715180	And the more you incentivize that in a loss function,
+6715380	6718100	the more smooth distribution you're going to achieve.
+6718300	6721260	So this brings us to something that's called regularization,
+6721460	6723860	where we can actually augment the loss
+6724060	6727780	function to have a small component that we call a regularization loss.
+6727980	6730980	In particular, what we're going to do is we can take W
+6731180	6733780	and we can, for example, square all of its entries.
+6733980	6734780	And then,
+6735060	6738860	we can, whoops, sorry about that.
+6739060	6742380	We can take all the entries of W and we can sum them.
+6743580	6748100	And because we're squaring, there will be no signs anymore.
+6748300	6751300	Negatives and positives all get squashed to be positive numbers.
+6751500	6757020	And then the way this works is you achieve zero loss if W is exactly or zero.
+6757220	6760980	But if W has non-zero numbers, you accumulate loss.
+6761180	6764780	And so we can actually take this and we can add it on here.
+6764980	6771900	So we can do something like loss plus W square dot sum.
+6772100	6773500	Or let's actually instead of sum,
+6773700	6777420	let's take a mean because otherwise the sum gets too large.
+6777620	6781220	So mean is like a little bit more manageable.
+6781420	6783460	And then we have a regularization loss here.
+6783660	6786420	Let's say 0.01 times or something like that.
+6786620	6789220	You can choose the regularization strength
+6789420	6791980	and then we can just optimize this.
+6792180	6794860	And now this optimization actually has two components.
+6795060	6797860	Not only is it trying to make all the probabilities work out,
+6798060	6800380	but in addition to that, there's an additional component
+6800580	6803420	that simultaneously tries to make all Ws be zero.
+6803620	6806020	Because if Ws are non-zero, you feel a loss.
+6806220	6809980	And so minimizing this, the only way to achieve that is for W to be zero.
+6810180	6814740	And so you can think of this as adding like a spring force or like a gravity
+6814940	6817260	force that pushes W to be zero.
+6817460	6820940	So W wants to be zero and the probabilities want to be uniform,
+6821140	6824620	but they also simultaneously want to match up your
+6824820	6827220	probabilities as indicated by the data.
+6827420	6830460	And so the strength of this regularization
+6830660	6837020	is exactly controlling the amount of counts that you add here.
+6837220	6842580	Adding a lot more counts here corresponds to
+6842780	6846180	increasing this number, because the more you increase it,
+6846380	6849340	the more this part of the loss function dominates this part.
+6849540	6854340	And the more these weights will be unable to grow, because as they
+6854620	6858140	grow, they accumulate way too much loss.
+6858340	6861060	And so if this is strong enough,
+6861260	6866620	then we are not able to overcome the force of this loss and we will never
+6866820	6869260	and basically everything will be uniform predictions.
+6869460	6870540	So I thought that's kind of cool.
+6870740	6872980	OK, and lastly, before we wrap up,
+6873180	6876580	I wanted to show you how you would sample from this neural net model.
+6876780	6883340	And I copy pasted the sampling code from before, where remember that we sampled five
+6883540	6884620	times.
+6884820	6886100	And all we did is we start at zero.
+6886300	6892220	We grabbed the current ix row of p and that was our probability row
+6892420	6898700	from which we sampled the next index and just accumulated that and break when zero.
+6898900	6903700	And running this gave us these results.
+6903900	6907380	I still have the p in memory, so this is fine.
+6907580	6911780	Now, this p doesn't come from the row of p.
+6911980	6914540	Instead, it comes from this neural net.
+6914820	6922300	First, we take ix and we encode it into a one hot row of xank.
+6922500	6925020	This xank multiplies our w,
+6925220	6928980	which really just plucks out the row of w corresponding to ix.
+6929180	6930260	Really, that's what's happening.
+6930460	6932100	And that gets our logits.
+6932300	6934620	And then we normalize those logits,
+6934820	6938820	exponentiate to get counts and then normalize to get the distribution.
+6939020	6941180	And then we can sample from the distribution.
+6941380	6943100	So if I run this,
+6944740	6948420	it's kind of anticlimactic or climatic, depending how you look at it.
+6948620	6951500	But we get the exact same result.
+6951700	6954460	And that's because this is the identical model.
+6954660	6959300	Not only does it achieve the same loss, but as I mentioned, these are identical
+6959500	6963820	models and this w is the log counts of what we've estimated before.
+6964020	6966460	But we came to this answer in a very
+6966460	6969060	different way and it's got a very different interpretation.
+6969260	6972620	But fundamentally, this is basically the same model and gives the same samples here.
+6972820	6974540	And so
+6974740	6975500	that's kind of cool.
+6975700	6977820	OK, so we've actually covered a lot of ground.
+6978020	6981780	We introduced the bigram character level language model.
+6981980	6986020	We saw how we can train the model, how we can sample from the model and how we can
+6986220	6990020	evaluate the quality of the model using the negative log likelihood loss.
+6990220	6991620	And then we actually trained the model
+6991820	6995260	in two completely different ways that actually get the same result and the same
+6995460	7000300	model. In the first way, we just counted up the frequency of all the bigrams and
+7000500	7004540	normalized. In the second way, we used the
+7004740	7010700	negative log likelihood loss as a guide to optimizing the counts matrix
+7010900	7015660	or the counts array so that the loss is minimized in a gradient based framework.
+7015860	7018220	And we saw that both of them give the same result.
+7018420	7020060	And
+7020460	7021300	that's it.
+7021500	7024740	Now, the second one of these, the gradient based framework is much more flexible.
+7024940	7027580	And right now, our neural network is super simple.
+7027780	7029980	We're taking a single previous character
+7030180	7033740	and we're taking it through a single linear layer to calculate the logits.
+7033860	7035660	This is about to complexify.
+7035860	7039260	So in the follow up videos, we're going to be taking more and more of these
+7039460	7042780	characters and we're going to be feeding them into a neural net.
+7042980	7045220	But this neural net will still output the exact same thing.
+7045420	7047740	The neural net will output logits.
+7047940	7050620	And these logits will still be normalized in the exact same way.
+7050620	7052180	And all the loss and everything else
+7052180	7055220	in the gradient based framework, everything stays identical.
+7055420	7060260	It's just that this neural net will now complexify all the way to transformers.
+7060460	7063260	So that's going to be pretty awesome and I'm looking forward to it.
+7063260	7064300	So for now, bye.
