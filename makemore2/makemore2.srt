@@ -1,0 +1,7572 @@
+1
+00:00:00,720 --> 00:00:04,640
+Hi everyone. Today we are continuing our implementation of MakeMore.
+
+2
+00:00:05,200 --> 00:00:09,840
+Now in the last lecture we implemented the bigram language model and we implemented it both using
+
+3
+00:00:09,840 --> 00:00:15,760
+counts and also using a super simple neural network that had a single linear layer. Now
+
+4
+00:00:16,320 --> 00:00:21,680
+this is the Jupyter notebook that we built out last lecture and we saw that the way we approached
+
+5
+00:00:21,680 --> 00:00:26,320
+this is that we looked at only the single previous character and we predicted the distribution for
+
+6
+00:00:26,320 --> 00:00:31,600
+the character that would go next in the sequence and we did that by taking counts and normalizing
+
+7
+00:00:31,600 --> 00:00:38,400
+them into probabilities so that each row here sums to one. Now this is all well and good if
+
+8
+00:00:38,400 --> 00:00:44,160
+you only have one character of previous context and this works and it's approachable. The problem
+
+9
+00:00:44,160 --> 00:00:49,520
+with this model of course is that the predictions from this model are not very good because you only
+
+10
+00:00:49,520 --> 00:00:54,720
+take one character of context so the model didn't produce very name-like sounding things.
+
+11
+00:00:56,080 --> 00:00:56,320
+Now
+
+12
+00:00:56,800 --> 00:01:01,200
+the problem with this approach though is that if we are to take more context into account
+
+13
+00:01:01,200 --> 00:01:06,080
+when predicting the next character in a sequence things quickly blow up and this table the size
+
+14
+00:01:06,080 --> 00:01:10,480
+of this table grows and in fact it grows exponentially with the length of the context
+
+15
+00:01:11,200 --> 00:01:15,280
+because if we only take a single character at a time that's 27 possibilities of context
+
+16
+00:01:15,920 --> 00:01:20,640
+but if we take two characters in the past and try to predict the third one suddenly the number
+
+17
+00:01:20,640 --> 00:01:26,080
+of rows in this matrix you can look at it that way is 27 times 27 so there's 720
+
+18
+00:01:26,560 --> 00:01:31,760
+possibilities for what could have come in the context. If we take three characters as the
+
+19
+00:01:31,760 --> 00:01:39,840
+context suddenly we have 20 000 possibilities of context and so that's just way too many rows
+
+20
+00:01:39,840 --> 00:01:45,920
+of this matrix it's way too few counts for each possibility and the whole thing just kind of
+
+21
+00:01:45,920 --> 00:01:51,360
+explodes and doesn't work very well. So that's why today we're going to move on to this bullet
+
+22
+00:01:51,360 --> 00:01:56,000
+point here and we're going to implement a multi-layer perceptron model to predict the next
+
+23
+00:01:56,720 --> 00:02:01,200
+character in a sequence and this modeling approach that we're going to adopt follows this
+
+24
+00:02:01,200 --> 00:02:07,600
+paper Benjou et al. 2003. So I have the paper pulled up here now this isn't the very first
+
+25
+00:02:07,600 --> 00:02:12,160
+paper that proposed the use of multi-layer perceptrons or neural networks to predict the
+
+26
+00:02:12,160 --> 00:02:17,120
+next character or token in a sequence but it's definitely one that is was very influential
+
+27
+00:02:17,120 --> 00:02:22,000
+around that time it is very often cited to stand in for this idea and I think it's a very nice
+
+28
+00:02:22,000 --> 00:02:26,000
+write-up and so this is the paper that we're going to first look at and then implement.
+
+29
+00:02:26,720 --> 00:02:31,760
+Now this paper has 19 pages so we don't have time to go into the full detail of this paper but I
+
+30
+00:02:31,760 --> 00:02:35,280
+invite you to read it it's very readable interesting and has a lot of interesting
+
+31
+00:02:35,280 --> 00:02:40,480
+ideas in it as well in the introduction they describe the exact same problem I just described
+
+32
+00:02:40,480 --> 00:02:46,640
+and then to address it they propose the following model now keep in mind that we are building a
+
+33
+00:02:46,640 --> 00:02:51,040
+character level language model so we're working on the level of characters in this paper they
+
+34
+00:02:51,040 --> 00:02:56,000
+have a vocabulary of seventeen thousand possible words and they instead build a word level and
+
+35
+00:02:56,000 --> 00:03:00,000
+language model but we're going to still stick with the characters but we'll take the same modeling
+
+36
+00:03:00,000 --> 00:03:05,920
+approach now what they do is basically they propose to take every one of these words seventeen
+
+37
+00:03:05,920 --> 00:03:11,920
+thousand words and they're going to associate to each word a say thirty dimensional feature vector
+
+38
+00:03:12,880 --> 00:03:18,720
+so every word is now embedded into a thirty dimensional space you can think of it that way
+
+39
+00:03:19,360 --> 00:03:25,440
+so we have seventeen thousand points or vectors in a thirty dimensional space and that's you might
+
+40
+00:03:25,440 --> 00:03:31,040
+imagine that's very crowded that's a lot of points for a very small space now in the beginning these
+
+41
+00:03:31,040 --> 00:03:35,520
+words are initialized completely randomly so they're spread out at random but then we're
+
+42
+00:03:35,520 --> 00:03:40,800
+going to tune these embeddings of these words using that propagation so during the course of
+
+43
+00:03:40,800 --> 00:03:45,120
+training of this neural network these points or vectors are going to basically move around in this
+
+44
+00:03:45,120 --> 00:03:50,320
+space and you might imagine that for example words that have very similar meanings or there are
+
+45
+00:03:50,320 --> 00:03:55,280
+indeed synonyms of each other might end up in a very similar part of the space and conversely words
+
+46
+00:03:55,440 --> 00:04:01,040
+in very different things would go somewhere else in the space now their modeling approach otherwise
+
+47
+00:04:01,040 --> 00:04:06,080
+is identical to ours they are using a multi-layer neural network to predict the next word given the
+
+48
+00:04:06,080 --> 00:04:10,720
+previous words and to train the neural network they are maximizing the log likelihood of the
+
+49
+00:04:10,720 --> 00:04:16,320
+training data just like we did so the modeling approach itself is identical now here they have
+
+50
+00:04:16,320 --> 00:04:22,000
+a concrete example of this intuition why does it work basically suppose that for example you are
+
+51
+00:04:22,000 --> 00:04:24,800
+trying to predict a dog was running in a blank
+
+52
+00:04:25,600 --> 00:04:30,960
+now suppose that the exact phrase a dog was running in a has never occurred in the training
+
+53
+00:04:30,960 --> 00:04:35,760
+data and here you are at sort of test time later when the model is deployed somewhere
+
+54
+00:04:36,320 --> 00:04:41,840
+and it's trying to make a sentence and it's saying a dog was running in a blank and because
+
+55
+00:04:41,840 --> 00:04:47,280
+it's never encountered this exact phrase in the training set you're out of distribution as we say
+
+56
+00:04:47,280 --> 00:04:55,120
+like you don't have fundamentally any reason to suspect um what might come next but this approach
+
+57
+00:04:55,440 --> 00:04:59,920
+allows you to get around that because maybe you didn't see the exact phrase a dog was running in a
+
+58
+00:04:59,920 --> 00:05:04,560
+something but maybe you've seen similar phrases maybe you've seen the phrase the dog was running
+
+59
+00:05:04,560 --> 00:05:11,040
+in a blank and maybe your network has learned that a and the are like frequently are interchangeable
+
+60
+00:05:11,040 --> 00:05:15,600
+with each other and so maybe it took the embedding for a and the embedding for the
+
+61
+00:05:15,600 --> 00:05:20,160
+and it actually put them like nearby each other in the space and so you can transfer knowledge
+
+62
+00:05:20,160 --> 00:05:25,360
+through that embedding and you can generalize in that way similarly the network could know that cats
+
+63
+00:05:25,440 --> 00:05:30,560
+and dogs are animals and they co-occur in lots of very similar contexts and so even though you
+
+64
+00:05:30,560 --> 00:05:36,320
+haven't seen this exact phrase or if you haven't seen exactly walking or running you can through
+
+65
+00:05:36,320 --> 00:05:42,880
+the embedding space transfer knowledge and you can generalize to novel scenarios so let's now scroll
+
+66
+00:05:42,880 --> 00:05:48,720
+down to the diagram of the neural network they have a nice diagram here and in this example
+
+67
+00:05:48,720 --> 00:05:54,720
+we are taking three previous words and we are trying to predict the fourth word in a sequence
+
+68
+00:05:56,000 --> 00:06:00,720
+now these three previous words as i mentioned we have a vocabulary of 17 000
+
+69
+00:06:01,600 --> 00:06:08,480
+possible words so every one of these basically are the index of the incoming word
+
+70
+00:06:09,360 --> 00:06:15,920
+and because there are 17 000 words this is an integer between 0 and 16 999
+
+71
+00:06:17,280 --> 00:06:24,400
+now there's also a lookup table that they call c this lookup table is a matrix that is 17 000 by
+
+72
+00:06:25,840 --> 00:06:29,600
+and basically what we're doing here is we're treating this as a lookup table
+
+73
+00:06:29,600 --> 00:06:37,040
+and so every index is plucking out a row of this embedding matrix so that each index is converted
+
+74
+00:06:37,040 --> 00:06:41,600
+to the 30-dimensional vector that corresponds to the embedding vector for that word
+
+75
+00:06:42,880 --> 00:06:49,680
+so here we have the input layer of 30 neurons for three words making up 90 neurons in total
+
+76
+00:06:50,640 --> 00:06:55,280
+and here they're saying that this matrix c is shared across all the words so we're always in a
+
+77
+00:06:55,440 --> 00:07:02,980
+indexing into the same matrix C over and over for each one of these words. Next up is the hidden
+
+78
+00:07:02,980 --> 00:07:08,080
+layer of this neural network. The size of this hidden neural layer of this neural net is a
+
+79
+00:07:08,080 --> 00:07:12,400
+hyperparameter. So we use the word hyperparameter when it's kind of like a design choice up to the
+
+80
+00:07:12,400 --> 00:07:16,680
+designer of the neural net. And this can be as large as you'd like or as small as you'd like.
+
+81
+00:07:16,840 --> 00:07:22,340
+So for example, the size could be 100. And we are going to go over multiple choices of the size of
+
+82
+00:07:22,340 --> 00:07:27,400
+this hidden layer. And we're going to evaluate how well they work. So say there were 100 neurons
+
+83
+00:07:27,400 --> 00:07:34,740
+here. All of them would be fully connected to the 90 words or 90 numbers that make up these three
+
+84
+00:07:34,740 --> 00:07:40,660
+words. So this is a fully connected layer. Then there's a 10-inch long linearity. And then there's
+
+85
+00:07:40,660 --> 00:07:46,440
+this output layer. And because there are 17,000 possible words that could come next, this layer
+
+86
+00:07:46,440 --> 00:07:52,140
+has 17,000 neurons. And all of them are fully connected to all of these neurons.
+
+87
+00:07:52,340 --> 00:07:58,700
+In the hidden layer. So there's a lot of parameters here because there's a lot of words. So most
+
+88
+00:07:58,700 --> 00:08:05,160
+computation is here. This is the expensive layer. Now there are 17,000 logits here. So on top of
+
+89
+00:08:05,160 --> 00:08:09,900
+there, we have the softmax layer, which we've seen in our previous video as well. So every one of
+
+90
+00:08:09,900 --> 00:08:15,180
+these logits is exponentiated. And then everything is normalized to sum to one. So then we have a
+
+91
+00:08:15,180 --> 00:08:21,120
+nice probability distribution for the next word in the sequence. Now, of course, during training,
+
+92
+00:08:21,120 --> 00:08:22,320
+we actually have the label.
+
+93
+00:08:22,340 --> 00:08:29,900
+We have the identity of the next word in the sequence. That word or its index is used to pluck
+
+94
+00:08:29,900 --> 00:08:35,980
+out the probability of that word. And then we are maximizing the probability of that word
+
+95
+00:08:35,980 --> 00:08:41,780
+with respect to the parameters of this neural net. So the parameters are the weights and biases
+
+96
+00:08:41,780 --> 00:08:48,360
+of this output layer, the weights and biases of the hidden layer, and the embedding lookup table
+
+97
+00:08:48,360 --> 00:08:51,360
+C. And all of that is optimized using backpropagation.
+
+98
+00:08:52,340 --> 00:08:57,980
+And these dashed arrows, ignore those. That represents a variation of a neural net that we are
+
+99
+00:08:57,980 --> 00:09:02,940
+not going to explore in this video. So that's the setup, and now let's implement it. Okay, so I
+
+100
+00:09:02,940 --> 00:09:08,220
+started a brand new notebook for this lecture. We are importing PyTorch, and we are importing
+
+101
+00:09:08,220 --> 00:09:14,220
+matplotlib so we can create figures. Then I am reading all the names into a list of words like
+
+102
+00:09:14,220 --> 00:09:21,020
+I did before, and I'm showing the first eight right here. Keep in mind that we have 32,000 in total.
+
+103
+00:09:21,020 --> 00:09:22,020
+These are just the first eight.
+
+104
+00:09:22,340 --> 00:09:30,340
+And then here I'm building out the vocabulary of characters and all the mappings from the characters as strings to integers, and vice versa.
+
+105
+00:09:30,340 --> 00:09:35,340
+Now the first thing we want to do is we want to compile the dataset for the neural network.
+
+106
+00:09:35,340 --> 00:09:39,340
+And I had to rewrite this code. I'll show you in a second what it looks like.
+
+107
+00:09:39,340 --> 00:09:47,340
+So this is the code that I created for the dataset creation. So let me first run it, and then I'll briefly explain how this works.
+
+108
+00:09:47,340 --> 00:09:51,340
+So first we're going to define something called block size.
+
+109
+00:09:52,340 --> 00:09:56,340
+This is going to be the context length of how many characters do we take to predict the next one.
+
+110
+00:09:56,340 --> 00:10:00,340
+So here in this example, we're taking three characters to predict the fourth one.
+
+111
+00:10:00,340 --> 00:10:05,340
+So we have a block size of three. That's the size of the block that supports the prediction.
+
+112
+00:10:05,340 --> 00:10:16,340
+Then here I'm building out the x and y. The x are the input to the neural net, and the y are the labels for each example inside the x.
+
+113
+00:10:16,340 --> 00:10:21,340
+Then I'm erasing over the first five words. I'm doing the first five just for efficiency
+
+114
+00:10:21,340 --> 00:10:28,340
+while we are developing all the code. But then later we are going to come here and erase this so that we use the entire training set.
+
+115
+00:10:28,340 --> 00:10:35,340
+So here I'm printing the word Emma. And here I'm basically showing the examples that we can generate,
+
+116
+00:10:35,340 --> 00:10:40,340
+the five examples that we can generate out of the single sort of word Emma.
+
+117
+00:10:40,340 --> 00:10:47,340
+So when we are given the context of just dot dot dot, the first character in the sequence is E.
+
+118
+00:10:47,340 --> 00:10:50,340
+In this context, the label is M.
+
+119
+00:10:50,340 --> 00:10:54,340
+When the context is this, the label is M, and so forth.
+
+120
+00:10:54,340 --> 00:10:59,340
+And so the way I build this out is first I start with a padded context of just zero tokens.
+
+121
+00:10:59,340 --> 00:11:04,340
+Then I iterate over all the characters. I get the character in the sequence.
+
+122
+00:11:04,340 --> 00:11:11,340
+And I basically build out the array y of this current character and the array x, which stores the current running context.
+
+123
+00:11:11,340 --> 00:11:18,340
+And then here, see, I print everything. And here I crop the context and enter the new character in the sequence.
+
+124
+00:11:18,340 --> 00:11:20,340
+So this is kind of like a rolling window.
+
+125
+00:11:20,340 --> 00:11:23,340
+This is kind of like a rolling window of context.
+
+126
+00:11:23,340 --> 00:11:26,340
+Now we can change the block size here to, for example, four.
+
+127
+00:11:26,340 --> 00:11:30,340
+And in that case, we would be predicting the fifth character given the previous four.
+
+128
+00:11:30,340 --> 00:11:34,340
+Or it can be five. And then it would look like this.
+
+129
+00:11:34,340 --> 00:11:38,340
+Or it can be, say, ten. And then it would look something like this.
+
+130
+00:11:38,340 --> 00:11:41,340
+We're taking ten characters to predict the eleventh one.
+
+131
+00:11:41,340 --> 00:11:43,340
+And we're always padding with dots.
+
+132
+00:11:43,340 --> 00:11:49,340
+So let me bring this back to three just so that we have what we have here in the paper.
+
+133
+00:11:50,340 --> 00:11:53,340
+And finally, the data set right now looks as follows.
+
+134
+00:11:53,340 --> 00:11:57,340
+From these five words, we have created a data set of 32 examples.
+
+135
+00:11:57,340 --> 00:12:01,340
+And each input to the neural net is three integers.
+
+136
+00:12:01,340 --> 00:12:04,340
+And we have a label that is also an integer, y.
+
+137
+00:12:04,340 --> 00:12:06,340
+So x looks like this.
+
+138
+00:12:06,340 --> 00:12:08,340
+These are the individual examples.
+
+139
+00:12:08,340 --> 00:12:12,340
+And then y are the labels.
+
+140
+00:12:12,340 --> 00:12:18,340
+So given this, let's now write a neural network that takes these x's and predicts the y's.
+
+141
+00:12:18,340 --> 00:12:19,340
+First, let's build the embedding.
+
+142
+00:12:20,340 --> 00:12:23,340
+Lookup table C.
+
+143
+00:12:23,340 --> 00:12:25,340
+So we have 27 possible characters.
+
+144
+00:12:25,340 --> 00:12:28,340
+And we're going to embed them in a lower-dimensional space.
+
+145
+00:12:28,340 --> 00:12:31,340
+In the paper, they have 17,000 words.
+
+146
+00:12:31,340 --> 00:12:35,340
+And they embed them in spaces as small-dimensional as 30.
+
+147
+00:12:35,340 --> 00:12:40,340
+So they cram 17,000 words into 30-dimensional space.
+
+148
+00:12:40,340 --> 00:12:43,340
+In our case, we have only 27 possible characters.
+
+149
+00:12:43,340 --> 00:12:48,340
+So let's cram them in something as small as, to start with, for example, a two-dimensional space.
+
+150
+00:12:48,340 --> 00:12:50,340
+So this lookup table will be random numbers.
+
+151
+00:12:50,340 --> 00:12:53,340
+And we'll have 27 rows.
+
+152
+00:12:53,340 --> 00:12:55,340
+And we'll have two columns.
+
+153
+00:12:55,340 --> 00:12:56,340
+Right?
+
+154
+00:12:56,340 --> 00:13:01,340
+So each one of 27 characters will have a two-dimensional embedding.
+
+155
+00:13:01,340 --> 00:13:05,340
+So that's our matrix C of embeddings.
+
+156
+00:13:05,340 --> 00:13:07,340
+In the beginning, initialized randomly.
+
+157
+00:13:07,340 --> 00:13:13,340
+Now before we embed all of the integers inside the input x using this lookup table C,
+
+158
+00:13:13,340 --> 00:13:18,340
+let me actually just try to embed a single individual integer, like, say, 5.
+
+159
+00:13:18,340 --> 00:13:19,340
+So we get a sense of time.
+
+160
+00:13:19,340 --> 00:13:21,340
+So we get a sense of how this works.
+
+161
+00:13:21,340 --> 00:13:27,340
+Now one way this works, of course, is we can just take the C and we can index into row 5.
+
+162
+00:13:27,340 --> 00:13:31,340
+And that gives us a vector, the fifth row of C.
+
+163
+00:13:31,340 --> 00:13:34,340
+And this is one way to do it.
+
+164
+00:13:34,340 --> 00:13:40,340
+The other way that I presented in the previous lecture is actually seemingly different but actually identical.
+
+165
+00:13:40,340 --> 00:13:47,340
+So in the previous lecture, what we did is we took these integers and we used the one-hot encoding to first encode them.
+
+166
+00:13:47,340 --> 00:13:49,340
+So we took that one-hot.
+
+167
+00:13:49,340 --> 00:13:51,340
+We want to encode integer 5.
+
+168
+00:13:51,340 --> 00:13:54,340
+And we want to tell it that the number of classes is 27.
+
+169
+00:13:54,340 --> 00:14:00,340
+So that's the 26-dimensional vector of all zeros except the fifth bit is turned on.
+
+170
+00:14:00,340 --> 00:14:03,340
+Now this actually doesn't work.
+
+171
+00:14:03,340 --> 00:14:08,340
+The reason is that this input actually must be a Torch.tensor.
+
+172
+00:14:08,340 --> 00:14:13,340
+And I'm making some of these errors intentionally just so you get to see some errors and how to fix them.
+
+173
+00:14:13,340 --> 00:14:15,340
+So this must be a tensor, not an int.
+
+174
+00:14:15,340 --> 00:14:16,340
+Fairly straightforward to fix.
+
+175
+00:14:16,340 --> 00:14:18,340
+We get a one-hot vector.
+
+176
+00:14:18,340 --> 00:14:20,340
+The fifth dimension is 1.
+
+177
+00:14:20,340 --> 00:14:22,340
+And the shape of this is 27.
+
+178
+00:14:22,340 --> 00:14:26,340
+And now notice that, just as I briefly alluded to in a previous video,
+
+179
+00:14:26,340 --> 00:14:33,340
+if we take this one-hot vector and we multiply it by C,
+
+180
+00:14:33,340 --> 00:14:37,340
+then what would you expect?
+
+181
+00:14:37,340 --> 00:14:41,340
+Well, number one, first you'd expect an error
+
+182
+00:14:41,340 --> 00:14:46,340
+because expected scalar type long but found float.
+
+183
+00:14:46,340 --> 00:14:48,340
+So a little bit confusing.
+
+184
+00:14:48,340 --> 00:14:54,340
+But the problem here is that one-hot, the data type of it, is long.
+
+185
+00:14:54,340 --> 00:14:56,340
+It's a 64-bit integer.
+
+186
+00:14:56,340 --> 00:14:58,340
+But this is a float tensor.
+
+187
+00:14:58,340 --> 00:15:01,340
+And so PyTorch doesn't know how to multiply an int with a float.
+
+188
+00:15:01,340 --> 00:15:06,340
+And that's why we had to explicitly cast this to a float so that we can multiply.
+
+189
+00:15:06,340 --> 00:15:11,340
+Now the output actually here is identical.
+
+190
+00:15:11,340 --> 00:15:15,340
+And it's identical because of the way the matrix multiplication here works.
+
+191
+00:15:16,340 --> 00:15:20,340
+So we have a one-hot vector multiplying columns of C.
+
+192
+00:15:20,340 --> 00:15:24,340
+And because of all the zeros, they actually end up masking out everything in C
+
+193
+00:15:24,340 --> 00:15:27,340
+except for the fifth row, which is plucked out.
+
+194
+00:15:27,340 --> 00:15:30,340
+And so we actually arrive at the same result.
+
+195
+00:15:30,340 --> 00:15:34,340
+And that tells you that here we can interpret this first piece here,
+
+196
+00:15:34,340 --> 00:15:36,340
+this embedding of the integer.
+
+197
+00:15:36,340 --> 00:15:40,340
+We can either think of it as the integer indexing into a lookup table C,
+
+198
+00:15:40,340 --> 00:15:43,340
+but equivalently we can also think of this little piece here
+
+199
+00:15:43,340 --> 00:15:46,340
+as a first layer of this bigger neural net.
+
+200
+00:15:46,340 --> 00:15:49,340
+This layer here has neurons that have no nonlinearity.
+
+201
+00:15:49,340 --> 00:15:50,340
+There's no tanh.
+
+202
+00:15:50,340 --> 00:15:52,340
+They're just linear neurons.
+
+203
+00:15:52,340 --> 00:15:55,340
+And their weight matrix is C.
+
+204
+00:15:55,340 --> 00:15:58,340
+And then we are encoding integers into one-hot
+
+205
+00:15:58,340 --> 00:16:00,340
+and feeding those into a neural net.
+
+206
+00:16:00,340 --> 00:16:02,340
+And this first layer basically embeds them.
+
+207
+00:16:02,340 --> 00:16:05,340
+So those are two equivalent ways of doing the same thing.
+
+208
+00:16:05,340 --> 00:16:08,340
+We're just going to index because it's much, much faster.
+
+209
+00:16:08,340 --> 00:16:13,340
+And we're going to discard this interpretation of one-hot inputs into neural nets.
+
+210
+00:16:13,340 --> 00:16:15,340
+And we're just going to index integers
+
+211
+00:16:15,340 --> 00:16:17,340
+to create and use embedding tables.
+
+212
+00:16:17,340 --> 00:16:20,340
+Now embedding a single integer like 5 is easy enough.
+
+213
+00:16:20,340 --> 00:16:24,340
+We can simply ask PyTorch to retrieve the fifth row of C
+
+214
+00:16:24,340 --> 00:16:27,340
+or the row index 5 of C.
+
+215
+00:16:27,340 --> 00:16:32,340
+But how do we simultaneously embed all of these 32 by 3 integers
+
+216
+00:16:32,340 --> 00:16:34,340
+stored in array X?
+
+217
+00:16:34,340 --> 00:16:38,340
+Luckily, PyTorch indexing is fairly flexible and quite powerful.
+
+218
+00:16:38,340 --> 00:16:44,340
+So it doesn't just work to ask for a single element 5 like this.
+
+219
+00:16:44,340 --> 00:16:46,340
+You can actually index using lists.
+
+220
+00:16:46,340 --> 00:16:49,340
+So for example, we can get the rows 5, 6, and 7.
+
+221
+00:16:49,340 --> 00:16:51,340
+And this will just work like this.
+
+222
+00:16:51,340 --> 00:16:53,340
+We can index with a list.
+
+223
+00:16:53,340 --> 00:16:55,340
+It doesn't just have to be a list.
+
+224
+00:16:55,340 --> 00:16:58,340
+It can also be actually a tensor of integers.
+
+225
+00:16:58,340 --> 00:17:00,340
+And we can index with that.
+
+226
+00:17:00,340 --> 00:17:03,340
+So this is an integer tensor 5, 6, 7.
+
+227
+00:17:03,340 --> 00:17:05,340
+And this will just work as well.
+
+228
+00:17:05,340 --> 00:17:09,340
+In fact, we can also, for example, repeat row 7
+
+229
+00:17:09,340 --> 00:17:11,340
+and retrieve it multiple times.
+
+230
+00:17:11,340 --> 00:17:14,340
+And that same index will just get embedded multiple times.
+
+231
+00:17:14,340 --> 00:17:20,340
+So here we are indexing with a one-dimensional tensor of integers.
+
+232
+00:17:20,340 --> 00:17:23,340
+But it turns out that you can also index with multidimensional
+
+233
+00:17:23,340 --> 00:17:25,340
+tensors of integers.
+
+234
+00:17:25,340 --> 00:17:28,340
+Here we have a two-dimensional tensor of integers.
+
+235
+00:17:28,340 --> 00:17:31,340
+So we can simply just do C at X.
+
+236
+00:17:31,340 --> 00:17:34,340
+And this just works.
+
+237
+00:17:34,340 --> 00:17:38,340
+And the shape of this is 32 by 3,
+
+238
+00:17:38,340 --> 00:17:40,340
+which is the original shape.
+
+239
+00:17:40,340 --> 00:17:42,340
+And now for every one of those 32 by 3 integers,
+
+240
+00:17:42,340 --> 00:17:44,340
+we've retrieved the embedding vector
+
+241
+00:17:44,340 --> 00:17:46,340
+here.
+
+242
+00:17:46,340 --> 00:17:49,340
+So basically, we have that as an example.
+
+243
+00:17:49,340 --> 00:17:53,340
+The example index 13,
+
+244
+00:17:53,340 --> 00:17:55,340
+the second dimension,
+
+245
+00:17:55,340 --> 00:17:58,340
+is the integer 1 as an example.
+
+246
+00:17:58,340 --> 00:18:01,340
+And so here, if we do C of X,
+
+247
+00:18:01,340 --> 00:18:03,340
+which gives us that array,
+
+248
+00:18:03,340 --> 00:18:05,340
+and then we index into 13 by 2
+
+249
+00:18:05,340 --> 00:18:07,340
+of that array,
+
+250
+00:18:07,340 --> 00:18:10,340
+then we get the embedding here.
+
+251
+00:18:10,340 --> 00:18:13,340
+And you can verify that C at 1
+
+252
+00:18:13,340 --> 00:18:16,340
+which is the integer at that location,
+
+253
+00:18:16,340 --> 00:18:19,340
+is indeed equal to this.
+
+254
+00:18:19,340 --> 00:18:21,340
+You see they're equal.
+
+255
+00:18:21,340 --> 00:18:23,340
+So basically, long story short,
+
+256
+00:18:23,340 --> 00:18:25,340
+PyTorch indexing is awesome.
+
+257
+00:18:25,340 --> 00:18:27,340
+And to embed simultaneously
+
+258
+00:18:27,340 --> 00:18:29,340
+all of the integers in X,
+
+259
+00:18:29,340 --> 00:18:31,340
+we can simply do C of X.
+
+260
+00:18:31,340 --> 00:18:33,340
+And that is our embedding.
+
+261
+00:18:33,340 --> 00:18:35,340
+And that just works.
+
+262
+00:18:35,340 --> 00:18:37,340
+Now let's construct this layer here,
+
+263
+00:18:37,340 --> 00:18:39,340
+the hidden layer.
+
+264
+00:18:39,340 --> 00:18:41,340
+So we have that W1, as I'll call it,
+
+265
+00:18:41,340 --> 00:18:43,340
+are these weights.
+
+266
+00:18:43,340 --> 00:18:45,340
+Which we will initialize randomly.
+
+267
+00:18:45,340 --> 00:18:47,340
+Now the number of inputs to this layer
+
+268
+00:18:47,340 --> 00:18:49,340
+is going to be 3 times 2.
+
+269
+00:18:49,340 --> 00:18:51,340
+Right?
+
+270
+00:18:51,340 --> 00:18:53,340
+Because we have two-dimensional embeddings
+
+271
+00:18:53,340 --> 00:18:55,340
+and we have three of them.
+
+272
+00:18:55,340 --> 00:18:57,340
+So the number of inputs is 6.
+
+273
+00:18:57,340 --> 00:18:59,340
+And the number of neurons in this layer
+
+274
+00:18:59,340 --> 00:19:01,340
+is a variable up to us.
+
+275
+00:19:01,340 --> 00:19:03,340
+Let's use 100 neurons as an example.
+
+276
+00:19:03,340 --> 00:19:05,340
+And then biases
+
+277
+00:19:05,340 --> 00:19:07,340
+will be also initialized randomly
+
+278
+00:19:07,340 --> 00:19:09,340
+as an example.
+
+279
+00:19:09,340 --> 00:19:11,340
+And we just need 100 of them.
+
+280
+00:19:11,340 --> 00:19:13,340
+Now the problem with this is,
+
+281
+00:19:13,340 --> 00:19:15,340
+we can't simply,
+
+282
+00:19:15,340 --> 00:19:17,340
+normally we would take the input,
+
+283
+00:19:17,340 --> 00:19:19,340
+in this case that's embedding,
+
+284
+00:19:19,340 --> 00:19:21,340
+and we'd like to multiply it with these weights.
+
+285
+00:19:21,340 --> 00:19:23,340
+And then we would like to add the bias.
+
+286
+00:19:23,340 --> 00:19:25,340
+This is roughly what we want to do.
+
+287
+00:19:25,340 --> 00:19:27,340
+But the problem here is that
+
+288
+00:19:27,340 --> 00:19:29,340
+these embeddings are stacked up
+
+289
+00:19:29,340 --> 00:19:31,340
+in the dimensions of this input tensor.
+
+290
+00:19:31,340 --> 00:19:33,340
+So this will not work,
+
+291
+00:19:33,340 --> 00:19:35,340
+this matrix multiplication,
+
+292
+00:19:35,340 --> 00:19:37,340
+because this is a shape 32x3x2
+
+293
+00:19:37,340 --> 00:19:39,340
+and I can't multiply that by 6x100.
+
+294
+00:19:39,340 --> 00:19:41,340
+So somehow we need to concatenate
+
+295
+00:19:41,340 --> 00:19:43,340
+these inputs here together,
+
+296
+00:19:43,340 --> 00:19:45,340
+which apparently does not work.
+
+297
+00:19:45,340 --> 00:19:47,340
+So how do we transform this 32x3x2
+
+298
+00:19:47,340 --> 00:19:49,340
+into a 32x6
+
+299
+00:19:49,340 --> 00:19:51,340
+so that we can actually perform
+
+300
+00:19:51,340 --> 00:19:53,340
+this multiplication over here?
+
+301
+00:19:53,340 --> 00:19:55,340
+I'd like to show you that there are
+
+302
+00:19:55,340 --> 00:19:57,340
+usually many ways of
+
+303
+00:19:57,340 --> 00:19:59,340
+implementing what you'd like to do
+
+304
+00:19:59,340 --> 00:20:01,340
+in Torch.
+
+305
+00:20:01,340 --> 00:20:03,340
+And some of them will be faster, better, shorter, etc.
+
+306
+00:20:03,340 --> 00:20:05,340
+And that's because Torch is
+
+307
+00:20:05,340 --> 00:20:07,340
+a very large library,
+
+308
+00:20:07,340 --> 00:20:09,340
+and it's got lots and lots of functions.
+
+309
+00:20:09,340 --> 00:20:11,340
+So if we just go to the documentation and click on Torch,
+
+310
+00:20:11,340 --> 00:20:13,340
+you'll see that my slider here
+
+311
+00:20:13,340 --> 00:20:15,340
+is very tiny.
+
+312
+00:20:15,340 --> 00:20:17,340
+And that's because there are so many functions
+
+313
+00:20:17,340 --> 00:20:19,340
+that you can call on these tensors
+
+314
+00:20:19,340 --> 00:20:21,340
+to transform them, create them,
+
+315
+00:20:21,340 --> 00:20:23,340
+multiply them, add them,
+
+316
+00:20:23,340 --> 00:20:25,340
+perform all kinds of different operations on them.
+
+317
+00:20:25,340 --> 00:20:27,340
+And so this is kind of like
+
+318
+00:20:27,340 --> 00:20:29,340
+the space of possibility,
+
+319
+00:20:29,340 --> 00:20:31,340
+if you will.
+
+320
+00:20:31,340 --> 00:20:33,340
+Now one of the things that you can do
+
+321
+00:20:33,340 --> 00:20:35,340
+is if we can control F for concatenate.
+
+322
+00:20:35,340 --> 00:20:37,340
+And we see that there's a function
+
+323
+00:20:37,340 --> 00:20:39,340
+torch.cat, short for concatenate.
+
+324
+00:20:39,340 --> 00:20:41,340
+And this concatenate
+
+325
+00:20:41,340 --> 00:20:43,340
+is a given sequence of tensors
+
+326
+00:20:43,340 --> 00:20:45,340
+of a given dimension.
+
+327
+00:20:45,340 --> 00:20:47,340
+And these tensors must have the same shape, etc.
+
+328
+00:20:47,340 --> 00:20:49,340
+So we can use the concatenate operation
+
+329
+00:20:49,340 --> 00:20:51,340
+to, in a naive way,
+
+330
+00:20:51,340 --> 00:20:53,340
+concatenate these three embeddings
+
+331
+00:20:53,340 --> 00:20:55,340
+for each input.
+
+332
+00:20:55,340 --> 00:20:57,340
+So in this case, we have
+
+333
+00:20:57,340 --> 00:20:59,340
+emb of the shape.
+
+334
+00:20:59,340 --> 00:21:01,340
+And really what we want to do
+
+335
+00:21:01,340 --> 00:21:03,340
+is we want to retrieve these three parts
+
+336
+00:21:03,340 --> 00:21:05,340
+and concatenate them.
+
+337
+00:21:05,340 --> 00:21:07,340
+So we want to grab all the examples.
+
+338
+00:21:07,340 --> 00:21:09,340
+We want to grab
+
+339
+00:21:09,340 --> 00:21:11,340
+first the zeroth
+
+340
+00:21:11,340 --> 00:21:13,340
+and then
+
+341
+00:21:13,340 --> 00:21:15,340
+index.
+
+342
+00:21:15,340 --> 00:21:17,340
+And then all of this.
+
+343
+00:21:17,340 --> 00:21:19,340
+So this plucks out
+
+344
+00:21:19,340 --> 00:21:21,340
+the 32 by 2
+
+345
+00:21:21,340 --> 00:21:23,340
+embeddings of just
+
+346
+00:21:23,340 --> 00:21:25,340
+the first word here.
+
+347
+00:21:25,340 --> 00:21:27,340
+And so basically
+
+348
+00:21:27,340 --> 00:21:29,340
+we want this guy,
+
+349
+00:21:29,340 --> 00:21:31,340
+we want the first dimension,
+
+350
+00:21:31,340 --> 00:21:33,340
+and we want the second dimension.
+
+351
+00:21:33,340 --> 00:21:35,340
+And these are the three pieces individually.
+
+352
+00:21:35,340 --> 00:21:37,340
+And then we want to
+
+353
+00:21:37,340 --> 00:21:39,340
+treat this as a sequence
+
+354
+00:21:39,340 --> 00:21:41,340
+and we want to torch.cat
+
+355
+00:21:41,340 --> 00:21:43,340
+on that sequence.
+
+356
+00:21:43,340 --> 00:21:45,340
+torch.cat takes a
+
+357
+00:21:45,340 --> 00:21:47,340
+sequence of tensors
+
+358
+00:21:47,340 --> 00:21:49,340
+and then we have to tell it along which dimension
+
+359
+00:21:49,340 --> 00:21:51,340
+to concatenate.
+
+360
+00:21:51,340 --> 00:21:53,340
+So in this case, all these are 32 by 2
+
+361
+00:21:53,340 --> 00:21:55,340
+and we want to concatenate not across
+
+362
+00:21:55,340 --> 00:21:57,340
+dimension 0, but across dimension 1.
+
+363
+00:21:57,340 --> 00:21:59,340
+So passing in 1
+
+364
+00:21:59,340 --> 00:22:01,340
+gives us a result
+
+365
+00:22:01,340 --> 00:22:03,340
+that the shape of this is 32 by 6
+
+366
+00:22:03,340 --> 00:22:05,340
+exactly as we'd like.
+
+367
+00:22:05,340 --> 00:22:07,340
+So that basically took 32 and
+
+368
+00:22:07,340 --> 00:22:09,340
+squashed these by concatenating
+
+369
+00:22:09,340 --> 00:22:11,340
+them into 32 by 6.
+
+370
+00:22:11,340 --> 00:22:13,340
+Now this is kind of ugly because
+
+371
+00:22:13,340 --> 00:22:15,340
+this code would not generalize
+
+372
+00:22:15,340 --> 00:22:17,340
+if we want to later change the block size.
+
+373
+00:22:17,340 --> 00:22:19,340
+Right now we have three inputs,
+
+374
+00:22:19,340 --> 00:22:21,340
+three words, but what if we had
+
+375
+00:22:21,340 --> 00:22:23,340
+five? Then here we would have to
+
+376
+00:22:23,340 --> 00:22:25,340
+change the code because I'm indexing directly.
+
+377
+00:22:25,340 --> 00:22:27,340
+Well, torch comes to rescue again
+
+378
+00:22:27,340 --> 00:22:29,340
+because there turns out to be
+
+379
+00:22:29,340 --> 00:22:31,340
+a function called unbind
+
+380
+00:22:31,340 --> 00:22:33,340
+and it removes a tensor dimension.
+
+381
+00:22:35,340 --> 00:22:37,340
+So it removes a tensor dimension, returns
+
+382
+00:22:37,340 --> 00:22:39,340
+a tuple of all slices along a given
+
+383
+00:22:39,340 --> 00:22:41,340
+dimension without it.
+
+384
+00:22:41,340 --> 00:22:43,340
+So this is exactly what we need.
+
+385
+00:22:43,340 --> 00:22:45,340
+And basically when we call
+
+386
+00:22:45,340 --> 00:22:47,340
+torch.unbind
+
+387
+00:22:47,340 --> 00:22:49,340
+torch.unbind
+
+388
+00:22:49,340 --> 00:22:51,340
+of m
+
+389
+00:22:51,340 --> 00:22:53,340
+and passing dimension
+
+390
+00:22:53,340 --> 00:22:55,340
+1
+
+391
+00:22:55,340 --> 00:22:57,340
+index 1, this gives us
+
+392
+00:22:57,340 --> 00:22:59,340
+a list of
+
+393
+00:22:59,340 --> 00:23:01,340
+a list of tensors exactly
+
+394
+00:23:01,340 --> 00:23:03,340
+equivalent to this. So running this
+
+395
+00:23:03,340 --> 00:23:05,340
+gives us a line
+
+396
+00:23:05,340 --> 00:23:07,340
+3
+
+397
+00:23:07,340 --> 00:23:09,340
+and it's exactly this list.
+
+398
+00:23:09,340 --> 00:23:11,340
+So we can call torch.cat on it
+
+399
+00:23:11,340 --> 00:23:13,340
+and
+
+400
+00:23:13,340 --> 00:23:15,340
+the first dimension.
+
+401
+00:23:15,340 --> 00:23:17,340
+And this works.
+
+402
+00:23:17,340 --> 00:23:19,340
+And this shape is the same.
+
+403
+00:23:19,340 --> 00:23:21,340
+But now this is, it doesn't matter if we
+
+404
+00:23:21,340 --> 00:23:23,340
+have block size 3 or 5 or 10,
+
+405
+00:23:23,340 --> 00:23:25,340
+this will just work.
+
+406
+00:23:25,340 --> 00:23:27,340
+So this is one way to do it. But it turns out that
+
+407
+00:23:27,340 --> 00:23:29,340
+in this case, there's actually a
+
+408
+00:23:29,340 --> 00:23:31,340
+significantly better and more efficient way.
+
+409
+00:23:31,340 --> 00:23:33,340
+And this gives me an opportunity to hint
+
+410
+00:23:33,340 --> 00:23:35,340
+at some of the internals of torch.tensor.
+
+411
+00:23:35,340 --> 00:23:37,340
+So let's create
+
+412
+00:23:37,340 --> 00:23:39,340
+an array here
+
+413
+00:23:39,340 --> 00:23:41,340
+of elements from
+
+414
+00:23:41,340 --> 00:23:43,340
+0 to 17. And the shape of
+
+415
+00:23:43,340 --> 00:23:45,340
+this is just 18.
+
+416
+00:23:45,340 --> 00:23:47,340
+It's a single vector of 18 numbers.
+
+417
+00:23:47,340 --> 00:23:49,340
+It turns out that we can
+
+418
+00:23:49,340 --> 00:23:51,340
+very quickly re-represent this
+
+419
+00:23:51,340 --> 00:23:53,340
+as different sized n-dimensional
+
+420
+00:23:53,340 --> 00:23:55,340
+tensors. We do this by
+
+421
+00:23:55,340 --> 00:23:57,340
+calling a view
+
+422
+00:23:57,340 --> 00:23:59,340
+and we can say that actually this is not
+
+423
+00:23:59,340 --> 00:24:01,340
+a single vector of 18.
+
+424
+00:24:01,340 --> 00:24:03,340
+This is a 2 by 9 tensor.
+
+425
+00:24:03,340 --> 00:24:05,340
+Or alternatively
+
+426
+00:24:05,340 --> 00:24:07,340
+this is a 9 by 2 tensor.
+
+427
+00:24:07,340 --> 00:24:09,340
+Or this is actually
+
+428
+00:24:09,340 --> 00:24:11,340
+a 3 by 3 by 2 tensor.
+
+429
+00:24:11,340 --> 00:24:13,340
+As long as the total number of
+
+430
+00:24:13,340 --> 00:24:15,340
+elements here multiply to be
+
+431
+00:24:15,340 --> 00:24:17,340
+the same, this will just work.
+
+432
+00:24:17,340 --> 00:24:19,340
+And in PyTorch,
+
+433
+00:24:19,340 --> 00:24:21,340
+this operation, calling
+
+434
+00:24:21,340 --> 00:24:23,340
+.view, is extremely efficient.
+
+435
+00:24:23,340 --> 00:24:25,340
+And the reason for that is that
+
+436
+00:24:25,340 --> 00:24:27,340
+in each tensor, there's
+
+437
+00:24:27,340 --> 00:24:29,340
+something called the underlying storage.
+
+438
+00:24:29,340 --> 00:24:31,340
+And the storage
+
+439
+00:24:31,340 --> 00:24:33,340
+is just the numbers always
+
+440
+00:24:33,340 --> 00:24:35,340
+as a one-dimensional vector. And this is
+
+441
+00:24:35,340 --> 00:24:37,340
+how this tensor is represented
+
+442
+00:24:37,340 --> 00:24:39,340
+in the computer memory. It's always a one-dimensional
+
+443
+00:24:39,340 --> 00:24:41,340
+vector.
+
+444
+00:24:41,340 --> 00:24:43,340
+But when we call .view,
+
+445
+00:24:43,340 --> 00:24:45,340
+we are manipulating some of
+
+446
+00:24:45,340 --> 00:24:47,340
+attributes of that tensor that
+
+447
+00:24:47,340 --> 00:24:49,340
+dictate how this one-dimensional
+
+448
+00:24:49,340 --> 00:24:51,340
+sequence is interpreted to be
+
+449
+00:24:51,340 --> 00:24:53,340
+an n-dimensional tensor.
+
+450
+00:24:53,340 --> 00:24:55,340
+And so what's happening here is that
+
+451
+00:24:55,340 --> 00:24:57,340
+no memory is being changed, copied, moved,
+
+452
+00:24:57,340 --> 00:24:59,340
+or created when we call .view.
+
+453
+00:24:59,340 --> 00:25:01,340
+The storage is identical.
+
+454
+00:25:01,340 --> 00:25:03,340
+But when you call .view,
+
+455
+00:25:03,340 --> 00:25:05,340
+some of the internal
+
+456
+00:25:05,340 --> 00:25:07,340
+attributes of the view of this tensor
+
+457
+00:25:07,340 --> 00:25:09,340
+are being manipulated and changed.
+
+458
+00:25:09,340 --> 00:25:11,340
+In particular, there's something called
+
+459
+00:25:11,340 --> 00:25:13,340
+storage offset, strides, and
+
+460
+00:25:13,340 --> 00:25:15,340
+shapes, and those are manipulated
+
+461
+00:25:15,340 --> 00:25:17,340
+so that this one-dimensional sequence of bytes
+
+462
+00:25:17,340 --> 00:25:19,340
+is seen as different n-dimensional arrays.
+
+463
+00:25:19,340 --> 00:25:21,340
+There's a blog post
+
+464
+00:25:21,340 --> 00:25:23,340
+here from Eric called
+
+465
+00:25:23,340 --> 00:25:25,340
+PyTorch Internals, where he
+
+466
+00:25:25,340 --> 00:25:27,340
+goes into some of this with respect to tensor
+
+467
+00:25:27,340 --> 00:25:29,340
+and how the view of a tensor is
+
+468
+00:25:29,340 --> 00:25:31,340
+represented. And this is really just like
+
+469
+00:25:31,340 --> 00:25:33,340
+a logical construct
+
+470
+00:25:33,340 --> 00:25:35,340
+of representing the physical memory.
+
+471
+00:25:35,340 --> 00:25:37,340
+And so this is a pretty good
+
+472
+00:25:37,340 --> 00:25:39,340
+blog post that you can go into.
+
+473
+00:25:39,340 --> 00:25:41,340
+I might also create an entire video
+
+474
+00:25:41,340 --> 00:25:43,340
+on the internals of TorchTensor and how this works.
+
+475
+00:25:43,340 --> 00:25:45,340
+For here,
+
+476
+00:25:45,340 --> 00:25:47,340
+we just note that this is an extremely efficient operation.
+
+477
+00:25:47,340 --> 00:25:49,340
+And if I delete
+
+478
+00:25:49,340 --> 00:25:51,340
+this and come back to our
+
+479
+00:25:51,340 --> 00:25:53,340
+emb,
+
+480
+00:25:53,340 --> 00:25:55,340
+we see that the shape of our emb is
+
+481
+00:25:55,340 --> 00:25:57,340
+32x3x2, but we can simply
+
+482
+00:25:57,340 --> 00:25:59,340
+ask for PyTorch
+
+483
+00:25:59,340 --> 00:26:01,340
+to view this instead as a 32x6.
+
+484
+00:26:01,340 --> 00:26:03,340
+And
+
+485
+00:26:03,340 --> 00:26:05,340
+the way this gets flattened
+
+486
+00:26:05,340 --> 00:26:07,340
+into a 32x6 array
+
+487
+00:26:07,340 --> 00:26:09,340
+just happens that
+
+488
+00:26:09,340 --> 00:26:11,340
+these two get
+
+489
+00:26:11,340 --> 00:26:13,340
+stacked up in a single row.
+
+490
+00:26:13,340 --> 00:26:15,340
+And so that's basically the concatenation operation
+
+491
+00:26:15,340 --> 00:26:17,340
+that we're after.
+
+492
+00:26:17,340 --> 00:26:19,340
+And you can verify that this actually gives the exact
+
+493
+00:26:19,340 --> 00:26:21,340
+same result as what we had before.
+
+494
+00:26:21,340 --> 00:26:23,340
+So this is an element y equals
+
+495
+00:26:23,340 --> 00:26:25,340
+and you can see that all the elements of these
+
+496
+00:26:25,340 --> 00:26:27,340
+two tensors are the same.
+
+497
+00:26:27,340 --> 00:26:29,340
+And so we get the exact same result.
+
+498
+00:26:29,340 --> 00:26:31,340
+So long story short,
+
+499
+00:26:31,340 --> 00:26:33,340
+we can actually just come here
+
+500
+00:26:33,340 --> 00:26:35,340
+and if we just view this
+
+501
+00:26:35,340 --> 00:26:37,340
+as a 32x6
+
+502
+00:26:37,340 --> 00:26:39,340
+instead,
+
+503
+00:26:39,340 --> 00:26:41,340
+then this multiplication will work
+
+504
+00:26:41,340 --> 00:26:43,340
+and give us the hidden states that we're
+
+505
+00:26:43,340 --> 00:26:45,340
+after. So if this is h,
+
+506
+00:26:45,340 --> 00:26:47,340
+then h-shape
+
+507
+00:26:47,340 --> 00:26:49,340
+is now the hundred-dimensional
+
+508
+00:26:49,340 --> 00:26:51,340
+activations for every
+
+509
+00:26:51,340 --> 00:26:53,340
+one of our 32 examples.
+
+510
+00:26:53,340 --> 00:26:55,340
+And this gives the desired result.
+
+511
+00:26:55,340 --> 00:26:57,340
+Let me do two things here.
+
+512
+00:26:57,340 --> 00:26:59,340
+Number one, let's not use 32.
+
+513
+00:26:59,340 --> 00:27:01,340
+We can, for example, do something like
+
+514
+00:27:01,340 --> 00:27:03,340
+emb.shape
+
+515
+00:27:03,340 --> 00:27:05,340
+at 0
+
+516
+00:27:05,340 --> 00:27:07,340
+so that we don't hardcode these numbers.
+
+517
+00:27:07,340 --> 00:27:09,340
+And this would work for any size of this
+
+518
+00:27:09,340 --> 00:27:11,340
+emb. Or alternatively, we can
+
+519
+00:27:11,340 --> 00:27:13,340
+also do negative 1. When we do negative 1,
+
+520
+00:27:13,340 --> 00:27:15,340
+PyTorch will infer
+
+521
+00:27:15,340 --> 00:27:17,340
+what this should be.
+
+522
+00:27:17,340 --> 00:27:19,340
+Because the number of elements must be the same,
+
+523
+00:27:19,340 --> 00:27:21,340
+and we're saying that this is 6, PyTorch will derive
+
+524
+00:27:21,340 --> 00:27:23,340
+that this must be 32.
+
+525
+00:27:23,340 --> 00:27:25,340
+Or whatever else it is, if emb is of different size.
+
+526
+00:27:25,340 --> 00:27:27,340
+The other thing
+
+527
+00:27:27,340 --> 00:27:29,340
+is here,
+
+528
+00:27:29,340 --> 00:27:31,340
+one more thing I'd like to point out is
+
+529
+00:27:31,340 --> 00:27:33,340
+here
+
+530
+00:27:33,340 --> 00:27:35,340
+when we do the concatenation,
+
+531
+00:27:35,340 --> 00:27:37,340
+this actually is much less efficient
+
+532
+00:27:37,340 --> 00:27:39,340
+because this
+
+533
+00:27:39,340 --> 00:27:41,340
+concatenation would create a whole new tensor
+
+534
+00:27:41,340 --> 00:27:43,340
+with a whole new storage, so new memory is being
+
+535
+00:27:43,340 --> 00:27:45,340
+created because there's no way to concatenate
+
+536
+00:27:45,340 --> 00:27:47,340
+tensors just by manipulating the view
+
+537
+00:27:47,340 --> 00:27:49,340
+attributes. So this is
+
+538
+00:27:49,340 --> 00:27:51,340
+inefficient and creates all kinds of new memory.
+
+539
+00:27:51,340 --> 00:27:53,340
+So let me
+
+540
+00:27:53,340 --> 00:27:55,340
+delete this now.
+
+541
+00:27:55,340 --> 00:27:57,340
+We don't need this.
+
+542
+00:27:57,340 --> 00:27:59,340
+And here to calculate h, we want to
+
+543
+00:27:59,340 --> 00:28:01,340
+also dot 10h
+
+544
+00:28:01,340 --> 00:28:03,340
+of this to get our
+
+545
+00:28:03,340 --> 00:28:05,340
+oops
+
+546
+00:28:05,340 --> 00:28:07,340
+to get our h.
+
+547
+00:28:07,340 --> 00:28:09,340
+So these are now numbers between negative 1 and 1
+
+548
+00:28:09,340 --> 00:28:11,340
+because of the 10h, and we have
+
+549
+00:28:11,340 --> 00:28:13,340
+that the shape is 32 by 100
+
+550
+00:28:13,340 --> 00:28:15,340
+and that is basically this
+
+551
+00:28:15,340 --> 00:28:17,340
+hidden layer of activations here
+
+552
+00:28:17,340 --> 00:28:19,340
+for every one of our 32
+
+553
+00:28:19,340 --> 00:28:21,340
+examples. Now there's one more thing I've
+
+554
+00:28:21,340 --> 00:28:23,340
+lost over that we have to be very careful with
+
+555
+00:28:23,340 --> 00:28:25,340
+and that's this plus
+
+556
+00:28:25,340 --> 00:28:27,340
+here. In particular we want to make
+
+557
+00:28:27,340 --> 00:28:29,340
+sure that the broadcasting will do
+
+558
+00:28:29,340 --> 00:28:31,340
+what we like. The shape of
+
+559
+00:28:31,340 --> 00:28:33,340
+this is 32 by 100
+
+560
+00:28:33,340 --> 00:28:35,340
+and b1's shape is 100.
+
+561
+00:28:35,340 --> 00:28:37,340
+So we see that the addition
+
+562
+00:28:37,340 --> 00:28:39,340
+here will broadcast these two
+
+563
+00:28:39,340 --> 00:28:41,340
+and in particular we have 32 by 100
+
+564
+00:28:41,340 --> 00:28:43,340
+broadcasting to 100.
+
+565
+00:28:43,340 --> 00:28:45,340
+So broadcasting
+
+566
+00:28:45,340 --> 00:28:47,340
+will align on the right
+
+567
+00:28:47,340 --> 00:28:49,340
+create a fake dimension here
+
+568
+00:28:49,340 --> 00:28:51,340
+so this will become a 1 by 100 row vector
+
+569
+00:28:51,340 --> 00:28:53,340
+and then it will copy
+
+570
+00:28:53,340 --> 00:28:55,340
+vertically for every
+
+571
+00:28:55,340 --> 00:28:57,340
+one of these rows of 32
+
+572
+00:28:57,340 --> 00:28:59,340
+and do an element-wise addition.
+
+573
+00:28:59,340 --> 00:29:01,340
+So in this case the correcting will be happening
+
+574
+00:29:01,340 --> 00:29:03,340
+because the same bias vector
+
+575
+00:29:03,340 --> 00:29:05,340
+will be added to all the rows
+
+576
+00:29:05,340 --> 00:29:07,340
+of this matrix.
+
+577
+00:29:07,340 --> 00:29:09,340
+So that is correct, that's what we'd like
+
+578
+00:29:09,340 --> 00:29:11,340
+and it's always good
+
+579
+00:29:11,340 --> 00:29:13,340
+practice to just make sure so that
+
+580
+00:29:13,340 --> 00:29:15,340
+you don't shoot yourself in the foot.
+
+581
+00:29:15,340 --> 00:29:17,340
+And finally let's create the final layer here
+
+582
+00:29:17,340 --> 00:29:19,340
+so let's create
+
+583
+00:29:19,340 --> 00:29:21,340
+w2 and b2
+
+584
+00:29:21,340 --> 00:29:23,340
+the input
+
+585
+00:29:23,340 --> 00:29:25,340
+now is 100
+
+586
+00:29:25,340 --> 00:29:27,340
+and the output number of neurons
+
+587
+00:29:27,340 --> 00:29:29,340
+will be for us 27
+
+588
+00:29:29,340 --> 00:29:31,340
+because we have 27 possible characters
+
+589
+00:29:31,340 --> 00:29:33,340
+that come next.
+
+590
+00:29:33,340 --> 00:29:35,340
+So the biases will be 27 as well.
+
+591
+00:29:35,340 --> 00:29:37,340
+So therefore the logits
+
+592
+00:29:37,340 --> 00:29:39,340
+which are the outputs of this neural net
+
+593
+00:29:39,340 --> 00:29:41,340
+are going to be
+
+594
+00:29:41,340 --> 00:29:43,340
+h multiplied
+
+595
+00:29:43,340 --> 00:29:45,340
+by w2 plus b2
+
+596
+00:29:47,340 --> 00:29:49,340
+logits.shape is 32 by 27
+
+597
+00:29:49,340 --> 00:29:51,340
+and the logits
+
+598
+00:29:51,340 --> 00:29:53,340
+look good.
+
+599
+00:29:53,340 --> 00:29:55,340
+Now exactly as we saw in the previous video
+
+600
+00:29:55,340 --> 00:29:57,340
+we want to take these logits and we want to
+
+601
+00:29:57,340 --> 00:29:59,340
+first exponentiate them to get our fake counts
+
+602
+00:29:59,340 --> 00:30:01,340
+and then we want to normalize them
+
+603
+00:30:01,340 --> 00:30:03,340
+into a probability.
+
+604
+00:30:03,340 --> 00:30:05,340
+So prob is counts divide
+
+605
+00:30:05,340 --> 00:30:07,340
+and now
+
+606
+00:30:07,340 --> 00:30:09,340
+counts.sum along
+
+607
+00:30:09,340 --> 00:30:11,340
+the first dimension and keep them
+
+608
+00:30:11,340 --> 00:30:13,340
+as true, exactly as in the previous video.
+
+609
+00:30:13,340 --> 00:30:15,340
+And so
+
+610
+00:30:15,340 --> 00:30:17,340
+prob.shape
+
+611
+00:30:17,340 --> 00:30:19,340
+now is 32 by 27
+
+612
+00:30:19,340 --> 00:30:21,340
+and you'll see that every row
+
+613
+00:30:21,340 --> 00:30:23,340
+of prob
+
+614
+00:30:23,340 --> 00:30:25,340
+sums to 1, so it's normalized.
+
+615
+00:30:25,340 --> 00:30:27,340
+So that gives us
+
+616
+00:30:27,340 --> 00:30:29,340
+the probabilities. Now of course we have
+
+617
+00:30:29,340 --> 00:30:31,340
+the actual letter that comes next
+
+618
+00:30:31,340 --> 00:30:33,340
+and that comes from this array y
+
+619
+00:30:33,340 --> 00:30:35,340
+which we
+
+620
+00:30:35,340 --> 00:30:37,340
+created during the dataset creation.
+
+621
+00:30:37,340 --> 00:30:39,340
+So y is this last piece here
+
+622
+00:30:39,340 --> 00:30:41,340
+which is the identity of the next character
+
+623
+00:30:41,340 --> 00:30:43,340
+in the sequence that we'd like to now predict.
+
+624
+00:30:43,340 --> 00:30:45,340
+So what we'd
+
+625
+00:30:45,340 --> 00:30:47,340
+like to do now is just as in the previous video
+
+626
+00:30:47,340 --> 00:30:49,340
+we'd like to index into the rows
+
+627
+00:30:49,340 --> 00:30:51,340
+of prob and in each row
+
+628
+00:30:51,340 --> 00:30:53,340
+we'd like to pluck out the probability assigned
+
+629
+00:30:53,340 --> 00:30:55,340
+to the correct character
+
+630
+00:30:55,340 --> 00:30:57,340
+as given here.
+
+631
+00:30:57,340 --> 00:30:59,340
+So first we have torch.arrange
+
+632
+00:30:59,340 --> 00:31:01,340
+which is kind of like
+
+633
+00:31:01,340 --> 00:31:03,340
+an iterator over
+
+634
+00:31:03,340 --> 00:31:05,340
+numbers from 0 to 31
+
+635
+00:31:05,340 --> 00:31:07,340
+and then we can index into prob
+
+636
+00:31:07,340 --> 00:31:09,340
+in the following way
+
+637
+00:31:09,340 --> 00:31:11,340
+prob.in
+
+638
+00:31:11,340 --> 00:31:13,340
+which iterates the rows
+
+639
+00:31:13,340 --> 00:31:15,340
+and then in each row we'd like to grab
+
+640
+00:31:15,340 --> 00:31:17,340
+this column
+
+641
+00:31:17,340 --> 00:31:19,340
+as given by y.
+
+642
+00:31:19,340 --> 00:31:21,340
+So this gives the current probabilities
+
+643
+00:31:21,340 --> 00:31:23,340
+as assigned by this neural network
+
+644
+00:31:23,340 --> 00:31:25,340
+with this setting of its weights
+
+645
+00:31:25,340 --> 00:31:27,340
+to the correct character in the sequence.
+
+646
+00:31:27,340 --> 00:31:29,340
+And you can see here that
+
+647
+00:31:29,340 --> 00:31:31,340
+this looks okay for some of these characters
+
+648
+00:31:31,340 --> 00:31:33,340
+like this is basically 0.2
+
+649
+00:31:33,340 --> 00:31:35,340
+but it doesn't look very good at all for many other characters
+
+650
+00:31:35,340 --> 00:31:39,340
+like this is 0.0701 probability
+
+651
+00:31:39,340 --> 00:31:41,340
+and so the network thinks that
+
+652
+00:31:41,340 --> 00:31:43,340
+some of these are extremely unlikely.
+
+653
+00:31:43,340 --> 00:31:45,340
+Of course we haven't trained the neural network yet
+
+654
+00:31:45,340 --> 00:31:47,340
+so
+
+655
+00:31:47,340 --> 00:31:49,340
+this will improve and ideally all of these
+
+656
+00:31:49,340 --> 00:31:51,340
+numbers here of course are 1
+
+657
+00:31:51,340 --> 00:31:53,340
+because then we are correctly predicting the next character.
+
+658
+00:31:53,340 --> 00:31:55,340
+Now just as in the previous video
+
+659
+00:31:55,340 --> 00:31:57,340
+we want to take these probabilities
+
+660
+00:31:57,340 --> 00:31:59,340
+we want to look at the log probability
+
+661
+00:31:59,340 --> 00:32:01,340
+and then we want to look at the average log probability
+
+662
+00:32:01,340 --> 00:32:03,340
+and the negative of it
+
+663
+00:32:03,340 --> 00:32:05,340
+to create the negative log likelihood loss.
+
+664
+00:32:07,340 --> 00:32:09,340
+So the loss here is 17
+
+665
+00:32:09,340 --> 00:32:11,340
+and this is the loss
+
+666
+00:32:11,340 --> 00:32:13,340
+that we'd like to minimize to get the network
+
+667
+00:32:13,340 --> 00:32:15,340
+to predict the correct character
+
+668
+00:32:15,340 --> 00:32:17,340
+in the sequence.
+
+669
+00:32:17,340 --> 00:32:19,340
+Okay so I rewrote everything here
+
+670
+00:32:19,340 --> 00:32:21,340
+and made it a bit more respectable.
+
+671
+00:32:21,340 --> 00:32:23,340
+So here's our dataset.
+
+672
+00:32:23,340 --> 00:32:25,340
+Here's all the parameters that we defined.
+
+673
+00:32:25,340 --> 00:32:27,340
+I'm now using a generator to make it reproducible.
+
+674
+00:32:27,340 --> 00:32:29,340
+I clustered all the parameters
+
+675
+00:32:29,340 --> 00:32:31,340
+into a single list of parameters
+
+676
+00:32:31,340 --> 00:32:33,340
+so that for example it's easy to count them
+
+677
+00:32:33,340 --> 00:32:35,340
+and see that in total we currently have
+
+678
+00:32:35,340 --> 00:32:37,340
+about 3400 parameters.
+
+679
+00:32:37,340 --> 00:32:39,340
+And this is the forward pass as we developed it
+
+680
+00:32:39,340 --> 00:32:41,340
+and we arrive at a
+
+681
+00:32:41,340 --> 00:32:43,340
+single number here, the loss, that is currently
+
+682
+00:32:43,340 --> 00:32:45,340
+expressing how well
+
+683
+00:32:45,340 --> 00:32:47,340
+this neural network works with the current
+
+684
+00:32:47,340 --> 00:32:49,340
+setting of parameters.
+
+685
+00:32:49,340 --> 00:32:51,340
+Now I would like to make it even more respectable.
+
+686
+00:32:51,340 --> 00:32:53,340
+So in particular see these lines here
+
+687
+00:32:53,340 --> 00:32:55,340
+where we take the logits and we calculate
+
+688
+00:32:55,340 --> 00:32:57,340
+the loss.
+
+689
+00:32:57,340 --> 00:32:59,340
+We're not actually reinventing the wheel here.
+
+690
+00:32:59,340 --> 00:33:01,340
+This is just
+
+691
+00:33:01,340 --> 00:33:03,340
+classification and many people
+
+692
+00:33:03,340 --> 00:33:05,340
+use classification and that's why there is
+
+693
+00:33:05,340 --> 00:33:07,340
+a functional dot cross entropy function
+
+694
+00:33:07,340 --> 00:33:09,340
+in PyTorch to calculate this
+
+695
+00:33:09,340 --> 00:33:11,340
+much more efficiently.
+
+696
+00:33:11,340 --> 00:33:13,340
+So we could just simply call f dot cross entropy
+
+697
+00:33:13,340 --> 00:33:15,340
+and we can pass in the logits and we can pass in
+
+698
+00:33:15,340 --> 00:33:17,340
+the array of targets y
+
+699
+00:33:17,340 --> 00:33:19,340
+and this calculates the exact
+
+700
+00:33:19,340 --> 00:33:21,340
+same loss.
+
+701
+00:33:21,340 --> 00:33:23,340
+So in fact we can
+
+702
+00:33:23,340 --> 00:33:25,340
+simply put this here
+
+703
+00:33:25,340 --> 00:33:27,340
+and erase these three lines
+
+704
+00:33:27,340 --> 00:33:29,340
+and we're going to get the exact same result.
+
+705
+00:33:29,340 --> 00:33:31,340
+Now there are actually many good reasons
+
+706
+00:33:31,340 --> 00:33:33,340
+to prefer f dot cross entropy over
+
+707
+00:33:33,340 --> 00:33:35,340
+rolling your own implementation like this.
+
+708
+00:33:35,340 --> 00:33:37,340
+I did this for educational reasons
+
+709
+00:33:37,340 --> 00:33:39,340
+but you'd never use this in practice.
+
+710
+00:33:39,340 --> 00:33:41,340
+Why is that?
+
+711
+00:33:41,340 --> 00:33:43,340
+Number one, when you use f dot cross entropy,
+
+712
+00:33:43,340 --> 00:33:45,340
+PyTorch will not actually create
+
+713
+00:33:45,340 --> 00:33:47,340
+all these intermediate tensors
+
+714
+00:33:47,340 --> 00:33:49,340
+because these are all new tensors in memory
+
+715
+00:33:49,340 --> 00:33:51,340
+and all this is fairly inefficient
+
+716
+00:33:51,340 --> 00:33:53,340
+to run like this.
+
+717
+00:33:53,340 --> 00:33:55,340
+Instead PyTorch will cluster up all these operations
+
+718
+00:33:55,340 --> 00:33:57,340
+and very often
+
+719
+00:33:57,340 --> 00:33:59,340
+have fused kernels
+
+720
+00:33:59,340 --> 00:34:01,340
+that very efficiently evaluate these expressions
+
+721
+00:34:01,340 --> 00:34:03,340
+that are sort of like clustered mathematical operations.
+
+722
+00:34:03,340 --> 00:34:05,340
+Number two,
+
+723
+00:34:05,340 --> 00:34:07,340
+the backward pass can be made much more efficient
+
+724
+00:34:07,340 --> 00:34:09,340
+and not just because it's a fused kernel
+
+725
+00:34:09,340 --> 00:34:11,340
+but also analytically
+
+726
+00:34:11,340 --> 00:34:13,340
+and mathematically
+
+727
+00:34:13,340 --> 00:34:15,340
+because it's often a very much simpler
+
+728
+00:34:15,340 --> 00:34:17,340
+backward pass to implement.
+
+729
+00:34:17,340 --> 00:34:19,340
+We actually saw this with micrograd.
+
+730
+00:34:19,340 --> 00:34:21,340
+You see here when we implemented 10H
+
+731
+00:34:21,340 --> 00:34:23,340
+the forward pass of this operation
+
+732
+00:34:23,340 --> 00:34:25,340
+to calculate the 10H
+
+733
+00:34:25,340 --> 00:34:27,340
+was actually a fairly complicated mathematical expression.
+
+734
+00:34:27,340 --> 00:34:29,340
+But because it's a clustered
+
+735
+00:34:29,340 --> 00:34:31,340
+mathematical expression
+
+736
+00:34:31,340 --> 00:34:33,340
+when we did the backward pass
+
+737
+00:34:33,340 --> 00:34:35,340
+we didn't individually backward through the
+
+738
+00:34:35,340 --> 00:34:37,340
+x and the 2 times and the minus 1
+
+739
+00:34:37,340 --> 00:34:39,340
+and the division, etc.
+
+740
+00:34:39,340 --> 00:34:41,340
+We just said it's 1 minus t squared
+
+741
+00:34:41,340 --> 00:34:43,340
+and that's a much simpler mathematical expression.
+
+742
+00:34:43,340 --> 00:34:45,340
+And we were able to do this
+
+743
+00:34:45,340 --> 00:34:47,340
+because we're able to reuse calculations
+
+744
+00:34:47,340 --> 00:34:49,340
+and because we are able to mathematically
+
+745
+00:34:49,340 --> 00:34:51,340
+and analytically derive the derivative
+
+746
+00:34:51,340 --> 00:34:53,340
+and often that expression simplifies mathematically
+
+747
+00:34:53,340 --> 00:34:55,340
+and so there's much less to implement.
+
+748
+00:34:55,340 --> 00:34:57,340
+So not only
+
+749
+00:34:57,340 --> 00:34:59,340
+can it be made more efficient
+
+750
+00:34:59,340 --> 00:35:01,340
+because it runs in a fused kernel
+
+751
+00:35:01,340 --> 00:35:03,340
+but also because the expressions
+
+752
+00:35:03,340 --> 00:35:05,340
+can take a much simpler form mathematically.
+
+753
+00:35:05,340 --> 00:35:07,340
+So that's number one.
+
+754
+00:35:07,340 --> 00:35:09,340
+Number two,
+
+755
+00:35:09,340 --> 00:35:11,340
+under the hood,
+
+756
+00:35:11,340 --> 00:35:13,340
+it's significantly more
+
+757
+00:35:13,340 --> 00:35:15,340
+numerically well behaved.
+
+758
+00:35:15,340 --> 00:35:17,340
+Let me show you an example of how this works.
+
+759
+00:35:19,340 --> 00:35:21,340
+Suppose we have a logits of
+
+760
+00:35:21,340 --> 00:35:23,340
+negative 2, 3, negative 3, 0 and 5.
+
+761
+00:35:23,340 --> 00:35:25,340
+And then we are taking the exponent
+
+762
+00:35:25,340 --> 00:35:27,340
+of it and normalizing it to sum to 1.
+
+763
+00:35:27,340 --> 00:35:29,340
+So when logits take on
+
+764
+00:35:29,340 --> 00:35:31,340
+these values, everything is well and good
+
+765
+00:35:31,340 --> 00:35:33,340
+and we get a nice probability distribution.
+
+766
+00:35:33,340 --> 00:35:35,340
+Now consider what happens when
+
+767
+00:35:35,340 --> 00:35:37,340
+some of these logits take on more extreme values.
+
+768
+00:35:37,340 --> 00:35:39,340
+And that can happen during optimization
+
+769
+00:35:39,340 --> 00:35:41,340
+of a neural network.
+
+770
+00:35:41,340 --> 00:35:43,340
+Let's say some of these numbers grow very negative
+
+771
+00:35:43,340 --> 00:35:45,340
+like say negative 100.
+
+772
+00:35:45,340 --> 00:35:47,340
+Then actually everything will come out fine.
+
+773
+00:35:47,340 --> 00:35:49,340
+We still get probabilities that
+
+774
+00:35:49,340 --> 00:35:51,340
+are well behaved
+
+775
+00:35:51,340 --> 00:35:53,340
+and they sum to 1 and everything is great.
+
+776
+00:35:53,340 --> 00:35:55,340
+But because of the way
+
+777
+00:35:55,340 --> 00:35:57,340
+the X works,
+
+778
+00:35:57,340 --> 00:35:59,340
+if you have very positive logits
+
+779
+00:35:59,340 --> 00:36:01,340
+like say positive 100 in here,
+
+780
+00:36:01,340 --> 00:36:03,340
+you actually start to run into trouble
+
+781
+00:36:03,340 --> 00:36:05,340
+and we get not a number here.
+
+782
+00:36:05,340 --> 00:36:07,340
+And the reason for that is that these counts
+
+783
+00:36:07,340 --> 00:36:09,340
+have an inf here.
+
+784
+00:36:09,340 --> 00:36:11,340
+So if you pass in
+
+785
+00:36:11,340 --> 00:36:13,340
+a very negative number to exp,
+
+786
+00:36:13,340 --> 00:36:15,340
+you just get a very negative,
+
+787
+00:36:15,340 --> 00:36:17,340
+sorry not negative, but very small number.
+
+788
+00:36:17,340 --> 00:36:19,340
+Very near 0 and that's fine.
+
+789
+00:36:19,340 --> 00:36:21,340
+But if you pass in a very positive number,
+
+790
+00:36:21,340 --> 00:36:23,340
+suddenly we run out of range
+
+791
+00:36:23,340 --> 00:36:25,340
+in our floating point number
+
+792
+00:36:25,340 --> 00:36:27,340
+that represents these counts.
+
+793
+00:36:27,340 --> 00:36:29,340
+So basically we are taking e
+
+794
+00:36:29,340 --> 00:36:31,340
+and we are raising it to the power of 100
+
+795
+00:36:31,340 --> 00:36:33,340
+and that gives us inf
+
+796
+00:36:33,340 --> 00:36:35,340
+because we ran out of dynamic range
+
+797
+00:36:35,340 --> 00:36:37,340
+on this floating point number that is count.
+
+798
+00:36:37,340 --> 00:36:39,340
+And so we cannot
+
+799
+00:36:39,340 --> 00:36:41,340
+pass very large logits through
+
+800
+00:36:41,340 --> 00:36:43,340
+this expression.
+
+801
+00:36:43,340 --> 00:36:45,340
+Now let me reset these numbers
+
+802
+00:36:45,340 --> 00:36:47,340
+to something reasonable.
+
+803
+00:36:47,340 --> 00:36:49,340
+The way PyTorch solved this
+
+804
+00:36:49,340 --> 00:36:51,340
+is that, you see how we have a
+
+805
+00:36:51,340 --> 00:36:53,340
+well-behaved result here?
+
+806
+00:36:53,340 --> 00:36:55,340
+It turns out that because of the normalization
+
+807
+00:36:55,340 --> 00:36:57,340
+here, you can actually offset
+
+808
+00:36:57,340 --> 00:36:59,340
+logits by any arbitrary
+
+809
+00:36:59,340 --> 00:37:01,340
+constant value that you want.
+
+810
+00:37:01,340 --> 00:37:03,340
+So if I add 1 here, you actually
+
+811
+00:37:03,340 --> 00:37:05,340
+get the exact same result.
+
+812
+00:37:05,340 --> 00:37:07,340
+Or if I add 2, or if I subtract
+
+813
+00:37:07,340 --> 00:37:09,340
+3.
+
+814
+00:37:09,340 --> 00:37:11,340
+Any offset will produce the exact same
+
+815
+00:37:11,340 --> 00:37:13,340
+values.
+
+816
+00:37:13,340 --> 00:37:15,340
+So because negative numbers are okay,
+
+817
+00:37:15,340 --> 00:37:17,340
+but positive numbers can actually overflow
+
+818
+00:37:17,340 --> 00:37:19,340
+this exp, what PyTorch does
+
+819
+00:37:19,340 --> 00:37:21,340
+is it internally calculates the maximum
+
+820
+00:37:21,340 --> 00:37:23,340
+value that occurs in the logits
+
+821
+00:37:23,340 --> 00:37:25,340
+and it subtracts it.
+
+822
+00:37:25,340 --> 00:37:27,340
+So in this case it would subtract 5.
+
+823
+00:37:27,340 --> 00:37:29,340
+And so therefore the greatest number in logits
+
+824
+00:37:29,340 --> 00:37:31,340
+will become 0, and all the other numbers
+
+825
+00:37:31,340 --> 00:37:33,340
+will become some negative numbers.
+
+826
+00:37:33,340 --> 00:37:35,340
+And then the result of this is always
+
+827
+00:37:35,340 --> 00:37:37,340
+well-behaved. So even if we have 100
+
+828
+00:37:37,340 --> 00:37:39,340
+here previously,
+
+829
+00:37:39,340 --> 00:37:41,340
+not good, but because PyTorch
+
+830
+00:37:41,340 --> 00:37:43,340
+subtracted 100, this will work.
+
+831
+00:37:43,340 --> 00:37:45,340
+And so there's
+
+832
+00:37:45,340 --> 00:37:47,340
+many good reasons to call cross
+
+833
+00:37:47,340 --> 00:37:49,340
+entropy. Number one, the forward
+
+834
+00:37:49,340 --> 00:37:51,340
+pass can be much more efficient, the backward
+
+835
+00:37:51,340 --> 00:37:53,340
+pass can be much more efficient, and
+
+836
+00:37:53,340 --> 00:37:55,340
+also things can be much more numerically
+
+837
+00:37:55,340 --> 00:37:57,340
+well-behaved. Okay, so let's now
+
+838
+00:37:57,340 --> 00:37:59,340
+set up the training of this neural net.
+
+839
+00:37:59,340 --> 00:38:01,340
+We have the forward pass.
+
+840
+00:38:01,340 --> 00:38:03,340
+We don't
+
+841
+00:38:03,340 --> 00:38:05,340
+need these, because then we have
+
+842
+00:38:05,340 --> 00:38:07,340
+that loss is equal to the
+
+843
+00:38:07,340 --> 00:38:09,340
+cross entropy, that's the forward pass.
+
+844
+00:38:09,340 --> 00:38:11,340
+Then we need the backward pass,
+
+845
+00:38:11,340 --> 00:38:13,340
+first we want to set the gradients
+
+846
+00:38:13,340 --> 00:38:15,340
+to be 0. So for p in parameters
+
+847
+00:38:15,340 --> 00:38:17,340
+we want to make sure that
+
+848
+00:38:17,340 --> 00:38:19,340
+p.grad is none, which is the same as setting
+
+849
+00:38:19,340 --> 00:38:21,340
+it to 0 in PyTorch. And then
+
+850
+00:38:21,340 --> 00:38:23,340
+loss.backward to populate those
+
+851
+00:38:23,340 --> 00:38:25,340
+gradients. Once we have the gradients
+
+852
+00:38:25,340 --> 00:38:27,340
+we can do the parameter update.
+
+853
+00:38:27,340 --> 00:38:29,340
+So for p in parameters we want to take all
+
+854
+00:38:29,340 --> 00:38:31,340
+the data, and we want to
+
+855
+00:38:31,340 --> 00:38:33,340
+nudge it learning rate times
+
+856
+00:38:33,340 --> 00:38:35,340
+p.grad.
+
+857
+00:38:35,340 --> 00:38:37,340
+And then
+
+858
+00:38:37,340 --> 00:38:39,340
+we want to repeat this
+
+859
+00:38:39,340 --> 00:38:41,340
+a few times.
+
+860
+00:38:41,340 --> 00:38:45,340
+And let's print
+
+861
+00:38:45,340 --> 00:38:47,340
+the loss here as well.
+
+862
+00:38:47,340 --> 00:38:49,340
+Now this
+
+863
+00:38:49,340 --> 00:38:51,340
+won't suffice and it will create an error,
+
+864
+00:38:51,340 --> 00:38:53,340
+because we also have to go for p in parameters
+
+865
+00:38:53,340 --> 00:38:55,340
+and we have to make sure that
+
+866
+00:38:55,340 --> 00:38:57,340
+p.requiresgrad is set
+
+867
+00:38:57,340 --> 00:38:59,340
+to true in PyTorch.
+
+868
+00:38:59,340 --> 00:39:01,340
+And this should
+
+869
+00:39:01,340 --> 00:39:03,340
+just work.
+
+870
+00:39:03,340 --> 00:39:05,340
+Okay, so we started off with
+
+871
+00:39:05,340 --> 00:39:07,340
+loss of 17 and we're decreasing it.
+
+872
+00:39:07,340 --> 00:39:09,340
+Let's run longer.
+
+873
+00:39:09,340 --> 00:39:11,340
+And you see how the loss
+
+874
+00:39:11,340 --> 00:39:13,340
+increases a lot here.
+
+875
+00:39:13,340 --> 00:39:15,340
+So
+
+876
+00:39:17,340 --> 00:39:19,340
+if we just run for 1000 times
+
+877
+00:39:19,340 --> 00:39:21,340
+we get a very, very low loss.
+
+878
+00:39:21,340 --> 00:39:23,340
+And that means that we're making very good predictions.
+
+879
+00:39:23,340 --> 00:39:25,340
+Now the reason that this is
+
+880
+00:39:25,340 --> 00:39:27,340
+so straightforward right now
+
+881
+00:39:27,340 --> 00:39:29,340
+is because we're only
+
+882
+00:39:29,340 --> 00:39:31,340
+overfitting 32
+
+883
+00:39:31,340 --> 00:39:33,340
+examples. So we only have
+
+884
+00:39:33,340 --> 00:39:35,340
+32 examples of the first 5
+
+885
+00:39:35,340 --> 00:39:37,340
+words, and therefore
+
+886
+00:39:37,340 --> 00:39:39,340
+it's very easy to make this neural net fit
+
+887
+00:39:39,340 --> 00:39:41,340
+only these 32 examples.
+
+888
+00:39:41,340 --> 00:39:43,340
+Because we have 3400 parameters
+
+889
+00:39:43,340 --> 00:39:45,340
+and only 32
+
+890
+00:39:45,340 --> 00:39:47,340
+examples. So we're doing what's called
+
+891
+00:39:47,340 --> 00:39:49,340
+overfitting a single batch of
+
+892
+00:39:49,340 --> 00:39:51,340
+the data and getting a very low
+
+893
+00:39:51,340 --> 00:39:53,340
+loss in good predictions.
+
+894
+00:39:53,340 --> 00:39:55,340
+But that's just because we have so many
+
+895
+00:39:55,340 --> 00:39:57,340
+parameters for so few examples. So it's easy
+
+896
+00:39:57,340 --> 00:39:59,340
+to make this be very low.
+
+897
+00:39:59,340 --> 00:40:01,340
+Now we're not able to achieve
+
+898
+00:40:01,340 --> 00:40:03,340
+exactly 0. And the reason
+
+899
+00:40:03,340 --> 00:40:05,340
+for that is, we can for example look at logits
+
+900
+00:40:05,340 --> 00:40:07,340
+which are being predicted.
+
+901
+00:40:07,340 --> 00:40:09,340
+And we
+
+902
+00:40:09,340 --> 00:40:11,340
+can look at the max along
+
+903
+00:40:11,340 --> 00:40:13,340
+the first dimension.
+
+904
+00:40:13,340 --> 00:40:15,340
+And in PyTorch
+
+905
+00:40:15,340 --> 00:40:17,340
+max reports both the actual values
+
+906
+00:40:17,340 --> 00:40:19,340
+that take on the maximum number
+
+907
+00:40:19,340 --> 00:40:21,340
+but also the indices of these.
+
+908
+00:40:21,340 --> 00:40:23,340
+And you'll see that the indices
+
+909
+00:40:23,340 --> 00:40:25,340
+are very close to the labels.
+
+910
+00:40:25,340 --> 00:40:27,340
+But in some cases
+
+911
+00:40:27,340 --> 00:40:29,340
+they differ. For example
+
+912
+00:40:29,340 --> 00:40:31,340
+in this very first example
+
+913
+00:40:31,340 --> 00:40:33,340
+the predicted index is 19
+
+914
+00:40:33,340 --> 00:40:35,340
+but the label is 5.
+
+915
+00:40:35,340 --> 00:40:37,340
+And we're not able to make loss be 0
+
+916
+00:40:37,340 --> 00:40:39,340
+and fundamentally that's because here
+
+917
+00:40:39,340 --> 00:40:41,340
+the very first
+
+918
+00:40:41,340 --> 00:40:43,340
+or the zeroth index is the example
+
+919
+00:40:43,340 --> 00:40:45,340
+where dot dot dot is supposed to predict E
+
+920
+00:40:45,340 --> 00:40:47,340
+but you see how dot dot dot is also supposed
+
+921
+00:40:47,340 --> 00:40:49,340
+to predict an O
+
+922
+00:40:49,340 --> 00:40:51,340
+and dot dot dot is also supposed to predict an I
+
+923
+00:40:51,340 --> 00:40:53,340
+and then S as well.
+
+924
+00:40:53,340 --> 00:40:55,340
+And so basically E, O, A
+
+925
+00:40:55,340 --> 00:40:57,340
+or S are all possible
+
+926
+00:40:57,340 --> 00:40:59,340
+outcomes in a training set for the exact
+
+927
+00:40:59,340 --> 00:41:01,340
+same input. So we're not able to
+
+928
+00:41:01,340 --> 00:41:03,340
+completely overfit and
+
+929
+00:41:03,340 --> 00:41:05,340
+make the loss be exactly 0.
+
+930
+00:41:05,340 --> 00:41:07,340
+But we're getting very
+
+931
+00:41:07,340 --> 00:41:09,340
+close in the cases where
+
+932
+00:41:09,340 --> 00:41:11,340
+there's a unique input for
+
+933
+00:41:11,340 --> 00:41:13,340
+a unique output. In those cases
+
+934
+00:41:13,340 --> 00:41:15,340
+we do what's called overfit and
+
+935
+00:41:15,340 --> 00:41:17,340
+we basically get the exact same
+
+936
+00:41:17,340 --> 00:41:19,340
+and the exact correct result.
+
+937
+00:41:19,340 --> 00:41:21,340
+So now all we have to do
+
+938
+00:41:21,340 --> 00:41:23,340
+is we just need to make sure that we read in the
+
+939
+00:41:23,340 --> 00:41:25,340
+full dataset and optimize the neural net.
+
+940
+00:41:25,340 --> 00:41:27,340
+Okay so let's swing back up
+
+941
+00:41:27,340 --> 00:41:29,340
+where we created the dataset
+
+942
+00:41:29,340 --> 00:41:31,340
+and we see that here we only use the first 5 words.
+
+943
+00:41:31,340 --> 00:41:33,340
+So let me now erase this
+
+944
+00:41:33,340 --> 00:41:35,340
+and let me erase the print statements
+
+945
+00:41:35,340 --> 00:41:37,340
+otherwise we'd be printing way too much.
+
+946
+00:41:37,340 --> 00:41:39,340
+And so when we process the
+
+947
+00:41:39,340 --> 00:41:41,340
+full dataset of all the words
+
+948
+00:41:41,340 --> 00:41:43,340
+we now have 228,000 examples
+
+949
+00:41:43,340 --> 00:41:45,340
+instead of just 32.
+
+950
+00:41:45,340 --> 00:41:47,340
+So let's now scroll back down
+
+951
+00:41:47,340 --> 00:41:49,340
+the dataset is much larger
+
+952
+00:41:49,340 --> 00:41:51,340
+reinitialize the weights, the same
+
+953
+00:41:51,340 --> 00:41:53,340
+number of parameters, they all require gradients
+
+954
+00:41:53,340 --> 00:41:55,340
+and then let's push
+
+955
+00:41:55,340 --> 00:41:57,340
+this print.loss.item
+
+956
+00:41:57,340 --> 00:41:59,340
+to be here and let's just see
+
+957
+00:41:59,340 --> 00:42:01,340
+how the optimization goes if we run this.
+
+958
+00:42:03,340 --> 00:42:05,340
+Okay so we started
+
+959
+00:42:05,340 --> 00:42:07,340
+with a fairly high loss and then as we're optimizing
+
+960
+00:42:07,340 --> 00:42:09,340
+the loss is coming down.
+
+961
+00:42:11,340 --> 00:42:13,340
+But you'll notice that it takes
+
+962
+00:42:13,340 --> 00:42:15,340
+quite a bit of time for every single iteration.
+
+963
+00:42:15,340 --> 00:42:17,340
+So let's actually address that
+
+964
+00:42:17,340 --> 00:42:19,340
+because we're doing way too much work
+
+965
+00:42:19,340 --> 00:42:21,340
+forwarding and backwarding 228,000
+
+966
+00:42:21,340 --> 00:42:23,340
+examples. In practice
+
+967
+00:42:23,340 --> 00:42:25,340
+what people usually do is they perform
+
+968
+00:42:25,340 --> 00:42:27,340
+forward and backward pass and update
+
+969
+00:42:27,340 --> 00:42:29,340
+on many batches of the data.
+
+970
+00:42:29,340 --> 00:42:31,340
+So what we will want to do is
+
+971
+00:42:31,340 --> 00:42:33,340
+we want to randomly select some portion
+
+972
+00:42:33,340 --> 00:42:35,340
+of the dataset and that's a many batch
+
+973
+00:42:35,340 --> 00:42:37,340
+and then only forward, backward and update
+
+974
+00:42:37,340 --> 00:42:39,340
+on that little many batch and then
+
+975
+00:42:39,340 --> 00:42:41,340
+we iterate on those many batches.
+
+976
+00:42:41,340 --> 00:42:43,340
+So in pytorch we can for example
+
+977
+00:42:43,340 --> 00:42:45,340
+use torch.randint
+
+978
+00:42:45,340 --> 00:42:47,340
+and we can generate numbers between 0
+
+979
+00:42:47,340 --> 00:42:49,340
+and 5 and make 32 of them.
+
+980
+00:42:51,340 --> 00:42:53,340
+I believe the size has to
+
+981
+00:42:53,340 --> 00:42:55,340
+be a tuple
+
+982
+00:42:55,340 --> 00:42:57,340
+in pytorch.
+
+983
+00:42:57,340 --> 00:42:59,340
+So we can have a tuple
+
+984
+00:42:59,340 --> 00:43:01,340
+32 of numbers between 0 and 5
+
+985
+00:43:01,340 --> 00:43:03,340
+but actually we want x.shape
+
+986
+00:43:03,340 --> 00:43:05,340
+of 0 here
+
+987
+00:43:05,340 --> 00:43:07,340
+and so this creates integers
+
+988
+00:43:07,340 --> 00:43:09,340
+that index into our dataset
+
+989
+00:43:09,340 --> 00:43:11,340
+and there's 32 of them.
+
+990
+00:43:11,340 --> 00:43:13,340
+So if our many batch size is 32
+
+991
+00:43:13,340 --> 00:43:15,340
+then we can come here and we can first do
+
+992
+00:43:15,340 --> 00:43:17,340
+a many batch
+
+993
+00:43:17,340 --> 00:43:19,340
+construct.
+
+994
+00:43:19,340 --> 00:43:21,340
+So integers
+
+995
+00:43:21,340 --> 00:43:23,340
+that we want to optimize in this
+
+996
+00:43:23,340 --> 00:43:25,340
+single iteration
+
+997
+00:43:25,340 --> 00:43:27,340
+are in the ix
+
+998
+00:43:27,340 --> 00:43:29,340
+and then we want to index into
+
+999
+00:43:29,340 --> 00:43:31,340
+x with
+
+1000
+00:43:31,340 --> 00:43:33,340
+ix to only grab those
+
+1001
+00:43:33,340 --> 00:43:35,340
+rows. So we're only getting 32
+
+1002
+00:43:35,340 --> 00:43:37,340
+rows of x and therefore
+
+1003
+00:43:37,340 --> 00:43:39,340
+embeddings will again be 32 by 3
+
+1004
+00:43:39,340 --> 00:43:41,340
+by 2, not 200,000
+
+1005
+00:43:41,340 --> 00:43:43,340
+by 3 by 2.
+
+1006
+00:43:43,340 --> 00:43:45,340
+And then this ix has to be used not just
+
+1007
+00:43:45,340 --> 00:43:47,340
+to index into x but also
+
+1008
+00:43:47,340 --> 00:43:49,340
+to index into y.
+
+1009
+00:43:49,340 --> 00:43:51,340
+And now this
+
+1010
+00:43:51,340 --> 00:43:53,340
+should be many batches and this should be
+
+1011
+00:43:53,340 --> 00:43:55,340
+much much faster.
+
+1012
+00:43:55,340 --> 00:43:57,340
+So it's instant almost.
+
+1013
+00:43:57,340 --> 00:43:59,340
+So this way we can run
+
+1014
+00:43:59,340 --> 00:44:01,340
+many many examples
+
+1015
+00:44:01,340 --> 00:44:03,340
+nearly instantly and decrease
+
+1016
+00:44:03,340 --> 00:44:05,340
+the loss much much faster.
+
+1017
+00:44:05,340 --> 00:44:07,340
+Now because we're only dealing with many batches
+
+1018
+00:44:07,340 --> 00:44:09,340
+the quality of our gradient
+
+1019
+00:44:09,340 --> 00:44:11,340
+is lower. So the direction is not
+
+1020
+00:44:11,340 --> 00:44:13,340
+as reliable. It's not the actual gradient
+
+1021
+00:44:13,340 --> 00:44:15,340
+direction. But
+
+1022
+00:44:15,340 --> 00:44:17,340
+the gradient direction is good enough even
+
+1023
+00:44:17,340 --> 00:44:19,340
+when it's estimating on only 32
+
+1024
+00:44:19,340 --> 00:44:21,340
+examples that it is useful.
+
+1025
+00:44:21,340 --> 00:44:23,340
+And so it's much better
+
+1026
+00:44:23,340 --> 00:44:25,340
+to have an approximate gradient and
+
+1027
+00:44:25,340 --> 00:44:27,340
+just make more steps than it is to
+
+1028
+00:44:27,340 --> 00:44:29,340
+evaluate the exact gradient and take
+
+1029
+00:44:29,340 --> 00:44:31,340
+fewer steps. So that's why
+
+1030
+00:44:31,340 --> 00:44:33,340
+in practice this works
+
+1031
+00:44:33,340 --> 00:44:35,340
+quite well. So let's now continue
+
+1032
+00:44:35,340 --> 00:44:37,340
+the optimization.
+
+1033
+00:44:37,340 --> 00:44:39,340
+Let me take out
+
+1034
+00:44:39,340 --> 00:44:41,340
+this loss.item from here.
+
+1035
+00:44:41,340 --> 00:44:43,340
+And place it
+
+1036
+00:44:43,340 --> 00:44:45,340
+over here at the end.
+
+1037
+00:44:45,340 --> 00:44:47,340
+Okay so we're hovering around 2.5
+
+1038
+00:44:47,340 --> 00:44:49,340
+or so.
+
+1039
+00:44:49,340 --> 00:44:51,340
+However this is only the loss
+
+1040
+00:44:51,340 --> 00:44:53,340
+for that many batch. So let's actually evaluate
+
+1041
+00:44:53,340 --> 00:44:55,340
+the loss here
+
+1042
+00:44:55,340 --> 00:44:57,340
+for all of x
+
+1043
+00:44:57,340 --> 00:44:59,340
+and for all of y.
+
+1044
+00:44:59,340 --> 00:45:01,340
+Just so we have a full
+
+1045
+00:45:01,340 --> 00:45:03,340
+sense of exactly how well the model is
+
+1046
+00:45:03,340 --> 00:45:05,340
+doing right now.
+
+1047
+00:45:05,340 --> 00:45:07,340
+So right now we're at about 2.7 on the
+
+1048
+00:45:07,340 --> 00:45:09,340
+entire training set.
+
+1049
+00:45:09,340 --> 00:45:11,340
+So let's run the optimization for a while.
+
+1050
+00:45:11,340 --> 00:45:13,340
+Okay we're at
+
+1051
+00:45:13,340 --> 00:45:15,340
+2.6
+
+1052
+00:45:15,340 --> 00:45:17,340
+2.57
+
+1053
+00:45:17,340 --> 00:45:19,340
+2.53
+
+1054
+00:45:21,340 --> 00:45:23,340
+Okay.
+
+1055
+00:45:23,340 --> 00:45:25,340
+So one issue of course is
+
+1056
+00:45:25,340 --> 00:45:27,340
+we don't know if we're stepping too slow
+
+1057
+00:45:27,340 --> 00:45:29,340
+or too fast.
+
+1058
+00:45:29,340 --> 00:45:31,340
+So at this point one I just guessed it.
+
+1059
+00:45:31,340 --> 00:45:33,340
+So one question is
+
+1060
+00:45:33,340 --> 00:45:35,340
+how do you determine this learning rate?
+
+1061
+00:45:35,340 --> 00:45:37,340
+And how do we gain confidence
+
+1062
+00:45:37,340 --> 00:45:39,340
+that we're stepping in the right
+
+1063
+00:45:39,340 --> 00:45:41,340
+sort of speed?
+
+1064
+00:45:41,340 --> 00:45:43,340
+So let's try to determine a reasonable learning rate.
+
+1065
+00:45:43,340 --> 00:45:45,340
+It works as follows.
+
+1066
+00:45:45,340 --> 00:45:47,340
+Let's reset our parameters
+
+1067
+00:45:47,340 --> 00:45:49,340
+to the initial
+
+1068
+00:45:49,340 --> 00:45:51,340
+settings.
+
+1069
+00:45:51,340 --> 00:45:53,340
+And now let's print
+
+1070
+00:45:53,340 --> 00:45:55,340
+in every step.
+
+1071
+00:45:55,340 --> 00:45:57,340
+But let's only do 10 steps or so.
+
+1072
+00:45:57,340 --> 00:45:59,340
+Or maybe
+
+1073
+00:45:59,340 --> 00:46:01,340
+100 steps.
+
+1074
+00:46:01,340 --> 00:46:03,340
+We want to find a very reasonable
+
+1075
+00:46:03,340 --> 00:46:05,340
+search range if you will.
+
+1076
+00:46:05,340 --> 00:46:07,340
+So for example if this is very low
+
+1077
+00:46:07,340 --> 00:46:09,340
+then
+
+1078
+00:46:09,340 --> 00:46:11,340
+we see that the loss is barely
+
+1079
+00:46:11,340 --> 00:46:13,340
+decreasing. So that's not
+
+1080
+00:46:13,340 --> 00:46:15,340
+that's like too low basically.
+
+1081
+00:46:15,340 --> 00:46:17,340
+So let's try this one.
+
+1082
+00:46:17,340 --> 00:46:19,340
+Okay so we're
+
+1083
+00:46:19,340 --> 00:46:21,340
+decreasing the loss but like not very quickly.
+
+1084
+00:46:21,340 --> 00:46:23,340
+So that's a pretty good low range.
+
+1085
+00:46:23,340 --> 00:46:25,340
+Now let's reset it again.
+
+1086
+00:46:25,340 --> 00:46:27,340
+And now let's try to find the place
+
+1087
+00:46:27,340 --> 00:46:29,340
+at which the loss kind of explodes.
+
+1088
+00:46:29,340 --> 00:46:31,340
+So maybe at negative one.
+
+1089
+00:46:33,340 --> 00:46:35,340
+Okay we see that we're minimizing the loss
+
+1090
+00:46:35,340 --> 00:46:37,340
+but you see how it's kind of unstable.
+
+1091
+00:46:37,340 --> 00:46:39,340
+It goes up and down quite a bit.
+
+1092
+00:46:39,340 --> 00:46:41,340
+So negative one is probably like a
+
+1093
+00:46:41,340 --> 00:46:43,340
+fast learning rate.
+
+1094
+00:46:43,340 --> 00:46:45,340
+Let's try negative ten.
+
+1095
+00:46:45,340 --> 00:46:47,340
+Okay so this isn't
+
+1096
+00:46:47,340 --> 00:46:49,340
+optimizing. This is not working very well.
+
+1097
+00:46:49,340 --> 00:46:51,340
+So negative ten is way too big.
+
+1098
+00:46:51,340 --> 00:46:53,340
+Negative one was already kind of big.
+
+1099
+00:46:53,340 --> 00:46:55,340
+So
+
+1100
+00:46:55,340 --> 00:46:57,340
+therefore negative one was like
+
+1101
+00:46:57,340 --> 00:46:59,340
+somewhat reasonable if I reset.
+
+1102
+00:46:59,340 --> 00:47:01,340
+So I'm thinking that the right
+
+1103
+00:47:01,340 --> 00:47:03,340
+learning rate is somewhere between
+
+1104
+00:47:03,340 --> 00:47:05,340
+negative 0.001
+
+1105
+00:47:05,340 --> 00:47:07,340
+and negative one.
+
+1106
+00:47:07,340 --> 00:47:09,340
+So the way we can do this
+
+1107
+00:47:09,340 --> 00:47:11,340
+here is we can use Torch.lin
+
+1108
+00:47:11,340 --> 00:47:13,340
+space.
+
+1109
+00:47:13,340 --> 00:47:15,340
+And we want to basically do something like this.
+
+1110
+00:47:15,340 --> 00:47:17,340
+Between zero and one.
+
+1111
+00:47:19,340 --> 00:47:21,340
+Oh number of steps is one more parameter
+
+1112
+00:47:21,340 --> 00:47:23,340
+that's required. Let's do a thousand steps.
+
+1113
+00:47:23,340 --> 00:47:25,340
+This creates one thousand
+
+1114
+00:47:25,340 --> 00:47:27,340
+numbers between
+
+1115
+00:47:27,340 --> 00:47:29,340
+0.001 and one.
+
+1116
+00:47:29,340 --> 00:47:31,340
+But it doesn't really make sense to
+
+1117
+00:47:31,340 --> 00:47:33,340
+step between these linearly.
+
+1118
+00:47:33,340 --> 00:47:35,340
+So instead let me create learning rate
+
+1119
+00:47:35,340 --> 00:47:37,340
+exponent. And instead of
+
+1120
+00:47:37,340 --> 00:47:39,340
+0.001 this will be
+
+1121
+00:47:39,340 --> 00:47:41,340
+a negative three and this will be a zero.
+
+1122
+00:47:41,340 --> 00:47:43,340
+And then the actual LRs
+
+1123
+00:47:43,340 --> 00:47:45,340
+that we want to search over are going to be
+
+1124
+00:47:45,340 --> 00:47:47,340
+ten to the power of LRE.
+
+1125
+00:47:47,340 --> 00:47:49,340
+So now what we're doing is
+
+1126
+00:47:49,340 --> 00:47:51,340
+we're stepping linearly between the exponents
+
+1127
+00:47:51,340 --> 00:47:53,340
+of these learning rates. This is 0.001
+
+1128
+00:47:53,340 --> 00:47:55,340
+and this is one.
+
+1129
+00:47:55,340 --> 00:47:57,340
+Because ten to the power of zero
+
+1130
+00:47:57,340 --> 00:47:59,340
+is one. And therefore
+
+1131
+00:47:59,340 --> 00:48:01,340
+we are spaced exponentially in this interval.
+
+1132
+00:48:01,340 --> 00:48:03,340
+So these are the candidate
+
+1133
+00:48:03,340 --> 00:48:05,340
+learning rates that we want
+
+1134
+00:48:05,340 --> 00:48:07,340
+to sort of like search over roughly.
+
+1135
+00:48:07,340 --> 00:48:09,340
+So now what we're going to do is
+
+1136
+00:48:09,340 --> 00:48:11,340
+here
+
+1137
+00:48:11,340 --> 00:48:13,340
+we are going to run the optimization for
+
+1138
+00:48:13,340 --> 00:48:15,340
+one thousand steps. And instead of using
+
+1139
+00:48:15,340 --> 00:48:17,340
+a fixed number we are going to
+
+1140
+00:48:17,340 --> 00:48:19,340
+use learning rate
+
+1141
+00:48:19,340 --> 00:48:21,340
+indexing into here LRs
+
+1142
+00:48:21,340 --> 00:48:23,340
+of i and make this
+
+1143
+00:48:23,340 --> 00:48:25,340
+i.
+
+1144
+00:48:25,340 --> 00:48:27,340
+So basically let me reset this
+
+1145
+00:48:27,340 --> 00:48:29,340
+to be again starting
+
+1146
+00:48:29,340 --> 00:48:31,340
+from random. Creating these learning
+
+1147
+00:48:31,340 --> 00:48:33,340
+rates between negative
+
+1148
+00:48:33,340 --> 00:48:35,340
+between 0.001 and
+
+1149
+00:48:35,340 --> 00:48:37,340
+one
+
+1150
+00:48:37,340 --> 00:48:39,340
+but exponentially stepped.
+
+1151
+00:48:39,340 --> 00:48:41,340
+And here what we're doing is
+
+1152
+00:48:41,340 --> 00:48:43,340
+we're iterating a thousand times
+
+1153
+00:48:43,340 --> 00:48:45,340
+we're going to use the learning rate
+
+1154
+00:48:45,340 --> 00:48:47,340
+that's in the beginning
+
+1155
+00:48:47,340 --> 00:48:49,340
+very very low. In the beginning it's going to be
+
+1156
+00:48:49,340 --> 00:48:51,340
+0.001 but by the end it's
+
+1157
+00:48:51,340 --> 00:48:53,340
+going to be one.
+
+1158
+00:48:53,340 --> 00:48:55,340
+And then we're going to step with that
+
+1159
+00:48:55,340 --> 00:48:57,340
+learning rate.
+
+1160
+00:48:57,340 --> 00:48:59,340
+And now what we want to do is we want to keep track
+
+1161
+00:48:59,340 --> 00:49:01,340
+of the
+
+1162
+00:49:03,340 --> 00:49:05,340
+learning rates that we used.
+
+1163
+00:49:05,340 --> 00:49:07,340
+And we want to look at the losses
+
+1164
+00:49:07,340 --> 00:49:09,340
+that resulted.
+
+1165
+00:49:09,340 --> 00:49:11,340
+And so here let me
+
+1166
+00:49:11,340 --> 00:49:13,340
+track stats.
+
+1167
+00:49:13,340 --> 00:49:15,340
+So LRI dot append
+
+1168
+00:49:15,340 --> 00:49:17,340
+LR and
+
+1169
+00:49:17,340 --> 00:49:19,340
+loss side dot append
+
+1170
+00:49:19,340 --> 00:49:21,340
+loss dot item.
+
+1171
+00:49:21,340 --> 00:49:23,340
+Okay.
+
+1172
+00:49:23,340 --> 00:49:25,340
+So again reset everything
+
+1173
+00:49:25,340 --> 00:49:27,340
+and then
+
+1174
+00:49:27,340 --> 00:49:29,340
+run.
+
+1175
+00:49:29,340 --> 00:49:31,340
+And so basically we started
+
+1176
+00:49:31,340 --> 00:49:33,340
+with a very low learning rate and we went all the way up
+
+1177
+00:49:33,340 --> 00:49:35,340
+to learning rate of negative one.
+
+1178
+00:49:35,340 --> 00:49:37,340
+And now what we can do is we can
+
+1179
+00:49:37,340 --> 00:49:39,340
+plt dot plot and
+
+1180
+00:49:39,340 --> 00:49:41,340
+we can plot the two. So we can plot
+
+1181
+00:49:41,340 --> 00:49:43,340
+the learning rates on the x-axis
+
+1182
+00:49:43,340 --> 00:49:45,340
+and the losses we saw on the y-axis.
+
+1183
+00:49:45,340 --> 00:49:47,340
+And often you're going to find
+
+1184
+00:49:47,340 --> 00:49:49,340
+that your plot looks something like this.
+
+1185
+00:49:49,340 --> 00:49:51,340
+Where in the beginning
+
+1186
+00:49:51,340 --> 00:49:53,340
+you had very low learning rates
+
+1187
+00:49:53,340 --> 00:49:55,340
+basically anything
+
+1188
+00:49:55,340 --> 00:49:57,340
+barely anything happened.
+
+1189
+00:49:57,340 --> 00:49:59,340
+Then we got to like a nice spot
+
+1190
+00:49:59,340 --> 00:50:01,340
+here and then as we increased
+
+1191
+00:50:01,340 --> 00:50:03,340
+the learning rate enough
+
+1192
+00:50:03,340 --> 00:50:05,340
+we basically started to be kind of unstable here.
+
+1193
+00:50:05,340 --> 00:50:07,340
+So a good learning rate turns out
+
+1194
+00:50:07,340 --> 00:50:09,340
+to be somewhere around here.
+
+1195
+00:50:09,340 --> 00:50:11,340
+And because
+
+1196
+00:50:11,340 --> 00:50:13,340
+we have LRI here
+
+1197
+00:50:13,340 --> 00:50:15,340
+we actually
+
+1198
+00:50:15,340 --> 00:50:17,340
+may want to
+
+1199
+00:50:19,340 --> 00:50:21,340
+do not LR
+
+1200
+00:50:21,340 --> 00:50:23,340
+not the learning rate but the exponent.
+
+1201
+00:50:23,340 --> 00:50:25,340
+So that would be the LRE at i
+
+1202
+00:50:25,340 --> 00:50:27,340
+is maybe what we want to log.
+
+1203
+00:50:27,340 --> 00:50:29,340
+So let me reset this and redo that
+
+1204
+00:50:29,340 --> 00:50:31,340
+calculation. But now on the x-axis
+
+1205
+00:50:31,340 --> 00:50:33,340
+we have the
+
+1206
+00:50:33,340 --> 00:50:35,340
+exponent of the learning rate.
+
+1207
+00:50:35,340 --> 00:50:37,340
+And so we can see that the exponent
+
+1208
+00:50:37,340 --> 00:50:39,340
+of the learning rate that is good to use
+
+1209
+00:50:39,340 --> 00:50:41,340
+would be sort of like roughly in the value here
+
+1210
+00:50:41,340 --> 00:50:43,340
+because here the learning rates are just way too low
+
+1211
+00:50:43,340 --> 00:50:45,340
+and then here we expect
+
+1212
+00:50:45,340 --> 00:50:47,340
+relatively good learning rates somewhere here
+
+1213
+00:50:47,340 --> 00:50:49,340
+and then here things are starting to explode.
+
+1214
+00:50:49,340 --> 00:50:51,340
+So somewhere around negative 1
+
+1215
+00:50:51,340 --> 00:50:53,340
+as the exponent of the learning rate is a pretty good setting.
+
+1216
+00:50:53,340 --> 00:50:55,340
+And 10 to the
+
+1217
+00:50:55,340 --> 00:50:57,340
+negative 1 is 0.1
+
+1218
+00:50:57,340 --> 00:50:59,340
+So 0.1 was actually
+
+1219
+00:50:59,340 --> 00:51:01,340
+a fairly good learning rate around here.
+
+1220
+00:51:01,340 --> 00:51:03,340
+And that's what we had
+
+1221
+00:51:03,340 --> 00:51:05,340
+in the initial setting
+
+1222
+00:51:05,340 --> 00:51:07,340
+but that's roughly how you would determine it.
+
+1223
+00:51:07,340 --> 00:51:09,340
+And so here now we can
+
+1224
+00:51:09,340 --> 00:51:11,340
+take out the tracking of these
+
+1225
+00:51:11,340 --> 00:51:13,340
+and we can
+
+1226
+00:51:13,340 --> 00:51:15,340
+just simply set LRE to be
+
+1227
+00:51:15,340 --> 00:51:17,340
+10 to the negative 1
+
+1228
+00:51:17,340 --> 00:51:19,340
+or basically otherwise 0.1
+
+1229
+00:51:19,340 --> 00:51:21,340
+as it was before.
+
+1230
+00:51:21,340 --> 00:51:23,340
+And now we have some confidence that this is actually a fairly good
+
+1231
+00:51:23,340 --> 00:51:25,340
+learning rate. And so now what we can do
+
+1232
+00:51:25,340 --> 00:51:27,340
+is we can crank up the iterations
+
+1233
+00:51:27,340 --> 00:51:29,340
+we can reset our optimization
+
+1234
+00:51:29,340 --> 00:51:31,340
+and
+
+1235
+00:51:31,340 --> 00:51:33,340
+we can run for
+
+1236
+00:51:33,340 --> 00:51:35,340
+a pretty long time using this learning rate
+
+1237
+00:51:35,340 --> 00:51:37,340
+oops
+
+1238
+00:51:37,340 --> 00:51:39,340
+and we don't want to print, it's way too much printing
+
+1239
+00:51:39,340 --> 00:51:41,340
+so let me again reset
+
+1240
+00:51:41,340 --> 00:51:43,340
+and run 10,000 steps.
+
+1241
+00:51:47,340 --> 00:51:49,340
+Okay so we're at
+
+1242
+00:51:49,340 --> 00:51:51,340
+2.48 roughly.
+
+1243
+00:51:51,340 --> 00:51:53,340
+Let's run another 10,000 steps.
+
+1244
+00:51:57,340 --> 00:51:59,340
+2.46
+
+1245
+00:51:59,340 --> 00:52:01,340
+And now let's do
+
+1246
+00:52:01,340 --> 00:52:03,340
+one learning rate decay. What this means is
+
+1247
+00:52:03,340 --> 00:52:05,340
+we're going to take our learning rate and we're going to
+
+1248
+00:52:05,340 --> 00:52:07,340
+10x lower it. And so
+
+1249
+00:52:07,340 --> 00:52:09,340
+we're at the late stages of training potentially
+
+1250
+00:52:09,340 --> 00:52:11,340
+and we may want to go
+
+1251
+00:52:11,340 --> 00:52:13,340
+a little bit slower. Let's do one more actually
+
+1252
+00:52:13,340 --> 00:52:15,340
+at 0.1 just to see if
+
+1253
+00:52:17,340 --> 00:52:19,340
+we're making a dent here.
+
+1254
+00:52:19,340 --> 00:52:21,340
+Okay we're still making a dent. And by the way the
+
+1255
+00:52:21,340 --> 00:52:23,340
+bigram loss that we
+
+1256
+00:52:23,340 --> 00:52:25,340
+achieved last video was 2.45
+
+1257
+00:52:25,340 --> 00:52:27,340
+so we've already surpassed
+
+1258
+00:52:27,340 --> 00:52:29,340
+the bigram model.
+
+1259
+00:52:29,340 --> 00:52:31,340
+And once I get a sense that this is actually kind of starting
+
+1260
+00:52:31,340 --> 00:52:33,340
+to plateau off, people like to do
+
+1261
+00:52:33,340 --> 00:52:35,340
+as I mentioned this learning rate decay.
+
+1262
+00:52:35,340 --> 00:52:37,340
+So let's try to decay the loss
+
+1263
+00:52:37,340 --> 00:52:39,340
+the learning rate I mean.
+
+1264
+00:52:41,340 --> 00:52:43,340
+And we achieve
+
+1265
+00:52:43,340 --> 00:52:45,340
+it about 2.3 now.
+
+1266
+00:52:45,340 --> 00:52:47,340
+Obviously this is janky
+
+1267
+00:52:47,340 --> 00:52:49,340
+and not exactly how you would train it in
+
+1268
+00:52:49,340 --> 00:52:51,340
+production but this is roughly what you're going
+
+1269
+00:52:51,340 --> 00:52:53,340
+through. You first find a decent learning
+
+1270
+00:52:53,340 --> 00:52:55,340
+rate using the approach that I showed you.
+
+1271
+00:52:55,340 --> 00:52:57,340
+Then you start with that learning rate
+
+1272
+00:52:57,340 --> 00:52:59,340
+and you train for a while. And then at
+
+1273
+00:52:59,340 --> 00:53:01,340
+the end people like to do a learning rate decay
+
+1274
+00:53:01,340 --> 00:53:03,340
+where you decay the learning rate by say a factor
+
+1275
+00:53:03,340 --> 00:53:05,340
+of 10 and you do a few more steps
+
+1276
+00:53:05,340 --> 00:53:07,340
+and then you get a trained network
+
+1277
+00:53:07,340 --> 00:53:09,340
+roughly speaking. So we've achieved
+
+1278
+00:53:09,340 --> 00:53:11,340
+2.3 and dramatically
+
+1279
+00:53:11,340 --> 00:53:13,340
+improved on the bigram language model
+
+1280
+00:53:13,340 --> 00:53:15,340
+using this simple neural net
+
+1281
+00:53:15,340 --> 00:53:17,340
+as described here.
+
+1282
+00:53:17,340 --> 00:53:19,340
+Using these 3400 parameters.
+
+1283
+00:53:19,340 --> 00:53:21,340
+Now there's something we have to be careful with.
+
+1284
+00:53:21,340 --> 00:53:23,340
+I said that we have
+
+1285
+00:53:23,340 --> 00:53:25,340
+a better model because we are achieving
+
+1286
+00:53:25,340 --> 00:53:27,340
+a lower loss. 2.3
+
+1287
+00:53:27,340 --> 00:53:29,340
+much lower than 2.45 with the bigram
+
+1288
+00:53:29,340 --> 00:53:31,340
+model previously. Now that's not
+
+1289
+00:53:31,340 --> 00:53:33,340
+exactly true. And the reason that's not
+
+1290
+00:53:33,340 --> 00:53:35,340
+true is that
+
+1291
+00:53:37,340 --> 00:53:39,340
+this is actually a fairly small model
+
+1292
+00:53:39,340 --> 00:53:41,340
+but these models can get larger and larger
+
+1293
+00:53:41,340 --> 00:53:43,340
+if you keep adding neurons and parameters.
+
+1294
+00:53:43,340 --> 00:53:45,340
+So you can imagine that we don't
+
+1295
+00:53:45,340 --> 00:53:47,340
+potentially have a thousand parameters. We could have
+
+1296
+00:53:47,340 --> 00:53:49,340
+10,000 or 100,000 or millions of parameters.
+
+1297
+00:53:49,340 --> 00:53:51,340
+And as the capacity of the neural
+
+1298
+00:53:51,340 --> 00:53:53,340
+network grows, it
+
+1299
+00:53:53,340 --> 00:53:55,340
+becomes more and more capable of
+
+1300
+00:53:55,340 --> 00:53:57,340
+overfitting your training set.
+
+1301
+00:53:57,340 --> 00:53:59,340
+What that means is that the loss on the
+
+1302
+00:53:59,340 --> 00:54:01,340
+training set, on the data that you're training
+
+1303
+00:54:01,340 --> 00:54:03,340
+on, will become very very low.
+
+1304
+00:54:03,340 --> 00:54:05,340
+As low as zero.
+
+1305
+00:54:05,340 --> 00:54:07,340
+But all that the model is doing is memorizing
+
+1306
+00:54:07,340 --> 00:54:09,340
+your training set verbatim.
+
+1307
+00:54:09,340 --> 00:54:11,340
+So if you take that model and it looks like it's working
+
+1308
+00:54:11,340 --> 00:54:13,340
+well, but you try to sample from it,
+
+1309
+00:54:13,340 --> 00:54:15,340
+you will basically only get examples
+
+1310
+00:54:15,340 --> 00:54:17,340
+exactly as they are in the training set.
+
+1311
+00:54:17,340 --> 00:54:19,340
+You won't get any new data.
+
+1312
+00:54:19,340 --> 00:54:21,340
+In addition to that, if you try to evaluate the
+
+1313
+00:54:21,340 --> 00:54:23,340
+loss on some withheld names
+
+1314
+00:54:23,340 --> 00:54:25,340
+or other words, you will
+
+1315
+00:54:25,340 --> 00:54:27,340
+actually see that the loss on those
+
+1316
+00:54:27,340 --> 00:54:29,340
+can be very high. And so basically
+
+1317
+00:54:29,340 --> 00:54:31,340
+it's not a good model.
+
+1318
+00:54:31,340 --> 00:54:33,340
+So the standard in the field is to split up
+
+1319
+00:54:33,340 --> 00:54:35,340
+your data set into three splits,
+
+1320
+00:54:35,340 --> 00:54:37,340
+as we call them. We have the training split,
+
+1321
+00:54:37,340 --> 00:54:39,340
+the def split, or the validation
+
+1322
+00:54:39,340 --> 00:54:41,340
+split, and the test split.
+
+1323
+00:54:41,340 --> 00:54:43,340
+So,
+
+1324
+00:54:43,340 --> 00:54:45,340
+training split,
+
+1325
+00:54:45,340 --> 00:54:47,340
+test or, sorry,
+
+1326
+00:54:47,340 --> 00:54:49,340
+def or validation split,
+
+1327
+00:54:49,340 --> 00:54:51,340
+and test split.
+
+1328
+00:54:51,340 --> 00:54:53,340
+And typically, this would be
+
+1329
+00:54:53,340 --> 00:54:55,340
+say 80% of your data set, this could be
+
+1330
+00:54:55,340 --> 00:54:57,340
+10%, and this 10% roughly.
+
+1331
+00:54:57,340 --> 00:54:59,340
+So you have these three splits
+
+1332
+00:54:59,340 --> 00:55:01,340
+of the data.
+
+1333
+00:55:01,340 --> 00:55:03,340
+Now, these 80% of your training
+
+1334
+00:55:03,340 --> 00:55:05,340
+of the data set, the training set,
+
+1335
+00:55:05,340 --> 00:55:07,340
+is used to optimize the parameters of the model.
+
+1336
+00:55:07,340 --> 00:55:09,340
+Just like we're doing here, using Gradient Descent.
+
+1337
+00:55:09,340 --> 00:55:11,340
+These 10%
+
+1338
+00:55:11,340 --> 00:55:13,340
+of the examples,
+
+1339
+00:55:13,340 --> 00:55:15,340
+the def or validation split, they're used
+
+1340
+00:55:15,340 --> 00:55:17,340
+for development over all the hyper
+
+1341
+00:55:17,340 --> 00:55:19,340
+parameters of your model. So
+
+1342
+00:55:19,340 --> 00:55:21,340
+hyper parameters are, for example, the size
+
+1343
+00:55:21,340 --> 00:55:23,340
+of this hidden layer, the size of
+
+1344
+00:55:23,340 --> 00:55:25,340
+the embedding. So this is a 100 or
+
+1345
+00:55:25,340 --> 00:55:27,340
+a 2 for us, but we could try different things.
+
+1346
+00:55:27,340 --> 00:55:29,340
+The strength of the regularization,
+
+1347
+00:55:29,340 --> 00:55:31,340
+which we aren't using yet so far.
+
+1348
+00:55:31,340 --> 00:55:33,340
+So there's lots of different hyper
+
+1349
+00:55:33,340 --> 00:55:35,340
+parameters and settings that go into defining
+
+1350
+00:55:35,340 --> 00:55:37,340
+a neural net. And you can try many different
+
+1351
+00:55:37,340 --> 00:55:39,340
+variations of them and see whichever
+
+1352
+00:55:39,340 --> 00:55:41,340
+one works best on your
+
+1353
+00:55:41,340 --> 00:55:43,340
+validation split.
+
+1354
+00:55:43,340 --> 00:55:45,340
+So this is used to train the parameters.
+
+1355
+00:55:45,340 --> 00:55:47,340
+This is used to train the
+
+1356
+00:55:47,340 --> 00:55:49,340
+hyper parameters. And test
+
+1357
+00:55:49,340 --> 00:55:51,340
+split is used to evaluate
+
+1358
+00:55:51,340 --> 00:55:53,340
+basically the performance of the model at the end.
+
+1359
+00:55:53,340 --> 00:55:55,340
+So we're only evaluating
+
+1360
+00:55:55,340 --> 00:55:57,340
+the loss on the test split very, very sparingly
+
+1361
+00:55:57,340 --> 00:55:59,340
+and very few times. Because
+
+1362
+00:55:59,340 --> 00:56:01,340
+every single time you evaluate your test
+
+1363
+00:56:01,340 --> 00:56:03,340
+loss and you learn something from it,
+
+1364
+00:56:03,340 --> 00:56:05,340
+you are basically starting to
+
+1365
+00:56:05,340 --> 00:56:07,340
+also train on the test split.
+
+1366
+00:56:07,340 --> 00:56:09,340
+So you are only allowed
+
+1367
+00:56:09,340 --> 00:56:11,340
+to test the loss on the test
+
+1368
+00:56:11,340 --> 00:56:13,340
+set very, very
+
+1369
+00:56:13,340 --> 00:56:15,340
+few times. Otherwise you risk
+
+1370
+00:56:15,340 --> 00:56:17,340
+overfitting to it as well
+
+1371
+00:56:17,340 --> 00:56:19,340
+as you experiment on your model.
+
+1372
+00:56:19,340 --> 00:56:21,340
+So let's also split up our training
+
+1373
+00:56:21,340 --> 00:56:23,340
+data into train, dev,
+
+1374
+00:56:23,340 --> 00:56:25,340
+and test. And then we are going to
+
+1375
+00:56:25,340 --> 00:56:27,340
+train on train and only evaluate
+
+1376
+00:56:27,340 --> 00:56:29,340
+on test very, very sparingly.
+
+1377
+00:56:29,340 --> 00:56:31,340
+Okay, so here we go.
+
+1378
+00:56:31,340 --> 00:56:33,340
+Here is where we took all the words
+
+1379
+00:56:33,340 --> 00:56:35,340
+and put them into x and y tensors.
+
+1380
+00:56:35,340 --> 00:56:37,340
+So instead, let me create
+
+1381
+00:56:37,340 --> 00:56:39,340
+a new cell here and let me just copy paste
+
+1382
+00:56:39,340 --> 00:56:41,340
+some code here. Because I don't
+
+1383
+00:56:41,340 --> 00:56:43,340
+think it's that complex.
+
+1384
+00:56:43,340 --> 00:56:45,340
+But
+
+1385
+00:56:45,340 --> 00:56:47,340
+we're going to try to save a little bit of time.
+
+1386
+00:56:47,340 --> 00:56:49,340
+I'm converting this to be a function now.
+
+1387
+00:56:49,340 --> 00:56:51,340
+And this function takes some list
+
+1388
+00:56:51,340 --> 00:56:53,340
+of words and builds the arrays
+
+1389
+00:56:53,340 --> 00:56:55,340
+x and y for those words only.
+
+1390
+00:56:55,340 --> 00:56:57,340
+And then here
+
+1391
+00:56:57,340 --> 00:56:59,340
+I am shuffling up all the
+
+1392
+00:56:59,340 --> 00:57:01,340
+words. So these are the input words
+
+1393
+00:57:01,340 --> 00:57:03,340
+that we get. We are randomly shuffling
+
+1394
+00:57:03,340 --> 00:57:05,340
+them all up. And then
+
+1395
+00:57:05,340 --> 00:57:07,340
+we're going to
+
+1396
+00:57:07,340 --> 00:57:09,340
+set n1 to be
+
+1397
+00:57:09,340 --> 00:57:11,340
+the number of examples. There's
+
+1398
+00:57:11,340 --> 00:57:13,340
+80% of the words and n2 to be
+
+1399
+00:57:13,340 --> 00:57:15,340
+90% of the weight of
+
+1400
+00:57:15,340 --> 00:57:17,340
+the words. So basically if length
+
+1401
+00:57:17,340 --> 00:57:19,340
+of words is 32,000
+
+1402
+00:57:19,340 --> 00:57:21,340
+n1 is
+
+1403
+00:57:21,340 --> 00:57:23,340
+oh sorry, I should probably run this.
+
+1404
+00:57:23,340 --> 00:57:25,340
+n1 is
+
+1405
+00:57:25,340 --> 00:57:27,340
+25,000 and n2 is 28,000.
+
+1406
+00:57:27,340 --> 00:57:29,340
+And so here we see that
+
+1407
+00:57:29,340 --> 00:57:31,340
+I'm calling build data set
+
+1408
+00:57:31,340 --> 00:57:33,340
+to build the training set x and y
+
+1409
+00:57:33,340 --> 00:57:35,340
+by indexing into
+
+1410
+00:57:35,340 --> 00:57:37,340
+up to n1. So we're going to have
+
+1411
+00:57:37,340 --> 00:57:39,340
+only 25,000 training words.
+
+1412
+00:57:39,340 --> 00:57:41,340
+And then we're going to have
+
+1413
+00:57:41,340 --> 00:57:43,340
+roughly
+
+1414
+00:57:43,340 --> 00:57:45,340
+n2 minus n1
+
+1415
+00:57:45,340 --> 00:57:47,340
+3,000 validation
+
+1416
+00:57:47,340 --> 00:57:49,340
+examples or dev
+
+1417
+00:57:49,340 --> 00:57:51,340
+examples and we're going to have
+
+1418
+00:57:53,340 --> 00:57:55,340
+length of words basically
+
+1419
+00:57:55,340 --> 00:57:57,340
+minus n2
+
+1420
+00:57:57,340 --> 00:57:59,340
+or 3,204
+
+1421
+00:57:59,340 --> 00:58:01,340
+examples here
+
+1422
+00:58:01,340 --> 00:58:03,340
+for the test set.
+
+1423
+00:58:03,340 --> 00:58:05,340
+So now we have
+
+1424
+00:58:05,340 --> 00:58:07,340
+x's and y's for
+
+1425
+00:58:07,340 --> 00:58:09,340
+all those three splits.
+
+1426
+00:58:11,340 --> 00:58:13,340
+Oh yeah
+
+1427
+00:58:13,340 --> 00:58:15,340
+I'm printing their size here inside the function as well.
+
+1428
+00:58:19,340 --> 00:58:21,340
+But here we don't have words but these are already
+
+1429
+00:58:21,340 --> 00:58:23,340
+the individual examples made from those words.
+
+1430
+00:58:25,340 --> 00:58:27,340
+So let's now scroll down here
+
+1431
+00:58:27,340 --> 00:58:29,340
+and the data set now for training
+
+1432
+00:58:29,340 --> 00:58:31,340
+is
+
+1433
+00:58:31,340 --> 00:58:33,340
+more like this.
+
+1434
+00:58:33,340 --> 00:58:35,340
+And then when we reset the network
+
+1435
+00:58:37,340 --> 00:58:39,340
+when we're training
+
+1436
+00:58:39,340 --> 00:58:41,340
+we're only going to be training using
+
+1437
+00:58:41,340 --> 00:58:43,340
+x train
+
+1438
+00:58:43,340 --> 00:58:45,340
+x train
+
+1439
+00:58:45,340 --> 00:58:47,340
+and y train.
+
+1440
+00:58:47,340 --> 00:58:49,340
+So that's the only thing we're
+
+1441
+00:58:49,340 --> 00:58:51,340
+training on.
+
+1442
+00:58:57,340 --> 00:58:59,340
+Let's see where we are
+
+1443
+00:58:59,340 --> 00:59:01,340
+on the single batch.
+
+1444
+00:59:01,340 --> 00:59:03,340
+Let's now train maybe
+
+1445
+00:59:03,340 --> 00:59:05,340
+a few more steps.
+
+1446
+00:59:07,340 --> 00:59:09,340
+Training of neural networks can take a while.
+
+1447
+00:59:09,340 --> 00:59:11,340
+Usually you don't do it inline.
+
+1448
+00:59:11,340 --> 00:59:13,340
+You launch a bunch of jobs
+
+1449
+00:59:13,340 --> 00:59:15,340
+and you wait for them to finish.
+
+1450
+00:59:15,340 --> 00:59:17,340
+It can take multiple days and so on.
+
+1451
+00:59:17,340 --> 00:59:19,340
+Luckily this is a very small network.
+
+1452
+00:59:21,340 --> 00:59:23,340
+Okay so the loss is pretty good.
+
+1453
+00:59:23,340 --> 00:59:25,340
+Oh we accidentally used
+
+1454
+00:59:25,340 --> 00:59:27,340
+a learning rate that is way too low.
+
+1455
+00:59:27,340 --> 00:59:29,340
+So let me actually come back.
+
+1456
+00:59:29,340 --> 00:59:31,340
+We used the decay learning rate
+
+1457
+00:59:31,340 --> 00:59:33,340
+of 0.01.
+
+1458
+00:59:35,340 --> 00:59:37,340
+So this will train much faster.
+
+1459
+00:59:37,340 --> 00:59:39,340
+And then here when we evaluate
+
+1460
+00:59:39,340 --> 00:59:41,340
+let's use the depth set here.
+
+1461
+00:59:41,340 --> 00:59:43,340
+x dev
+
+1462
+00:59:43,340 --> 00:59:45,340
+and y dev
+
+1463
+00:59:45,340 --> 00:59:47,340
+to evaluate the loss.
+
+1464
+00:59:49,340 --> 00:59:51,340
+And let's not decay the learning rate
+
+1465
+00:59:51,340 --> 00:59:53,340
+and only do say 10,000 examples.
+
+1466
+00:59:55,340 --> 00:59:57,340
+And let's evaluate the dev loss
+
+1467
+00:59:57,340 --> 00:59:59,340
+once here.
+
+1468
+00:59:59,340 --> 01:00:01,340
+Okay so we're getting about 2.3 on dev.
+
+1469
+01:00:01,340 --> 01:00:03,340
+And so the neural network when it was training
+
+1470
+01:00:03,340 --> 01:00:05,340
+did not see these dev examples.
+
+1471
+01:00:05,340 --> 01:00:07,340
+It hasn't optimized on them.
+
+1472
+01:00:07,340 --> 01:00:09,340
+And yet when we evaluate the loss
+
+1473
+01:00:09,340 --> 01:00:11,340
+on these dev we actually get a pretty decent loss.
+
+1474
+01:00:11,340 --> 01:00:13,340
+And so
+
+1475
+01:00:13,340 --> 01:00:15,340
+we can also look at what the
+
+1476
+01:00:15,340 --> 01:00:17,340
+loss is on all of training set.
+
+1477
+01:00:19,340 --> 01:00:21,340
+Oops.
+
+1478
+01:00:21,340 --> 01:00:23,340
+And so we see that the training and the dev loss
+
+1479
+01:00:23,340 --> 01:00:25,340
+are about equal.
+
+1480
+01:00:25,340 --> 01:00:27,340
+So we're not overfitting.
+
+1481
+01:00:27,340 --> 01:00:29,340
+This model is not powerful enough
+
+1482
+01:00:29,340 --> 01:00:31,340
+to just be purely memorizing the data.
+
+1483
+01:00:31,340 --> 01:00:33,340
+And so far we are what's called underfitting.
+
+1484
+01:00:33,340 --> 01:00:35,340
+Because the training loss
+
+1485
+01:00:35,340 --> 01:00:37,340
+and the dev or test losses
+
+1486
+01:00:37,340 --> 01:00:39,340
+are roughly equal.
+
+1487
+01:00:39,340 --> 01:00:41,340
+So what we can do is
+
+1488
+01:00:41,340 --> 01:00:43,340
+is that our network is very tiny.
+
+1489
+01:00:43,340 --> 01:00:45,340
+Very small.
+
+1490
+01:00:45,340 --> 01:00:47,340
+And we expect to make performance improvements
+
+1491
+01:00:47,340 --> 01:00:49,340
+by scaling up the size of this neural net.
+
+1492
+01:00:49,340 --> 01:00:51,340
+So let's do that now.
+
+1493
+01:00:51,340 --> 01:00:53,340
+So let's come over here
+
+1494
+01:00:53,340 --> 01:00:55,340
+and let's increase the size of the neural net.
+
+1495
+01:00:55,340 --> 01:00:57,340
+The easiest way to do this
+
+1496
+01:00:57,340 --> 01:00:59,340
+is we can come here to the hidden layer
+
+1497
+01:00:59,340 --> 01:01:01,340
+which currently has 100 neurons.
+
+1498
+01:01:01,340 --> 01:01:03,340
+And let's just bump this up.
+
+1499
+01:01:03,340 --> 01:01:05,340
+So let's do 300 neurons.
+
+1500
+01:01:05,340 --> 01:01:07,340
+And then this is also 300 biases.
+
+1501
+01:01:07,340 --> 01:01:09,340
+And here we have 300 inputs
+
+1502
+01:01:09,340 --> 01:01:11,340
+that initialize our neural net.
+
+1503
+01:01:11,340 --> 01:01:13,340
+We now have 10,000 parameters
+
+1504
+01:01:13,340 --> 01:01:15,340
+instead of 3,000 parameters.
+
+1505
+01:01:15,340 --> 01:01:17,340
+And then we're not using this.
+
+1506
+01:01:17,340 --> 01:01:19,340
+And then here what I'd like to do
+
+1507
+01:01:19,340 --> 01:01:21,340
+is I'd like to actually
+
+1508
+01:01:21,340 --> 01:01:23,340
+keep track of
+
+1509
+01:01:27,340 --> 01:01:29,340
+Okay, let's just do this.
+
+1510
+01:01:29,340 --> 01:01:31,340
+Let's keep stats again.
+
+1511
+01:01:31,340 --> 01:01:33,340
+And here when we're keeping track of the
+
+1512
+01:01:33,340 --> 01:01:35,340
+loss
+
+1513
+01:01:35,340 --> 01:01:37,340
+let's just also keep track of
+
+1514
+01:01:37,340 --> 01:01:39,340
+the steps.
+
+1515
+01:01:39,340 --> 01:01:41,340
+I have an eye here.
+
+1516
+01:01:41,340 --> 01:01:43,340
+And let's train on 30,000
+
+1517
+01:01:43,340 --> 01:01:45,340
+or rather say
+
+1518
+01:01:45,340 --> 01:01:47,340
+Okay, let's try 30,000.
+
+1519
+01:01:47,340 --> 01:01:49,340
+And we are at 0.1
+
+1520
+01:01:51,340 --> 01:01:53,340
+And we should
+
+1521
+01:01:53,340 --> 01:01:55,340
+be able to run this
+
+1522
+01:01:55,340 --> 01:01:57,340
+and optimize the neural net.
+
+1523
+01:01:57,340 --> 01:01:59,340
+And then here basically
+
+1524
+01:01:59,340 --> 01:02:01,340
+I want to plt.plot
+
+1525
+01:02:01,340 --> 01:02:03,340
+the steps against
+
+1526
+01:02:03,340 --> 01:02:05,340
+the loss.
+
+1527
+01:02:09,340 --> 01:02:11,340
+So these are the x's and the y's.
+
+1528
+01:02:11,340 --> 01:02:13,340
+And this is
+
+1529
+01:02:13,340 --> 01:02:15,340
+the loss function
+
+1530
+01:02:15,340 --> 01:02:17,340
+and how it's being optimized.
+
+1531
+01:02:17,340 --> 01:02:19,340
+Now you see that there's quite a bit of
+
+1532
+01:02:19,340 --> 01:02:21,340
+thickness to this.
+
+1533
+01:02:21,340 --> 01:02:23,340
+And that's because we are optimizing over these mini-batches.
+
+1534
+01:02:23,340 --> 01:02:25,340
+And the mini-batches create a little bit of noise
+
+1535
+01:02:25,340 --> 01:02:27,340
+in this.
+
+1536
+01:02:27,340 --> 01:02:29,340
+Where are we in the def set?
+
+1537
+01:02:29,340 --> 01:02:31,340
+We are at 2.5.
+
+1538
+01:02:31,340 --> 01:02:33,340
+So we still haven't optimized this neural net very well.
+
+1539
+01:02:33,340 --> 01:02:35,340
+And that's probably because we made it bigger.
+
+1540
+01:02:35,340 --> 01:02:37,340
+It might take longer for this neural net to converge.
+
+1541
+01:02:37,340 --> 01:02:39,340
+And so let's continue training.
+
+1542
+01:02:41,340 --> 01:02:43,340
+Yeah, let's just
+
+1543
+01:02:43,340 --> 01:02:45,340
+continue training.
+
+1544
+01:02:45,340 --> 01:02:47,340
+One possibility
+
+1545
+01:02:47,340 --> 01:02:49,340
+is that the batch size is so low
+
+1546
+01:02:49,340 --> 01:02:51,340
+that we just have way too much
+
+1547
+01:02:51,340 --> 01:02:53,340
+noise in the training.
+
+1548
+01:02:53,340 --> 01:02:55,340
+And we may want to increase the batch size so that we have a bit more
+
+1549
+01:02:55,340 --> 01:02:57,340
+correct gradient.
+
+1550
+01:02:57,340 --> 01:02:59,340
+And we are not thrashing too much.
+
+1551
+01:02:59,340 --> 01:03:01,340
+And we can actually optimize more properly.
+
+1552
+01:03:07,340 --> 01:03:09,340
+This will now become
+
+1553
+01:03:09,340 --> 01:03:11,340
+meaningless because we've
+
+1554
+01:03:11,340 --> 01:03:13,340
+re-initialized these.
+
+1555
+01:03:13,340 --> 01:03:15,340
+This looks not
+
+1556
+01:03:15,340 --> 01:03:17,340
+pleasing right now.
+
+1557
+01:03:17,340 --> 01:03:19,340
+But there probably is a tiny improvement
+
+1558
+01:03:19,340 --> 01:03:21,340
+but it's so hard to tell.
+
+1559
+01:03:21,340 --> 01:03:23,340
+Let's go again.
+
+1560
+01:03:23,340 --> 01:03:25,340
+2.52
+
+1561
+01:03:25,340 --> 01:03:27,340
+Let's try to decrease the learning rate
+
+1562
+01:03:27,340 --> 01:03:29,340
+by a factor of 2.
+
+1563
+01:03:37,340 --> 01:03:51,340
+Okay, we're at 2.32.
+
+1564
+01:03:51,340 --> 01:03:53,340
+Let's continue training.
+
+1565
+01:04:05,340 --> 01:04:07,340
+We basically expect to see a lower
+
+1566
+01:04:07,340 --> 01:04:09,340
+loss than what we had before.
+
+1567
+01:04:09,340 --> 01:04:11,340
+Because now we have a much much bigger model
+
+1568
+01:04:11,340 --> 01:04:13,340
+and we were underfitting.
+
+1569
+01:04:13,340 --> 01:04:15,340
+So we'd expect that increasing the size of the model should help the neural net.
+
+1570
+01:04:15,340 --> 01:04:17,340
+2.32
+
+1571
+01:04:17,340 --> 01:04:19,340
+Okay, so that's not happening too well.
+
+1572
+01:04:19,340 --> 01:04:21,340
+Now one other concern is that
+
+1573
+01:04:21,340 --> 01:04:23,340
+even though we've made the 10H layer here
+
+1574
+01:04:23,340 --> 01:04:25,340
+or the hidden layer much much bigger
+
+1575
+01:04:25,340 --> 01:04:27,340
+it could be that the bottleneck of the network
+
+1576
+01:04:27,340 --> 01:04:29,340
+right now are these embeddings
+
+1577
+01:04:29,340 --> 01:04:31,340
+that are two-dimensional.
+
+1578
+01:04:31,340 --> 01:04:33,340
+It can be that we're just cramming way too many characters
+
+1579
+01:04:33,340 --> 01:04:35,340
+into just two dimensions
+
+1580
+01:04:35,340 --> 01:04:37,340
+and the neural net is not able to really use that space effectively.
+
+1581
+01:04:37,340 --> 01:04:39,340
+And that is sort of like
+
+1582
+01:04:39,340 --> 01:04:41,340
+the bottleneck to our network's performance.
+
+1583
+01:04:41,340 --> 01:04:43,340
+Okay, 2.23
+
+1584
+01:04:43,340 --> 01:04:45,340
+So just by decreasing the learning rate
+
+1585
+01:04:45,340 --> 01:04:47,340
+I was able to make quite a bit of progress.
+
+1586
+01:04:47,340 --> 01:04:49,340
+Let's run this one more time.
+
+1587
+01:04:51,340 --> 01:04:53,340
+And then evaluate the training
+
+1588
+01:04:53,340 --> 01:04:55,340
+and the dev loss.
+
+1589
+01:04:55,340 --> 01:04:57,340
+Now one more thing
+
+1590
+01:04:57,340 --> 01:04:59,340
+after training that I'd like to do
+
+1591
+01:04:59,340 --> 01:05:01,340
+is I'd like to visualize
+
+1592
+01:05:01,340 --> 01:05:03,340
+the embedding vectors
+
+1593
+01:05:03,340 --> 01:05:05,340
+for these
+
+1594
+01:05:05,340 --> 01:05:07,340
+characters before we scale up
+
+1595
+01:05:07,340 --> 01:05:09,340
+the embedding size from 2.
+
+1596
+01:05:09,340 --> 01:05:11,340
+Because we'd like to make
+
+1597
+01:05:11,340 --> 01:05:13,340
+this bottleneck potentially go away.
+
+1598
+01:05:13,340 --> 01:05:15,340
+But once I make this greater than 2
+
+1599
+01:05:15,340 --> 01:05:17,340
+we won't be able to visualize them.
+
+1600
+01:05:17,340 --> 01:05:19,340
+So here, okay we're at 2.23
+
+1601
+01:05:19,340 --> 01:05:21,340
+and 2.24
+
+1602
+01:05:21,340 --> 01:05:23,340
+so we're not improving
+
+1603
+01:05:23,340 --> 01:05:25,340
+much more and maybe the bottleneck now
+
+1604
+01:05:25,340 --> 01:05:27,340
+is the character embedding size which is 2.
+
+1605
+01:05:27,340 --> 01:05:29,340
+So here I have a bunch
+
+1606
+01:05:29,340 --> 01:05:31,340
+of code that will create a figure
+
+1607
+01:05:31,340 --> 01:05:33,340
+and then we're going to visualize
+
+1608
+01:05:33,340 --> 01:05:35,340
+the embeddings that were trained
+
+1609
+01:05:35,340 --> 01:05:37,340
+by the neural net on these characters.
+
+1610
+01:05:37,340 --> 01:05:39,340
+Because right now the embedding size is just 2
+
+1611
+01:05:39,340 --> 01:05:41,340
+so we can visualize all the characters
+
+1612
+01:05:41,340 --> 01:05:43,340
+with the x and the y coordinates
+
+1613
+01:05:43,340 --> 01:05:45,340
+as the two embedding locations
+
+1614
+01:05:45,340 --> 01:05:47,340
+for each of these characters.
+
+1615
+01:05:47,340 --> 01:05:49,340
+And so here are the
+
+1616
+01:05:49,340 --> 01:05:51,340
+x coordinates and the y coordinates
+
+1617
+01:05:51,340 --> 01:05:53,340
+which are the columns of C
+
+1618
+01:05:53,340 --> 01:05:55,340
+and then for each one I also include
+
+1619
+01:05:55,340 --> 01:05:57,340
+the text of the little character.
+
+1620
+01:05:57,340 --> 01:05:59,340
+So here what we see
+
+1621
+01:05:59,340 --> 01:06:01,340
+is actually kind of interesting.
+
+1622
+01:06:01,340 --> 01:06:03,340
+The network has
+
+1623
+01:06:03,340 --> 01:06:05,340
+basically learned to separate out
+
+1624
+01:06:05,340 --> 01:06:07,340
+the characters and cluster them a little bit
+
+1625
+01:06:07,340 --> 01:06:09,340
+so for example you see how the vowels
+
+1626
+01:06:09,340 --> 01:06:11,340
+a, e, i, o, u
+
+1627
+01:06:11,340 --> 01:06:13,340
+are clustered up here
+
+1628
+01:06:13,340 --> 01:06:15,340
+so what that's telling us is that the neural net
+
+1629
+01:06:15,340 --> 01:06:17,340
+treats these as very similar
+
+1630
+01:06:17,340 --> 01:06:19,340
+because when they feed into the neural net
+
+1631
+01:06:19,340 --> 01:06:21,340
+the embedding for all these characters
+
+1632
+01:06:21,340 --> 01:06:23,340
+is very similar and so the neural net
+
+1633
+01:06:23,340 --> 01:06:25,340
+thinks that they're very similar
+
+1634
+01:06:25,340 --> 01:06:27,340
+and kind of like interchangeable
+
+1635
+01:06:27,340 --> 01:06:29,340
+if that makes sense.
+
+1636
+01:06:29,340 --> 01:06:31,340
+Then the points that are like
+
+1637
+01:06:31,340 --> 01:06:33,340
+really far away are for example Q
+
+1638
+01:06:33,340 --> 01:06:35,340
+Q is kind of treated as an exception
+
+1639
+01:06:35,340 --> 01:06:37,340
+and Q has a very special embedding vector
+
+1640
+01:06:37,340 --> 01:06:39,340
+so to speak.
+
+1641
+01:06:39,340 --> 01:06:41,340
+Similarly dot, which is a special character
+
+1642
+01:06:41,340 --> 01:06:43,340
+is all the way out here
+
+1643
+01:06:43,340 --> 01:06:45,340
+and a lot of the other letters are sort of like
+
+1644
+01:06:45,340 --> 01:06:47,340
+clustered up here.
+
+1645
+01:06:47,340 --> 01:06:49,340
+And so it's kind of interesting that there's
+
+1646
+01:06:49,340 --> 01:06:51,340
+a little bit of structure here
+
+1647
+01:06:51,340 --> 01:06:53,340
+after the training and it's not
+
+1648
+01:06:53,340 --> 01:06:55,340
+definitely not random and these embeddings
+
+1649
+01:06:55,340 --> 01:06:57,340
+make sense.
+
+1650
+01:06:57,340 --> 01:06:59,340
+So we're now going to scale up the embedding size
+
+1651
+01:06:59,340 --> 01:07:01,340
+and won't be able to visualize it directly
+
+1652
+01:07:01,340 --> 01:07:03,340
+but we expect that because we're underfitting
+
+1653
+01:07:03,340 --> 01:07:05,340
+and we made this layer
+
+1654
+01:07:05,340 --> 01:07:07,340
+much bigger and did not sufficiently
+
+1655
+01:07:07,340 --> 01:07:09,340
+improve the loss, we're thinking that the
+
+1656
+01:07:09,340 --> 01:07:11,340
+constraint
+
+1657
+01:07:11,340 --> 01:07:13,340
+to better performance right now
+
+1658
+01:07:13,340 --> 01:07:15,340
+could be these embedding vectors.
+
+1659
+01:07:15,340 --> 01:07:17,340
+So let's make them bigger.
+
+1660
+01:07:17,340 --> 01:07:19,340
+So let's scroll up here and now we don't have
+
+1661
+01:07:19,340 --> 01:07:21,340
+two dimensional embeddings, we are going to have
+
+1662
+01:07:21,340 --> 01:07:23,340
+say 10 dimensional embeddings
+
+1663
+01:07:23,340 --> 01:07:25,340
+for each word.
+
+1664
+01:07:25,340 --> 01:07:27,340
+Then this layer will receive
+
+1665
+01:07:27,340 --> 01:07:29,340
+3 times 10
+
+1666
+01:07:29,340 --> 01:07:31,340
+so 30 inputs
+
+1667
+01:07:31,340 --> 01:07:33,340
+will go into
+
+1668
+01:07:33,340 --> 01:07:35,340
+the hidden layer.
+
+1669
+01:07:35,340 --> 01:07:37,340
+Let's also make the hidden layer a bit smaller
+
+1670
+01:07:37,340 --> 01:07:39,340
+so instead of 300 let's just do 200
+
+1671
+01:07:39,340 --> 01:07:41,340
+neurons in that hidden layer.
+
+1672
+01:07:41,340 --> 01:07:43,340
+So now the total number of elements
+
+1673
+01:07:43,340 --> 01:07:45,340
+will be slightly bigger at
+
+1674
+01:07:45,340 --> 01:07:47,340
+11,000.
+
+1675
+01:07:47,340 --> 01:07:49,340
+And then here we have to be a bit careful because
+
+1676
+01:07:49,340 --> 01:07:51,340
+the learning rate
+
+1677
+01:07:51,340 --> 01:07:53,340
+we set to 0.1
+
+1678
+01:07:53,340 --> 01:07:55,340
+here we are hardcoding 6
+
+1679
+01:07:55,340 --> 01:07:57,340
+and obviously if you're working in production
+
+1680
+01:07:57,340 --> 01:07:59,340
+you don't want to be hardcoding magic numbers
+
+1681
+01:07:59,340 --> 01:08:01,340
+but instead of 6 this should now be 30.
+
+1682
+01:08:03,340 --> 01:08:05,340
+And let's run for
+
+1683
+01:08:05,340 --> 01:08:07,340
+50,000 iterations and let me
+
+1684
+01:08:07,340 --> 01:08:09,340
+split out the initialization here
+
+1685
+01:08:09,340 --> 01:08:11,340
+outside so that
+
+1686
+01:08:11,340 --> 01:08:13,340
+when we run this multiple times it's not going
+
+1687
+01:08:13,340 --> 01:08:15,340
+to wipe out our loss.
+
+1688
+01:08:17,340 --> 01:08:19,340
+In addition to that
+
+1689
+01:08:19,340 --> 01:08:21,340
+here let's instead
+
+1690
+01:08:21,340 --> 01:08:23,340
+of logging loss.item let's actually
+
+1691
+01:08:23,340 --> 01:08:25,340
+log the
+
+1692
+01:08:25,340 --> 01:08:27,340
+let's do log10
+
+1693
+01:08:27,340 --> 01:08:29,340
+I believe
+
+1694
+01:08:29,340 --> 01:08:31,340
+that's a function of the loss
+
+1695
+01:08:31,340 --> 01:08:33,340
+and I'll show you
+
+1696
+01:08:33,340 --> 01:08:35,340
+why in a second. Let's optimize this.
+
+1697
+01:08:35,340 --> 01:08:37,340
+This
+
+1698
+01:08:37,340 --> 01:08:39,340
+basically I'd like to plot the log loss
+
+1699
+01:08:39,340 --> 01:08:41,340
+instead of the loss because when you plot
+
+1700
+01:08:41,340 --> 01:08:43,340
+the loss many times it can have this hockey stick
+
+1701
+01:08:43,340 --> 01:08:45,340
+appearance and log
+
+1702
+01:08:45,340 --> 01:08:47,340
+squashes it in.
+
+1703
+01:08:47,340 --> 01:08:49,340
+So it just kind of like looks nicer.
+
+1704
+01:08:49,340 --> 01:08:51,340
+So the x-axis is step i
+
+1705
+01:08:51,340 --> 01:08:53,340
+and the y-axis will be the loss
+
+1706
+01:08:53,340 --> 01:08:55,340
+i.
+
+1707
+01:09:01,340 --> 01:09:03,340
+And then here this is 30.
+
+1708
+01:09:03,340 --> 01:09:05,340
+Ideally we wouldn't be hardcoding these
+
+1709
+01:09:05,340 --> 01:09:09,340
+because let's look
+
+1710
+01:09:09,340 --> 01:09:11,340
+at the loss.
+
+1711
+01:09:11,340 --> 01:09:13,340
+It's again very thick because
+
+1712
+01:09:13,340 --> 01:09:15,340
+the mini-batch size is very small
+
+1713
+01:09:15,340 --> 01:09:17,340
+but the total loss over the training set
+
+1714
+01:09:17,340 --> 01:09:19,340
+is 2.3 and the test
+
+1715
+01:09:19,340 --> 01:09:21,340
+or the def set is 2.38 as well.
+
+1716
+01:09:21,340 --> 01:09:23,340
+So far so good.
+
+1717
+01:09:23,340 --> 01:09:25,340
+Let's try to now decrease the learning rate
+
+1718
+01:09:25,340 --> 01:09:27,340
+by a factor of 10
+
+1719
+01:09:29,340 --> 01:09:31,340
+and train for another 50,000 iterations.
+
+1720
+01:09:35,340 --> 01:09:37,340
+We'd hope that we would be able to beat
+
+1721
+01:09:37,340 --> 01:09:39,340
+2.32.
+
+1722
+01:09:43,340 --> 01:09:45,340
+But again we're just kind of like doing this very
+
+1723
+01:09:45,340 --> 01:09:47,340
+haphazardly so I don't actually have
+
+1724
+01:09:47,340 --> 01:09:49,340
+confidence that our learning rate is set
+
+1725
+01:09:49,340 --> 01:09:51,340
+very well, that our learning rate decay
+
+1726
+01:09:51,340 --> 01:09:53,340
+which we just do at random
+
+1727
+01:09:53,340 --> 01:09:55,340
+is set very well.
+
+1728
+01:09:55,340 --> 01:09:57,340
+And so the optimization here
+
+1729
+01:09:57,340 --> 01:09:59,340
+is kind of suspect to be honest and this is
+
+1730
+01:09:59,340 --> 01:10:01,340
+not how you would do it typically in production.
+
+1731
+01:10:01,340 --> 01:10:03,340
+In production you would create parameters
+
+1732
+01:10:03,340 --> 01:10:05,340
+or hyperparameters out of all these settings
+
+1733
+01:10:05,340 --> 01:10:07,340
+and then you would run lots of experiments
+
+1734
+01:10:07,340 --> 01:10:09,340
+and see whichever ones are working well for you.
+
+1735
+01:10:11,340 --> 01:10:13,340
+Okay.
+
+1736
+01:10:13,340 --> 01:10:15,340
+So we have 2.17 now
+
+1737
+01:10:15,340 --> 01:10:17,340
+and 2.2.
+
+1738
+01:10:17,340 --> 01:10:19,340
+So you see how the training and the validation
+
+1739
+01:10:19,340 --> 01:10:21,340
+performance are starting to
+
+1740
+01:10:21,340 --> 01:10:23,340
+slightly slowly depart.
+
+1741
+01:10:23,340 --> 01:10:25,340
+So maybe we're getting the sense that the neural net
+
+1742
+01:10:25,340 --> 01:10:27,340
+is getting good enough
+
+1743
+01:10:27,340 --> 01:10:29,340
+or that number of parameters
+
+1744
+01:10:29,340 --> 01:10:31,340
+is large enough
+
+1745
+01:10:31,340 --> 01:10:33,340
+that we are slowly starting to overfit.
+
+1746
+01:10:33,340 --> 01:10:35,340
+Let's maybe run
+
+1747
+01:10:35,340 --> 01:10:37,340
+one more iteration of this
+
+1748
+01:10:37,340 --> 01:10:39,340
+and see where we get.
+
+1749
+01:10:41,340 --> 01:10:43,340
+But yeah, basically you would be running
+
+1750
+01:10:43,340 --> 01:10:45,340
+lots of experiments and then you are slowly
+
+1751
+01:10:45,340 --> 01:10:47,340
+scrutinizing whichever ones give you the best
+
+1752
+01:10:47,340 --> 01:10:49,340
+depth performance. And then once you find
+
+1753
+01:10:49,340 --> 01:10:51,340
+all the hyperparameters that make
+
+1754
+01:10:51,340 --> 01:10:53,340
+your depth performance good
+
+1755
+01:10:53,340 --> 01:10:55,340
+you take that model and you evaluate the test set
+
+1756
+01:10:55,340 --> 01:10:57,340
+performance a single time.
+
+1757
+01:10:57,340 --> 01:10:59,340
+And that's the number that you report in your paper
+
+1758
+01:10:59,340 --> 01:11:01,340
+or wherever else you want to talk about
+
+1759
+01:11:01,340 --> 01:11:03,340
+and brag about your model.
+
+1760
+01:11:05,340 --> 01:11:07,340
+So let's then rerun the plot
+
+1761
+01:11:07,340 --> 01:11:09,340
+and rerun the train and dev.
+
+1762
+01:11:11,340 --> 01:11:13,340
+And because we're getting lower loss now
+
+1763
+01:11:13,340 --> 01:11:15,340
+it is the case that the embedding size
+
+1764
+01:11:15,340 --> 01:11:17,340
+of these was holding us back very likely.
+
+1765
+01:11:19,340 --> 01:11:21,340
+Okay, so 2.16, 2.19
+
+1766
+01:11:21,340 --> 01:11:23,340
+is what we're roughly getting.
+
+1767
+01:11:23,340 --> 01:11:25,340
+So there's many ways
+
+1768
+01:11:25,340 --> 01:11:27,340
+to go from here.
+
+1769
+01:11:27,340 --> 01:11:29,340
+We can continue tuning the optimization.
+
+1770
+01:11:29,340 --> 01:11:31,340
+We can continue
+
+1771
+01:11:31,340 --> 01:11:33,340
+for example playing with the size of the neural net.
+
+1772
+01:11:33,340 --> 01:11:35,340
+Or we can increase the number of
+
+1773
+01:11:35,340 --> 01:11:37,340
+words or characters
+
+1774
+01:11:37,340 --> 01:11:39,340
+in our case that we are taking as an input.
+
+1775
+01:11:39,340 --> 01:11:41,340
+So instead of just three characters we could be taking
+
+1776
+01:11:41,340 --> 01:11:43,340
+more characters as an input.
+
+1777
+01:11:43,340 --> 01:11:45,340
+And that could further improve
+
+1778
+01:11:45,340 --> 01:11:47,340
+the loss. Okay, so I changed
+
+1779
+01:11:47,340 --> 01:11:49,340
+the code slightly so we have here
+
+1780
+01:11:49,340 --> 01:11:51,340
+200,000 steps of the optimization
+
+1781
+01:11:51,340 --> 01:11:53,340
+and in the first 100,000 we're using
+
+1782
+01:11:53,340 --> 01:11:55,340
+a learning rate of 0.1 and then in the next
+
+1783
+01:11:55,340 --> 01:11:57,340
+100,000 we're using a learning rate of 0.01.
+
+1784
+01:11:57,340 --> 01:11:59,340
+This is the loss
+
+1785
+01:11:59,340 --> 01:12:01,340
+that I achieve and these are the
+
+1786
+01:12:01,340 --> 01:12:03,340
+performance on the training and validation loss.
+
+1787
+01:12:03,340 --> 01:12:05,340
+And in particular the best
+
+1788
+01:12:05,340 --> 01:12:07,340
+validation loss I've been able to obtain in the last
+
+1789
+01:12:07,340 --> 01:12:09,340
+30 minutes or so is 2.17.
+
+1790
+01:12:09,340 --> 01:12:11,340
+So now I invite
+
+1791
+01:12:11,340 --> 01:12:13,340
+you to beat this number. And you have
+
+1792
+01:12:13,340 --> 01:12:15,340
+quite a few knobs available to you to I think
+
+1793
+01:12:15,340 --> 01:12:17,340
+surpass this number.
+
+1794
+01:12:17,340 --> 01:12:19,340
+So number one, you can of course change the number of
+
+1795
+01:12:19,340 --> 01:12:21,340
+neurons in the hidden layer of this model.
+
+1796
+01:12:21,340 --> 01:12:23,340
+You can change the dimensionality of the
+
+1797
+01:12:23,340 --> 01:12:25,340
+embedding lookup table.
+
+1798
+01:12:25,340 --> 01:12:27,340
+You can change the number of characters that are feeding
+
+1799
+01:12:27,340 --> 01:12:29,340
+in as an input
+
+1800
+01:12:29,340 --> 01:12:31,340
+as the context into this model.
+
+1801
+01:12:31,340 --> 01:12:33,340
+And then of course you can
+
+1802
+01:12:33,340 --> 01:12:35,340
+change the details of the optimization.
+
+1803
+01:12:35,340 --> 01:12:37,340
+How long are we running? Where is the learning rate?
+
+1804
+01:12:37,340 --> 01:12:39,340
+How does it change over time?
+
+1805
+01:12:39,340 --> 01:12:41,340
+How does it decay?
+
+1806
+01:12:41,340 --> 01:12:43,340
+You can change the batch size and you may be able to
+
+1807
+01:12:43,340 --> 01:12:45,340
+actually achieve a much better convergence
+
+1808
+01:12:45,340 --> 01:12:47,340
+speed in terms of
+
+1809
+01:12:47,340 --> 01:12:49,340
+how many seconds or minutes it takes to train
+
+1810
+01:12:49,340 --> 01:12:51,340
+the model and get
+
+1811
+01:12:51,340 --> 01:12:53,340
+your result in terms of really good
+
+1812
+01:12:53,340 --> 01:12:55,340
+loss.
+
+1813
+01:12:55,340 --> 01:12:57,340
+And then of course I actually invite you to
+
+1814
+01:12:57,340 --> 01:12:59,340
+read this paper. It is 19 pages
+
+1815
+01:12:59,340 --> 01:13:01,340
+but at this point you should actually be able to
+
+1816
+01:13:01,340 --> 01:13:03,340
+read a good chunk of this paper and understand
+
+1817
+01:13:03,340 --> 01:13:05,340
+a pretty good
+
+1818
+01:13:05,340 --> 01:13:07,340
+chunks of it.
+
+1819
+01:13:07,340 --> 01:13:09,340
+And this paper also has quite a few ideas for
+
+1820
+01:13:09,340 --> 01:13:11,340
+improvements that you can play with.
+
+1821
+01:13:11,340 --> 01:13:13,340
+So all of those are knobs available to you
+
+1822
+01:13:13,340 --> 01:13:15,340
+and you should be able to beat this number.
+
+1823
+01:13:15,340 --> 01:13:17,340
+I'm leaving that as an exercise to the reader
+
+1824
+01:13:17,340 --> 01:13:19,340
+and that's it for now and I'll see you
+
+1825
+01:13:19,340 --> 01:13:21,340
+next time.
+
+1826
+01:13:23,340 --> 01:13:25,340
+Before we wrap up I also
+
+1827
+01:13:25,340 --> 01:13:27,340
+wanted to show how you would sample from the model.
+
+1828
+01:13:27,340 --> 01:13:29,340
+So we're going to
+
+1829
+01:13:29,340 --> 01:13:31,340
+generate 20 samples.
+
+1830
+01:13:31,340 --> 01:13:33,340
+At first we begin with all dots
+
+1831
+01:13:33,340 --> 01:13:35,340
+so that's the context.
+
+1832
+01:13:35,340 --> 01:13:37,340
+And then until we generate
+
+1833
+01:13:37,340 --> 01:13:39,340
+the 0th character again
+
+1834
+01:13:39,340 --> 01:13:41,340
+we're going to embed
+
+1835
+01:13:41,340 --> 01:13:43,340
+the current context
+
+1836
+01:13:43,340 --> 01:13:45,340
+using the embedding table C.
+
+1837
+01:13:45,340 --> 01:13:47,340
+Now usually
+
+1838
+01:13:47,340 --> 01:13:49,340
+here the first dimension was the size
+
+1839
+01:13:49,340 --> 01:13:51,340
+of the training set. But here we're only working
+
+1840
+01:13:51,340 --> 01:13:53,340
+with a single example that we're generating
+
+1841
+01:13:53,340 --> 01:13:55,340
+so this is just dimension 1
+
+1842
+01:13:55,340 --> 01:13:57,340
+just for simplicity.
+
+1843
+01:13:57,340 --> 01:13:59,340
+And so this
+
+1844
+01:13:59,340 --> 01:14:01,340
+embedding then gets projected into
+
+1845
+01:14:01,340 --> 01:14:03,340
+the state. You get the logits.
+
+1846
+01:14:03,340 --> 01:14:05,340
+Now we calculate the probabilities.
+
+1847
+01:14:05,340 --> 01:14:07,340
+For that you can use f.softmax
+
+1848
+01:14:07,340 --> 01:14:09,340
+of logits
+
+1849
+01:14:09,340 --> 01:14:11,340
+and that just basically
+
+1850
+01:14:11,340 --> 01:14:13,340
+exponentiates the logits and makes them sum to 1.
+
+1851
+01:14:13,340 --> 01:14:15,340
+And similar to cross entropy
+
+1852
+01:14:15,340 --> 01:14:17,340
+it is careful that there's no overflows.
+
+1853
+01:14:17,340 --> 01:14:19,340
+Once we have the probabilities
+
+1854
+01:14:19,340 --> 01:14:21,340
+we sample from them using
+
+1855
+01:14:21,340 --> 01:14:23,340
+torsh.multinomial to get our next index
+
+1856
+01:14:23,340 --> 01:14:25,340
+and then we shift the context window
+
+1857
+01:14:25,340 --> 01:14:27,340
+to append index and record it.
+
+1858
+01:14:27,340 --> 01:14:29,340
+And then we can just
+
+1859
+01:14:29,340 --> 01:14:31,340
+decode all the integers to strings
+
+1860
+01:14:31,340 --> 01:14:33,340
+and print them out.
+
+1861
+01:14:33,340 --> 01:14:35,340
+And so these are some example samples.
+
+1862
+01:14:35,340 --> 01:14:37,340
+And you can see that the model now
+
+1863
+01:14:37,340 --> 01:14:39,340
+works much better.
+
+1864
+01:14:39,340 --> 01:14:41,340
+So the words here are much more word-like
+
+1865
+01:14:41,340 --> 01:14:43,340
+or name-like. So we have things like
+
+1866
+01:14:43,340 --> 01:14:45,340
+ham,
+
+1867
+01:14:45,340 --> 01:14:47,340
+joes,
+
+1868
+01:14:47,340 --> 01:14:49,340
+lila.
+
+1869
+01:14:49,340 --> 01:14:51,340
+It's starting to sound a little bit more name-like.
+
+1870
+01:14:51,340 --> 01:14:53,340
+So we're definitely making progress
+
+1871
+01:14:53,340 --> 01:14:55,340
+but we can still improve on this model quite a lot.
+
+1872
+01:14:55,340 --> 01:14:57,340
+Okay sorry, there's some bonus content.
+
+1873
+01:14:57,340 --> 01:14:59,340
+I wanted to mention that
+
+1874
+01:14:59,340 --> 01:15:01,340
+I want to make these notebooks more accessible.
+
+1875
+01:15:01,340 --> 01:15:03,340
+And so I don't want you to have to
+
+1876
+01:15:03,340 --> 01:15:05,340
+install Jupyter notebooks and torsh and everything else
+
+1877
+01:15:05,340 --> 01:15:07,340
+so I will be sharing a link
+
+1878
+01:15:07,340 --> 01:15:09,340
+to a Google Colab
+
+1879
+01:15:09,340 --> 01:15:11,340
+and the Google Colab will look like a notebook
+
+1880
+01:15:11,340 --> 01:15:13,340
+in your browser.
+
+1881
+01:15:13,340 --> 01:15:15,340
+And you can just go to the URL
+
+1882
+01:15:15,340 --> 01:15:17,340
+and you'll be able to execute all of the code that you saw
+
+1883
+01:15:17,340 --> 01:15:19,340
+in the Google Colab.
+
+1884
+01:15:19,340 --> 01:15:21,340
+And so this is me executing the code
+
+1885
+01:15:21,340 --> 01:15:23,340
+in this lecture and I shortened it a little bit.
+
+1886
+01:15:23,340 --> 01:15:25,340
+But basically you're able to train
+
+1887
+01:15:25,340 --> 01:15:27,340
+the exact same network and then
+
+1888
+01:15:27,340 --> 01:15:29,340
+plot and sample from the model
+
+1889
+01:15:29,340 --> 01:15:31,340
+and everything is ready for you to tinker with the numbers
+
+1890
+01:15:31,340 --> 01:15:33,340
+right there in your browser
+
+1891
+01:15:33,340 --> 01:15:35,340
+no installation necessary.
+
+1892
+01:15:35,340 --> 01:15:37,340
+So I just wanted to point that out
+
+1893
+01:15:37,340 --> 01:15:39,340
+and the link to this will be in the video description.
+

@@ -1,0 +1,1894 @@
+start	end	text
+720	4640	Hi everyone. Today we are continuing our implementation of MakeMore.
+5200	9840	Now in the last lecture we implemented the bigram language model and we implemented it both using
+9840	15760	counts and also using a super simple neural network that had a single linear layer. Now
+16320	21680	this is the Jupyter notebook that we built out last lecture and we saw that the way we approached
+21680	26320	this is that we looked at only the single previous character and we predicted the distribution for
+26320	31600	the character that would go next in the sequence and we did that by taking counts and normalizing
+31600	38400	them into probabilities so that each row here sums to one. Now this is all well and good if
+38400	44160	you only have one character of previous context and this works and it's approachable. The problem
+44160	49520	with this model of course is that the predictions from this model are not very good because you only
+49520	54720	take one character of context so the model didn't produce very name-like sounding things.
+56080	56320	Now
+56800	61200	the problem with this approach though is that if we are to take more context into account
+61200	66080	when predicting the next character in a sequence things quickly blow up and this table the size
+66080	70480	of this table grows and in fact it grows exponentially with the length of the context
+71200	75280	because if we only take a single character at a time that's 27 possibilities of context
+75920	80640	but if we take two characters in the past and try to predict the third one suddenly the number
+80640	86080	of rows in this matrix you can look at it that way is 27 times 27 so there's 720
+86560	91760	possibilities for what could have come in the context. If we take three characters as the
+91760	99840	context suddenly we have 20 000 possibilities of context and so that's just way too many rows
+99840	105920	of this matrix it's way too few counts for each possibility and the whole thing just kind of
+105920	111360	explodes and doesn't work very well. So that's why today we're going to move on to this bullet
+111360	116000	point here and we're going to implement a multi-layer perceptron model to predict the next
+116720	121200	character in a sequence and this modeling approach that we're going to adopt follows this
+121200	127600	paper Benjou et al. 2003. So I have the paper pulled up here now this isn't the very first
+127600	132160	paper that proposed the use of multi-layer perceptrons or neural networks to predict the
+132160	137120	next character or token in a sequence but it's definitely one that is was very influential
+137120	142000	around that time it is very often cited to stand in for this idea and I think it's a very nice
+142000	146000	write-up and so this is the paper that we're going to first look at and then implement.
+146720	151760	Now this paper has 19 pages so we don't have time to go into the full detail of this paper but I
+151760	155280	invite you to read it it's very readable interesting and has a lot of interesting
+155280	160480	ideas in it as well in the introduction they describe the exact same problem I just described
+160480	166640	and then to address it they propose the following model now keep in mind that we are building a
+166640	171040	character level language model so we're working on the level of characters in this paper they
+171040	176000	have a vocabulary of seventeen thousand possible words and they instead build a word level and
+176000	180000	language model but we're going to still stick with the characters but we'll take the same modeling
+180000	185920	approach now what they do is basically they propose to take every one of these words seventeen
+185920	191920	thousand words and they're going to associate to each word a say thirty dimensional feature vector
+192880	198720	so every word is now embedded into a thirty dimensional space you can think of it that way
+199360	205440	so we have seventeen thousand points or vectors in a thirty dimensional space and that's you might
+205440	211040	imagine that's very crowded that's a lot of points for a very small space now in the beginning these
+211040	215520	words are initialized completely randomly so they're spread out at random but then we're
+215520	220800	going to tune these embeddings of these words using that propagation so during the course of
+220800	225120	training of this neural network these points or vectors are going to basically move around in this
+225120	230320	space and you might imagine that for example words that have very similar meanings or there are
+230320	235280	indeed synonyms of each other might end up in a very similar part of the space and conversely words
+235440	241040	in very different things would go somewhere else in the space now their modeling approach otherwise
+241040	246080	is identical to ours they are using a multi-layer neural network to predict the next word given the
+246080	250720	previous words and to train the neural network they are maximizing the log likelihood of the
+250720	256320	training data just like we did so the modeling approach itself is identical now here they have
+256320	262000	a concrete example of this intuition why does it work basically suppose that for example you are
+262000	264800	trying to predict a dog was running in a blank
+265600	270960	now suppose that the exact phrase a dog was running in a has never occurred in the training
+270960	275760	data and here you are at sort of test time later when the model is deployed somewhere
+276320	281840	and it's trying to make a sentence and it's saying a dog was running in a blank and because
+281840	287280	it's never encountered this exact phrase in the training set you're out of distribution as we say
+287280	295120	like you don't have fundamentally any reason to suspect um what might come next but this approach
+295440	299920	allows you to get around that because maybe you didn't see the exact phrase a dog was running in a
+299920	304560	something but maybe you've seen similar phrases maybe you've seen the phrase the dog was running
+304560	311040	in a blank and maybe your network has learned that a and the are like frequently are interchangeable
+311040	315600	with each other and so maybe it took the embedding for a and the embedding for the
+315600	320160	and it actually put them like nearby each other in the space and so you can transfer knowledge
+320160	325360	through that embedding and you can generalize in that way similarly the network could know that cats
+325440	330560	and dogs are animals and they co-occur in lots of very similar contexts and so even though you
+330560	336320	haven't seen this exact phrase or if you haven't seen exactly walking or running you can through
+336320	342880	the embedding space transfer knowledge and you can generalize to novel scenarios so let's now scroll
+342880	348720	down to the diagram of the neural network they have a nice diagram here and in this example
+348720	354720	we are taking three previous words and we are trying to predict the fourth word in a sequence
+356000	360720	now these three previous words as i mentioned we have a vocabulary of 17 000
+361600	368480	possible words so every one of these basically are the index of the incoming word
+369360	375920	and because there are 17 000 words this is an integer between 0 and 16 999
+377280	384400	now there's also a lookup table that they call c this lookup table is a matrix that is 17 000 by
+385840	389600	and basically what we're doing here is we're treating this as a lookup table
+389600	397040	and so every index is plucking out a row of this embedding matrix so that each index is converted
+397040	401600	to the 30-dimensional vector that corresponds to the embedding vector for that word
+402880	409680	so here we have the input layer of 30 neurons for three words making up 90 neurons in total
+410640	415280	and here they're saying that this matrix c is shared across all the words so we're always in a
+415440	422980	indexing into the same matrix C over and over for each one of these words. Next up is the hidden
+422980	428080	layer of this neural network. The size of this hidden neural layer of this neural net is a
+428080	432400	hyperparameter. So we use the word hyperparameter when it's kind of like a design choice up to the
+432400	436680	designer of the neural net. And this can be as large as you'd like or as small as you'd like.
+436840	442340	So for example, the size could be 100. And we are going to go over multiple choices of the size of
+442340	447400	this hidden layer. And we're going to evaluate how well they work. So say there were 100 neurons
+447400	454740	here. All of them would be fully connected to the 90 words or 90 numbers that make up these three
+454740	460660	words. So this is a fully connected layer. Then there's a 10-inch long linearity. And then there's
+460660	466440	this output layer. And because there are 17,000 possible words that could come next, this layer
+466440	472140	has 17,000 neurons. And all of them are fully connected to all of these neurons.
+472340	478700	In the hidden layer. So there's a lot of parameters here because there's a lot of words. So most
+478700	485160	computation is here. This is the expensive layer. Now there are 17,000 logits here. So on top of
+485160	489900	there, we have the softmax layer, which we've seen in our previous video as well. So every one of
+489900	495180	these logits is exponentiated. And then everything is normalized to sum to one. So then we have a
+495180	501120	nice probability distribution for the next word in the sequence. Now, of course, during training,
+501120	502320	we actually have the label.
+502340	509900	We have the identity of the next word in the sequence. That word or its index is used to pluck
+509900	515980	out the probability of that word. And then we are maximizing the probability of that word
+515980	521780	with respect to the parameters of this neural net. So the parameters are the weights and biases
+521780	528360	of this output layer, the weights and biases of the hidden layer, and the embedding lookup table
+528360	531360	C. And all of that is optimized using backpropagation.
+532340	537980	And these dashed arrows, ignore those. That represents a variation of a neural net that we are
+537980	542940	not going to explore in this video. So that's the setup, and now let's implement it. Okay, so I
+542940	548220	started a brand new notebook for this lecture. We are importing PyTorch, and we are importing
+548220	554220	matplotlib so we can create figures. Then I am reading all the names into a list of words like
+554220	561020	I did before, and I'm showing the first eight right here. Keep in mind that we have 32,000 in total.
+561020	562020	These are just the first eight.
+562340	570340	And then here I'm building out the vocabulary of characters and all the mappings from the characters as strings to integers, and vice versa.
+570340	575340	Now the first thing we want to do is we want to compile the dataset for the neural network.
+575340	579340	And I had to rewrite this code. I'll show you in a second what it looks like.
+579340	587340	So this is the code that I created for the dataset creation. So let me first run it, and then I'll briefly explain how this works.
+587340	591340	So first we're going to define something called block size.
+592340	596340	This is going to be the context length of how many characters do we take to predict the next one.
+596340	600340	So here in this example, we're taking three characters to predict the fourth one.
+600340	605340	So we have a block size of three. That's the size of the block that supports the prediction.
+605340	616340	Then here I'm building out the x and y. The x are the input to the neural net, and the y are the labels for each example inside the x.
+616340	621340	Then I'm erasing over the first five words. I'm doing the first five just for efficiency
+621340	628340	while we are developing all the code. But then later we are going to come here and erase this so that we use the entire training set.
+628340	635340	So here I'm printing the word Emma. And here I'm basically showing the examples that we can generate,
+635340	640340	the five examples that we can generate out of the single sort of word Emma.
+640340	647340	So when we are given the context of just dot dot dot, the first character in the sequence is E.
+647340	650340	In this context, the label is M.
+650340	654340	When the context is this, the label is M, and so forth.
+654340	659340	And so the way I build this out is first I start with a padded context of just zero tokens.
+659340	664340	Then I iterate over all the characters. I get the character in the sequence.
+664340	671340	And I basically build out the array y of this current character and the array x, which stores the current running context.
+671340	678340	And then here, see, I print everything. And here I crop the context and enter the new character in the sequence.
+678340	680340	So this is kind of like a rolling window.
+680340	683340	This is kind of like a rolling window of context.
+683340	686340	Now we can change the block size here to, for example, four.
+686340	690340	And in that case, we would be predicting the fifth character given the previous four.
+690340	694340	Or it can be five. And then it would look like this.
+694340	698340	Or it can be, say, ten. And then it would look something like this.
+698340	701340	We're taking ten characters to predict the eleventh one.
+701340	703340	And we're always padding with dots.
+703340	709340	So let me bring this back to three just so that we have what we have here in the paper.
+710340	713340	And finally, the data set right now looks as follows.
+713340	717340	From these five words, we have created a data set of 32 examples.
+717340	721340	And each input to the neural net is three integers.
+721340	724340	And we have a label that is also an integer, y.
+724340	726340	So x looks like this.
+726340	728340	These are the individual examples.
+728340	732340	And then y are the labels.
+732340	738340	So given this, let's now write a neural network that takes these x's and predicts the y's.
+738340	739340	First, let's build the embedding.
+740340	743340	Lookup table C.
+743340	745340	So we have 27 possible characters.
+745340	748340	And we're going to embed them in a lower-dimensional space.
+748340	751340	In the paper, they have 17,000 words.
+751340	755340	And they embed them in spaces as small-dimensional as 30.
+755340	760340	So they cram 17,000 words into 30-dimensional space.
+760340	763340	In our case, we have only 27 possible characters.
+763340	768340	So let's cram them in something as small as, to start with, for example, a two-dimensional space.
+768340	770340	So this lookup table will be random numbers.
+770340	773340	And we'll have 27 rows.
+773340	775340	And we'll have two columns.
+775340	776340	Right?
+776340	781340	So each one of 27 characters will have a two-dimensional embedding.
+781340	785340	So that's our matrix C of embeddings.
+785340	787340	In the beginning, initialized randomly.
+787340	793340	Now before we embed all of the integers inside the input x using this lookup table C,
+793340	798340	let me actually just try to embed a single individual integer, like, say, 5.
+798340	799340	So we get a sense of time.
+799340	801340	So we get a sense of how this works.
+801340	807340	Now one way this works, of course, is we can just take the C and we can index into row 5.
+807340	811340	And that gives us a vector, the fifth row of C.
+811340	814340	And this is one way to do it.
+814340	820340	The other way that I presented in the previous lecture is actually seemingly different but actually identical.
+820340	827340	So in the previous lecture, what we did is we took these integers and we used the one-hot encoding to first encode them.
+827340	829340	So we took that one-hot.
+829340	831340	We want to encode integer 5.
+831340	834340	And we want to tell it that the number of classes is 27.
+834340	840340	So that's the 26-dimensional vector of all zeros except the fifth bit is turned on.
+840340	843340	Now this actually doesn't work.
+843340	848340	The reason is that this input actually must be a Torch.tensor.
+848340	853340	And I'm making some of these errors intentionally just so you get to see some errors and how to fix them.
+853340	855340	So this must be a tensor, not an int.
+855340	856340	Fairly straightforward to fix.
+856340	858340	We get a one-hot vector.
+858340	860340	The fifth dimension is 1.
+860340	862340	And the shape of this is 27.
+862340	866340	And now notice that, just as I briefly alluded to in a previous video,
+866340	873340	if we take this one-hot vector and we multiply it by C,
+873340	877340	then what would you expect?
+877340	881340	Well, number one, first you'd expect an error
+881340	886340	because expected scalar type long but found float.
+886340	888340	So a little bit confusing.
+888340	894340	But the problem here is that one-hot, the data type of it, is long.
+894340	896340	It's a 64-bit integer.
+896340	898340	But this is a float tensor.
+898340	901340	And so PyTorch doesn't know how to multiply an int with a float.
+901340	906340	And that's why we had to explicitly cast this to a float so that we can multiply.
+906340	911340	Now the output actually here is identical.
+911340	915340	And it's identical because of the way the matrix multiplication here works.
+916340	920340	So we have a one-hot vector multiplying columns of C.
+920340	924340	And because of all the zeros, they actually end up masking out everything in C
+924340	927340	except for the fifth row, which is plucked out.
+927340	930340	And so we actually arrive at the same result.
+930340	934340	And that tells you that here we can interpret this first piece here,
+934340	936340	this embedding of the integer.
+936340	940340	We can either think of it as the integer indexing into a lookup table C,
+940340	943340	but equivalently we can also think of this little piece here
+943340	946340	as a first layer of this bigger neural net.
+946340	949340	This layer here has neurons that have no nonlinearity.
+949340	950340	There's no tanh.
+950340	952340	They're just linear neurons.
+952340	955340	And their weight matrix is C.
+955340	958340	And then we are encoding integers into one-hot
+958340	960340	and feeding those into a neural net.
+960340	962340	And this first layer basically embeds them.
+962340	965340	So those are two equivalent ways of doing the same thing.
+965340	968340	We're just going to index because it's much, much faster.
+968340	973340	And we're going to discard this interpretation of one-hot inputs into neural nets.
+973340	975340	And we're just going to index integers
+975340	977340	to create and use embedding tables.
+977340	980340	Now embedding a single integer like 5 is easy enough.
+980340	984340	We can simply ask PyTorch to retrieve the fifth row of C
+984340	987340	or the row index 5 of C.
+987340	992340	But how do we simultaneously embed all of these 32 by 3 integers
+992340	994340	stored in array X?
+994340	998340	Luckily, PyTorch indexing is fairly flexible and quite powerful.
+998340	1004340	So it doesn't just work to ask for a single element 5 like this.
+1004340	1006340	You can actually index using lists.
+1006340	1009340	So for example, we can get the rows 5, 6, and 7.
+1009340	1011340	And this will just work like this.
+1011340	1013340	We can index with a list.
+1013340	1015340	It doesn't just have to be a list.
+1015340	1018340	It can also be actually a tensor of integers.
+1018340	1020340	And we can index with that.
+1020340	1023340	So this is an integer tensor 5, 6, 7.
+1023340	1025340	And this will just work as well.
+1025340	1029340	In fact, we can also, for example, repeat row 7
+1029340	1031340	and retrieve it multiple times.
+1031340	1034340	And that same index will just get embedded multiple times.
+1034340	1040340	So here we are indexing with a one-dimensional tensor of integers.
+1040340	1043340	But it turns out that you can also index with multidimensional
+1043340	1045340	tensors of integers.
+1045340	1048340	Here we have a two-dimensional tensor of integers.
+1048340	1051340	So we can simply just do C at X.
+1051340	1054340	And this just works.
+1054340	1058340	And the shape of this is 32 by 3,
+1058340	1060340	which is the original shape.
+1060340	1062340	And now for every one of those 32 by 3 integers,
+1062340	1064340	we've retrieved the embedding vector
+1064340	1066340	here.
+1066340	1069340	So basically, we have that as an example.
+1069340	1073340	The example index 13,
+1073340	1075340	the second dimension,
+1075340	1078340	is the integer 1 as an example.
+1078340	1081340	And so here, if we do C of X,
+1081340	1083340	which gives us that array,
+1083340	1085340	and then we index into 13 by 2
+1085340	1087340	of that array,
+1087340	1090340	then we get the embedding here.
+1090340	1093340	And you can verify that C at 1
+1093340	1096340	which is the integer at that location,
+1096340	1099340	is indeed equal to this.
+1099340	1101340	You see they're equal.
+1101340	1103340	So basically, long story short,
+1103340	1105340	PyTorch indexing is awesome.
+1105340	1107340	And to embed simultaneously
+1107340	1109340	all of the integers in X,
+1109340	1111340	we can simply do C of X.
+1111340	1113340	And that is our embedding.
+1113340	1115340	And that just works.
+1115340	1117340	Now let's construct this layer here,
+1117340	1119340	the hidden layer.
+1119340	1121340	So we have that W1, as I'll call it,
+1121340	1123340	are these weights.
+1123340	1125340	Which we will initialize randomly.
+1125340	1127340	Now the number of inputs to this layer
+1127340	1129340	is going to be 3 times 2.
+1129340	1131340	Right?
+1131340	1133340	Because we have two-dimensional embeddings
+1133340	1135340	and we have three of them.
+1135340	1137340	So the number of inputs is 6.
+1137340	1139340	And the number of neurons in this layer
+1139340	1141340	is a variable up to us.
+1141340	1143340	Let's use 100 neurons as an example.
+1143340	1145340	And then biases
+1145340	1147340	will be also initialized randomly
+1147340	1149340	as an example.
+1149340	1151340	And we just need 100 of them.
+1151340	1153340	Now the problem with this is,
+1153340	1155340	we can't simply,
+1155340	1157340	normally we would take the input,
+1157340	1159340	in this case that's embedding,
+1159340	1161340	and we'd like to multiply it with these weights.
+1161340	1163340	And then we would like to add the bias.
+1163340	1165340	This is roughly what we want to do.
+1165340	1167340	But the problem here is that
+1167340	1169340	these embeddings are stacked up
+1169340	1171340	in the dimensions of this input tensor.
+1171340	1173340	So this will not work,
+1173340	1175340	this matrix multiplication,
+1175340	1177340	because this is a shape 32x3x2
+1177340	1179340	and I can't multiply that by 6x100.
+1179340	1181340	So somehow we need to concatenate
+1181340	1183340	these inputs here together,
+1183340	1185340	which apparently does not work.
+1185340	1187340	So how do we transform this 32x3x2
+1187340	1189340	into a 32x6
+1189340	1191340	so that we can actually perform
+1191340	1193340	this multiplication over here?
+1193340	1195340	I'd like to show you that there are
+1195340	1197340	usually many ways of
+1197340	1199340	implementing what you'd like to do
+1199340	1201340	in Torch.
+1201340	1203340	And some of them will be faster, better, shorter, etc.
+1203340	1205340	And that's because Torch is
+1205340	1207340	a very large library,
+1207340	1209340	and it's got lots and lots of functions.
+1209340	1211340	So if we just go to the documentation and click on Torch,
+1211340	1213340	you'll see that my slider here
+1213340	1215340	is very tiny.
+1215340	1217340	And that's because there are so many functions
+1217340	1219340	that you can call on these tensors
+1219340	1221340	to transform them, create them,
+1221340	1223340	multiply them, add them,
+1223340	1225340	perform all kinds of different operations on them.
+1225340	1227340	And so this is kind of like
+1227340	1229340	the space of possibility,
+1229340	1231340	if you will.
+1231340	1233340	Now one of the things that you can do
+1233340	1235340	is if we can control F for concatenate.
+1235340	1237340	And we see that there's a function
+1237340	1239340	torch.cat, short for concatenate.
+1239340	1241340	And this concatenate
+1241340	1243340	is a given sequence of tensors
+1243340	1245340	of a given dimension.
+1245340	1247340	And these tensors must have the same shape, etc.
+1247340	1249340	So we can use the concatenate operation
+1249340	1251340	to, in a naive way,
+1251340	1253340	concatenate these three embeddings
+1253340	1255340	for each input.
+1255340	1257340	So in this case, we have
+1257340	1259340	emb of the shape.
+1259340	1261340	And really what we want to do
+1261340	1263340	is we want to retrieve these three parts
+1263340	1265340	and concatenate them.
+1265340	1267340	So we want to grab all the examples.
+1267340	1269340	We want to grab
+1269340	1271340	first the zeroth
+1271340	1273340	and then
+1273340	1275340	index.
+1275340	1277340	And then all of this.
+1277340	1279340	So this plucks out
+1279340	1281340	the 32 by 2
+1281340	1283340	embeddings of just
+1283340	1285340	the first word here.
+1285340	1287340	And so basically
+1287340	1289340	we want this guy,
+1289340	1291340	we want the first dimension,
+1291340	1293340	and we want the second dimension.
+1293340	1295340	And these are the three pieces individually.
+1295340	1297340	And then we want to
+1297340	1299340	treat this as a sequence
+1299340	1301340	and we want to torch.cat
+1301340	1303340	on that sequence.
+1303340	1305340	torch.cat takes a
+1305340	1307340	sequence of tensors
+1307340	1309340	and then we have to tell it along which dimension
+1309340	1311340	to concatenate.
+1311340	1313340	So in this case, all these are 32 by 2
+1313340	1315340	and we want to concatenate not across
+1315340	1317340	dimension 0, but across dimension 1.
+1317340	1319340	So passing in 1
+1319340	1321340	gives us a result
+1321340	1323340	that the shape of this is 32 by 6
+1323340	1325340	exactly as we'd like.
+1325340	1327340	So that basically took 32 and
+1327340	1329340	squashed these by concatenating
+1329340	1331340	them into 32 by 6.
+1331340	1333340	Now this is kind of ugly because
+1333340	1335340	this code would not generalize
+1335340	1337340	if we want to later change the block size.
+1337340	1339340	Right now we have three inputs,
+1339340	1341340	three words, but what if we had
+1341340	1343340	five? Then here we would have to
+1343340	1345340	change the code because I'm indexing directly.
+1345340	1347340	Well, torch comes to rescue again
+1347340	1349340	because there turns out to be
+1349340	1351340	a function called unbind
+1351340	1353340	and it removes a tensor dimension.
+1355340	1357340	So it removes a tensor dimension, returns
+1357340	1359340	a tuple of all slices along a given
+1359340	1361340	dimension without it.
+1361340	1363340	So this is exactly what we need.
+1363340	1365340	And basically when we call
+1365340	1367340	torch.unbind
+1367340	1369340	torch.unbind
+1369340	1371340	of m
+1371340	1373340	and passing dimension
+1373340	1375340	1
+1375340	1377340	index 1, this gives us
+1377340	1379340	a list of
+1379340	1381340	a list of tensors exactly
+1381340	1383340	equivalent to this. So running this
+1383340	1385340	gives us a line
+1385340	1387340	3
+1387340	1389340	and it's exactly this list.
+1389340	1391340	So we can call torch.cat on it
+1391340	1393340	and
+1393340	1395340	the first dimension.
+1395340	1397340	And this works.
+1397340	1399340	And this shape is the same.
+1399340	1401340	But now this is, it doesn't matter if we
+1401340	1403340	have block size 3 or 5 or 10,
+1403340	1405340	this will just work.
+1405340	1407340	So this is one way to do it. But it turns out that
+1407340	1409340	in this case, there's actually a
+1409340	1411340	significantly better and more efficient way.
+1411340	1413340	And this gives me an opportunity to hint
+1413340	1415340	at some of the internals of torch.tensor.
+1415340	1417340	So let's create
+1417340	1419340	an array here
+1419340	1421340	of elements from
+1421340	1423340	0 to 17. And the shape of
+1423340	1425340	this is just 18.
+1425340	1427340	It's a single vector of 18 numbers.
+1427340	1429340	It turns out that we can
+1429340	1431340	very quickly re-represent this
+1431340	1433340	as different sized n-dimensional
+1433340	1435340	tensors. We do this by
+1435340	1437340	calling a view
+1437340	1439340	and we can say that actually this is not
+1439340	1441340	a single vector of 18.
+1441340	1443340	This is a 2 by 9 tensor.
+1443340	1445340	Or alternatively
+1445340	1447340	this is a 9 by 2 tensor.
+1447340	1449340	Or this is actually
+1449340	1451340	a 3 by 3 by 2 tensor.
+1451340	1453340	As long as the total number of
+1453340	1455340	elements here multiply to be
+1455340	1457340	the same, this will just work.
+1457340	1459340	And in PyTorch,
+1459340	1461340	this operation, calling
+1461340	1463340	.view, is extremely efficient.
+1463340	1465340	And the reason for that is that
+1465340	1467340	in each tensor, there's
+1467340	1469340	something called the underlying storage.
+1469340	1471340	And the storage
+1471340	1473340	is just the numbers always
+1473340	1475340	as a one-dimensional vector. And this is
+1475340	1477340	how this tensor is represented
+1477340	1479340	in the computer memory. It's always a one-dimensional
+1479340	1481340	vector.
+1481340	1483340	But when we call .view,
+1483340	1485340	we are manipulating some of
+1485340	1487340	attributes of that tensor that
+1487340	1489340	dictate how this one-dimensional
+1489340	1491340	sequence is interpreted to be
+1491340	1493340	an n-dimensional tensor.
+1493340	1495340	And so what's happening here is that
+1495340	1497340	no memory is being changed, copied, moved,
+1497340	1499340	or created when we call .view.
+1499340	1501340	The storage is identical.
+1501340	1503340	But when you call .view,
+1503340	1505340	some of the internal
+1505340	1507340	attributes of the view of this tensor
+1507340	1509340	are being manipulated and changed.
+1509340	1511340	In particular, there's something called
+1511340	1513340	storage offset, strides, and
+1513340	1515340	shapes, and those are manipulated
+1515340	1517340	so that this one-dimensional sequence of bytes
+1517340	1519340	is seen as different n-dimensional arrays.
+1519340	1521340	There's a blog post
+1521340	1523340	here from Eric called
+1523340	1525340	PyTorch Internals, where he
+1525340	1527340	goes into some of this with respect to tensor
+1527340	1529340	and how the view of a tensor is
+1529340	1531340	represented. And this is really just like
+1531340	1533340	a logical construct
+1533340	1535340	of representing the physical memory.
+1535340	1537340	And so this is a pretty good
+1537340	1539340	blog post that you can go into.
+1539340	1541340	I might also create an entire video
+1541340	1543340	on the internals of TorchTensor and how this works.
+1543340	1545340	For here,
+1545340	1547340	we just note that this is an extremely efficient operation.
+1547340	1549340	And if I delete
+1549340	1551340	this and come back to our
+1551340	1553340	emb,
+1553340	1555340	we see that the shape of our emb is
+1555340	1557340	32x3x2, but we can simply
+1557340	1559340	ask for PyTorch
+1559340	1561340	to view this instead as a 32x6.
+1561340	1563340	And
+1563340	1565340	the way this gets flattened
+1565340	1567340	into a 32x6 array
+1567340	1569340	just happens that
+1569340	1571340	these two get
+1571340	1573340	stacked up in a single row.
+1573340	1575340	And so that's basically the concatenation operation
+1575340	1577340	that we're after.
+1577340	1579340	And you can verify that this actually gives the exact
+1579340	1581340	same result as what we had before.
+1581340	1583340	So this is an element y equals
+1583340	1585340	and you can see that all the elements of these
+1585340	1587340	two tensors are the same.
+1587340	1589340	And so we get the exact same result.
+1589340	1591340	So long story short,
+1591340	1593340	we can actually just come here
+1593340	1595340	and if we just view this
+1595340	1597340	as a 32x6
+1597340	1599340	instead,
+1599340	1601340	then this multiplication will work
+1601340	1603340	and give us the hidden states that we're
+1603340	1605340	after. So if this is h,
+1605340	1607340	then h-shape
+1607340	1609340	is now the hundred-dimensional
+1609340	1611340	activations for every
+1611340	1613340	one of our 32 examples.
+1613340	1615340	And this gives the desired result.
+1615340	1617340	Let me do two things here.
+1617340	1619340	Number one, let's not use 32.
+1619340	1621340	We can, for example, do something like
+1621340	1623340	emb.shape
+1623340	1625340	at 0
+1625340	1627340	so that we don't hardcode these numbers.
+1627340	1629340	And this would work for any size of this
+1629340	1631340	emb. Or alternatively, we can
+1631340	1633340	also do negative 1. When we do negative 1,
+1633340	1635340	PyTorch will infer
+1635340	1637340	what this should be.
+1637340	1639340	Because the number of elements must be the same,
+1639340	1641340	and we're saying that this is 6, PyTorch will derive
+1641340	1643340	that this must be 32.
+1643340	1645340	Or whatever else it is, if emb is of different size.
+1645340	1647340	The other thing
+1647340	1649340	is here,
+1649340	1651340	one more thing I'd like to point out is
+1651340	1653340	here
+1653340	1655340	when we do the concatenation,
+1655340	1657340	this actually is much less efficient
+1657340	1659340	because this
+1659340	1661340	concatenation would create a whole new tensor
+1661340	1663340	with a whole new storage, so new memory is being
+1663340	1665340	created because there's no way to concatenate
+1665340	1667340	tensors just by manipulating the view
+1667340	1669340	attributes. So this is
+1669340	1671340	inefficient and creates all kinds of new memory.
+1671340	1673340	So let me
+1673340	1675340	delete this now.
+1675340	1677340	We don't need this.
+1677340	1679340	And here to calculate h, we want to
+1679340	1681340	also dot 10h
+1681340	1683340	of this to get our
+1683340	1685340	oops
+1685340	1687340	to get our h.
+1687340	1689340	So these are now numbers between negative 1 and 1
+1689340	1691340	because of the 10h, and we have
+1691340	1693340	that the shape is 32 by 100
+1693340	1695340	and that is basically this
+1695340	1697340	hidden layer of activations here
+1697340	1699340	for every one of our 32
+1699340	1701340	examples. Now there's one more thing I've
+1701340	1703340	lost over that we have to be very careful with
+1703340	1705340	and that's this plus
+1705340	1707340	here. In particular we want to make
+1707340	1709340	sure that the broadcasting will do
+1709340	1711340	what we like. The shape of
+1711340	1713340	this is 32 by 100
+1713340	1715340	and b1's shape is 100.
+1715340	1717340	So we see that the addition
+1717340	1719340	here will broadcast these two
+1719340	1721340	and in particular we have 32 by 100
+1721340	1723340	broadcasting to 100.
+1723340	1725340	So broadcasting
+1725340	1727340	will align on the right
+1727340	1729340	create a fake dimension here
+1729340	1731340	so this will become a 1 by 100 row vector
+1731340	1733340	and then it will copy
+1733340	1735340	vertically for every
+1735340	1737340	one of these rows of 32
+1737340	1739340	and do an element-wise addition.
+1739340	1741340	So in this case the correcting will be happening
+1741340	1743340	because the same bias vector
+1743340	1745340	will be added to all the rows
+1745340	1747340	of this matrix.
+1747340	1749340	So that is correct, that's what we'd like
+1749340	1751340	and it's always good
+1751340	1753340	practice to just make sure so that
+1753340	1755340	you don't shoot yourself in the foot.
+1755340	1757340	And finally let's create the final layer here
+1757340	1759340	so let's create
+1759340	1761340	w2 and b2
+1761340	1763340	the input
+1763340	1765340	now is 100
+1765340	1767340	and the output number of neurons
+1767340	1769340	will be for us 27
+1769340	1771340	because we have 27 possible characters
+1771340	1773340	that come next.
+1773340	1775340	So the biases will be 27 as well.
+1775340	1777340	So therefore the logits
+1777340	1779340	which are the outputs of this neural net
+1779340	1781340	are going to be
+1781340	1783340	h multiplied
+1783340	1785340	by w2 plus b2
+1787340	1789340	logits.shape is 32 by 27
+1789340	1791340	and the logits
+1791340	1793340	look good.
+1793340	1795340	Now exactly as we saw in the previous video
+1795340	1797340	we want to take these logits and we want to
+1797340	1799340	first exponentiate them to get our fake counts
+1799340	1801340	and then we want to normalize them
+1801340	1803340	into a probability.
+1803340	1805340	So prob is counts divide
+1805340	1807340	and now
+1807340	1809340	counts.sum along
+1809340	1811340	the first dimension and keep them
+1811340	1813340	as true, exactly as in the previous video.
+1813340	1815340	And so
+1815340	1817340	prob.shape
+1817340	1819340	now is 32 by 27
+1819340	1821340	and you'll see that every row
+1821340	1823340	of prob
+1823340	1825340	sums to 1, so it's normalized.
+1825340	1827340	So that gives us
+1827340	1829340	the probabilities. Now of course we have
+1829340	1831340	the actual letter that comes next
+1831340	1833340	and that comes from this array y
+1833340	1835340	which we
+1835340	1837340	created during the dataset creation.
+1837340	1839340	So y is this last piece here
+1839340	1841340	which is the identity of the next character
+1841340	1843340	in the sequence that we'd like to now predict.
+1843340	1845340	So what we'd
+1845340	1847340	like to do now is just as in the previous video
+1847340	1849340	we'd like to index into the rows
+1849340	1851340	of prob and in each row
+1851340	1853340	we'd like to pluck out the probability assigned
+1853340	1855340	to the correct character
+1855340	1857340	as given here.
+1857340	1859340	So first we have torch.arrange
+1859340	1861340	which is kind of like
+1861340	1863340	an iterator over
+1863340	1865340	numbers from 0 to 31
+1865340	1867340	and then we can index into prob
+1867340	1869340	in the following way
+1869340	1871340	prob.in
+1871340	1873340	which iterates the rows
+1873340	1875340	and then in each row we'd like to grab
+1875340	1877340	this column
+1877340	1879340	as given by y.
+1879340	1881340	So this gives the current probabilities
+1881340	1883340	as assigned by this neural network
+1883340	1885340	with this setting of its weights
+1885340	1887340	to the correct character in the sequence.
+1887340	1889340	And you can see here that
+1889340	1891340	this looks okay for some of these characters
+1891340	1893340	like this is basically 0.2
+1893340	1895340	but it doesn't look very good at all for many other characters
+1895340	1899340	like this is 0.0701 probability
+1899340	1901340	and so the network thinks that
+1901340	1903340	some of these are extremely unlikely.
+1903340	1905340	Of course we haven't trained the neural network yet
+1905340	1907340	so
+1907340	1909340	this will improve and ideally all of these
+1909340	1911340	numbers here of course are 1
+1911340	1913340	because then we are correctly predicting the next character.
+1913340	1915340	Now just as in the previous video
+1915340	1917340	we want to take these probabilities
+1917340	1919340	we want to look at the log probability
+1919340	1921340	and then we want to look at the average log probability
+1921340	1923340	and the negative of it
+1923340	1925340	to create the negative log likelihood loss.
+1927340	1929340	So the loss here is 17
+1929340	1931340	and this is the loss
+1931340	1933340	that we'd like to minimize to get the network
+1933340	1935340	to predict the correct character
+1935340	1937340	in the sequence.
+1937340	1939340	Okay so I rewrote everything here
+1939340	1941340	and made it a bit more respectable.
+1941340	1943340	So here's our dataset.
+1943340	1945340	Here's all the parameters that we defined.
+1945340	1947340	I'm now using a generator to make it reproducible.
+1947340	1949340	I clustered all the parameters
+1949340	1951340	into a single list of parameters
+1951340	1953340	so that for example it's easy to count them
+1953340	1955340	and see that in total we currently have
+1955340	1957340	about 3400 parameters.
+1957340	1959340	And this is the forward pass as we developed it
+1959340	1961340	and we arrive at a
+1961340	1963340	single number here, the loss, that is currently
+1963340	1965340	expressing how well
+1965340	1967340	this neural network works with the current
+1967340	1969340	setting of parameters.
+1969340	1971340	Now I would like to make it even more respectable.
+1971340	1973340	So in particular see these lines here
+1973340	1975340	where we take the logits and we calculate
+1975340	1977340	the loss.
+1977340	1979340	We're not actually reinventing the wheel here.
+1979340	1981340	This is just
+1981340	1983340	classification and many people
+1983340	1985340	use classification and that's why there is
+1985340	1987340	a functional dot cross entropy function
+1987340	1989340	in PyTorch to calculate this
+1989340	1991340	much more efficiently.
+1991340	1993340	So we could just simply call f dot cross entropy
+1993340	1995340	and we can pass in the logits and we can pass in
+1995340	1997340	the array of targets y
+1997340	1999340	and this calculates the exact
+1999340	2001340	same loss.
+2001340	2003340	So in fact we can
+2003340	2005340	simply put this here
+2005340	2007340	and erase these three lines
+2007340	2009340	and we're going to get the exact same result.
+2009340	2011340	Now there are actually many good reasons
+2011340	2013340	to prefer f dot cross entropy over
+2013340	2015340	rolling your own implementation like this.
+2015340	2017340	I did this for educational reasons
+2017340	2019340	but you'd never use this in practice.
+2019340	2021340	Why is that?
+2021340	2023340	Number one, when you use f dot cross entropy,
+2023340	2025340	PyTorch will not actually create
+2025340	2027340	all these intermediate tensors
+2027340	2029340	because these are all new tensors in memory
+2029340	2031340	and all this is fairly inefficient
+2031340	2033340	to run like this.
+2033340	2035340	Instead PyTorch will cluster up all these operations
+2035340	2037340	and very often
+2037340	2039340	have fused kernels
+2039340	2041340	that very efficiently evaluate these expressions
+2041340	2043340	that are sort of like clustered mathematical operations.
+2043340	2045340	Number two,
+2045340	2047340	the backward pass can be made much more efficient
+2047340	2049340	and not just because it's a fused kernel
+2049340	2051340	but also analytically
+2051340	2053340	and mathematically
+2053340	2055340	because it's often a very much simpler
+2055340	2057340	backward pass to implement.
+2057340	2059340	We actually saw this with micrograd.
+2059340	2061340	You see here when we implemented 10H
+2061340	2063340	the forward pass of this operation
+2063340	2065340	to calculate the 10H
+2065340	2067340	was actually a fairly complicated mathematical expression.
+2067340	2069340	But because it's a clustered
+2069340	2071340	mathematical expression
+2071340	2073340	when we did the backward pass
+2073340	2075340	we didn't individually backward through the
+2075340	2077340	x and the 2 times and the minus 1
+2077340	2079340	and the division, etc.
+2079340	2081340	We just said it's 1 minus t squared
+2081340	2083340	and that's a much simpler mathematical expression.
+2083340	2085340	And we were able to do this
+2085340	2087340	because we're able to reuse calculations
+2087340	2089340	and because we are able to mathematically
+2089340	2091340	and analytically derive the derivative
+2091340	2093340	and often that expression simplifies mathematically
+2093340	2095340	and so there's much less to implement.
+2095340	2097340	So not only
+2097340	2099340	can it be made more efficient
+2099340	2101340	because it runs in a fused kernel
+2101340	2103340	but also because the expressions
+2103340	2105340	can take a much simpler form mathematically.
+2105340	2107340	So that's number one.
+2107340	2109340	Number two,
+2109340	2111340	under the hood,
+2111340	2113340	it's significantly more
+2113340	2115340	numerically well behaved.
+2115340	2117340	Let me show you an example of how this works.
+2119340	2121340	Suppose we have a logits of
+2121340	2123340	negative 2, 3, negative 3, 0 and 5.
+2123340	2125340	And then we are taking the exponent
+2125340	2127340	of it and normalizing it to sum to 1.
+2127340	2129340	So when logits take on
+2129340	2131340	these values, everything is well and good
+2131340	2133340	and we get a nice probability distribution.
+2133340	2135340	Now consider what happens when
+2135340	2137340	some of these logits take on more extreme values.
+2137340	2139340	And that can happen during optimization
+2139340	2141340	of a neural network.
+2141340	2143340	Let's say some of these numbers grow very negative
+2143340	2145340	like say negative 100.
+2145340	2147340	Then actually everything will come out fine.
+2147340	2149340	We still get probabilities that
+2149340	2151340	are well behaved
+2151340	2153340	and they sum to 1 and everything is great.
+2153340	2155340	But because of the way
+2155340	2157340	the X works,
+2157340	2159340	if you have very positive logits
+2159340	2161340	like say positive 100 in here,
+2161340	2163340	you actually start to run into trouble
+2163340	2165340	and we get not a number here.
+2165340	2167340	And the reason for that is that these counts
+2167340	2169340	have an inf here.
+2169340	2171340	So if you pass in
+2171340	2173340	a very negative number to exp,
+2173340	2175340	you just get a very negative,
+2175340	2177340	sorry not negative, but very small number.
+2177340	2179340	Very near 0 and that's fine.
+2179340	2181340	But if you pass in a very positive number,
+2181340	2183340	suddenly we run out of range
+2183340	2185340	in our floating point number
+2185340	2187340	that represents these counts.
+2187340	2189340	So basically we are taking e
+2189340	2191340	and we are raising it to the power of 100
+2191340	2193340	and that gives us inf
+2193340	2195340	because we ran out of dynamic range
+2195340	2197340	on this floating point number that is count.
+2197340	2199340	And so we cannot
+2199340	2201340	pass very large logits through
+2201340	2203340	this expression.
+2203340	2205340	Now let me reset these numbers
+2205340	2207340	to something reasonable.
+2207340	2209340	The way PyTorch solved this
+2209340	2211340	is that, you see how we have a
+2211340	2213340	well-behaved result here?
+2213340	2215340	It turns out that because of the normalization
+2215340	2217340	here, you can actually offset
+2217340	2219340	logits by any arbitrary
+2219340	2221340	constant value that you want.
+2221340	2223340	So if I add 1 here, you actually
+2223340	2225340	get the exact same result.
+2225340	2227340	Or if I add 2, or if I subtract
+2227340	2229340	3.
+2229340	2231340	Any offset will produce the exact same
+2231340	2233340	values.
+2233340	2235340	So because negative numbers are okay,
+2235340	2237340	but positive numbers can actually overflow
+2237340	2239340	this exp, what PyTorch does
+2239340	2241340	is it internally calculates the maximum
+2241340	2243340	value that occurs in the logits
+2243340	2245340	and it subtracts it.
+2245340	2247340	So in this case it would subtract 5.
+2247340	2249340	And so therefore the greatest number in logits
+2249340	2251340	will become 0, and all the other numbers
+2251340	2253340	will become some negative numbers.
+2253340	2255340	And then the result of this is always
+2255340	2257340	well-behaved. So even if we have 100
+2257340	2259340	here previously,
+2259340	2261340	not good, but because PyTorch
+2261340	2263340	subtracted 100, this will work.
+2263340	2265340	And so there's
+2265340	2267340	many good reasons to call cross
+2267340	2269340	entropy. Number one, the forward
+2269340	2271340	pass can be much more efficient, the backward
+2271340	2273340	pass can be much more efficient, and
+2273340	2275340	also things can be much more numerically
+2275340	2277340	well-behaved. Okay, so let's now
+2277340	2279340	set up the training of this neural net.
+2279340	2281340	We have the forward pass.
+2281340	2283340	We don't
+2283340	2285340	need these, because then we have
+2285340	2287340	that loss is equal to the
+2287340	2289340	cross entropy, that's the forward pass.
+2289340	2291340	Then we need the backward pass,
+2291340	2293340	first we want to set the gradients
+2293340	2295340	to be 0. So for p in parameters
+2295340	2297340	we want to make sure that
+2297340	2299340	p.grad is none, which is the same as setting
+2299340	2301340	it to 0 in PyTorch. And then
+2301340	2303340	loss.backward to populate those
+2303340	2305340	gradients. Once we have the gradients
+2305340	2307340	we can do the parameter update.
+2307340	2309340	So for p in parameters we want to take all
+2309340	2311340	the data, and we want to
+2311340	2313340	nudge it learning rate times
+2313340	2315340	p.grad.
+2315340	2317340	And then
+2317340	2319340	we want to repeat this
+2319340	2321340	a few times.
+2321340	2325340	And let's print
+2325340	2327340	the loss here as well.
+2327340	2329340	Now this
+2329340	2331340	won't suffice and it will create an error,
+2331340	2333340	because we also have to go for p in parameters
+2333340	2335340	and we have to make sure that
+2335340	2337340	p.requiresgrad is set
+2337340	2339340	to true in PyTorch.
+2339340	2341340	And this should
+2341340	2343340	just work.
+2343340	2345340	Okay, so we started off with
+2345340	2347340	loss of 17 and we're decreasing it.
+2347340	2349340	Let's run longer.
+2349340	2351340	And you see how the loss
+2351340	2353340	increases a lot here.
+2353340	2355340	So
+2357340	2359340	if we just run for 1000 times
+2359340	2361340	we get a very, very low loss.
+2361340	2363340	And that means that we're making very good predictions.
+2363340	2365340	Now the reason that this is
+2365340	2367340	so straightforward right now
+2367340	2369340	is because we're only
+2369340	2371340	overfitting 32
+2371340	2373340	examples. So we only have
+2373340	2375340	32 examples of the first 5
+2375340	2377340	words, and therefore
+2377340	2379340	it's very easy to make this neural net fit
+2379340	2381340	only these 32 examples.
+2381340	2383340	Because we have 3400 parameters
+2383340	2385340	and only 32
+2385340	2387340	examples. So we're doing what's called
+2387340	2389340	overfitting a single batch of
+2389340	2391340	the data and getting a very low
+2391340	2393340	loss in good predictions.
+2393340	2395340	But that's just because we have so many
+2395340	2397340	parameters for so few examples. So it's easy
+2397340	2399340	to make this be very low.
+2399340	2401340	Now we're not able to achieve
+2401340	2403340	exactly 0. And the reason
+2403340	2405340	for that is, we can for example look at logits
+2405340	2407340	which are being predicted.
+2407340	2409340	And we
+2409340	2411340	can look at the max along
+2411340	2413340	the first dimension.
+2413340	2415340	And in PyTorch
+2415340	2417340	max reports both the actual values
+2417340	2419340	that take on the maximum number
+2419340	2421340	but also the indices of these.
+2421340	2423340	And you'll see that the indices
+2423340	2425340	are very close to the labels.
+2425340	2427340	But in some cases
+2427340	2429340	they differ. For example
+2429340	2431340	in this very first example
+2431340	2433340	the predicted index is 19
+2433340	2435340	but the label is 5.
+2435340	2437340	And we're not able to make loss be 0
+2437340	2439340	and fundamentally that's because here
+2439340	2441340	the very first
+2441340	2443340	or the zeroth index is the example
+2443340	2445340	where dot dot dot is supposed to predict E
+2445340	2447340	but you see how dot dot dot is also supposed
+2447340	2449340	to predict an O
+2449340	2451340	and dot dot dot is also supposed to predict an I
+2451340	2453340	and then S as well.
+2453340	2455340	And so basically E, O, A
+2455340	2457340	or S are all possible
+2457340	2459340	outcomes in a training set for the exact
+2459340	2461340	same input. So we're not able to
+2461340	2463340	completely overfit and
+2463340	2465340	make the loss be exactly 0.
+2465340	2467340	But we're getting very
+2467340	2469340	close in the cases where
+2469340	2471340	there's a unique input for
+2471340	2473340	a unique output. In those cases
+2473340	2475340	we do what's called overfit and
+2475340	2477340	we basically get the exact same
+2477340	2479340	and the exact correct result.
+2479340	2481340	So now all we have to do
+2481340	2483340	is we just need to make sure that we read in the
+2483340	2485340	full dataset and optimize the neural net.
+2485340	2487340	Okay so let's swing back up
+2487340	2489340	where we created the dataset
+2489340	2491340	and we see that here we only use the first 5 words.
+2491340	2493340	So let me now erase this
+2493340	2495340	and let me erase the print statements
+2495340	2497340	otherwise we'd be printing way too much.
+2497340	2499340	And so when we process the
+2499340	2501340	full dataset of all the words
+2501340	2503340	we now have 228,000 examples
+2503340	2505340	instead of just 32.
+2505340	2507340	So let's now scroll back down
+2507340	2509340	the dataset is much larger
+2509340	2511340	reinitialize the weights, the same
+2511340	2513340	number of parameters, they all require gradients
+2513340	2515340	and then let's push
+2515340	2517340	this print.loss.item
+2517340	2519340	to be here and let's just see
+2519340	2521340	how the optimization goes if we run this.
+2523340	2525340	Okay so we started
+2525340	2527340	with a fairly high loss and then as we're optimizing
+2527340	2529340	the loss is coming down.
+2531340	2533340	But you'll notice that it takes
+2533340	2535340	quite a bit of time for every single iteration.
+2535340	2537340	So let's actually address that
+2537340	2539340	because we're doing way too much work
+2539340	2541340	forwarding and backwarding 228,000
+2541340	2543340	examples. In practice
+2543340	2545340	what people usually do is they perform
+2545340	2547340	forward and backward pass and update
+2547340	2549340	on many batches of the data.
+2549340	2551340	So what we will want to do is
+2551340	2553340	we want to randomly select some portion
+2553340	2555340	of the dataset and that's a many batch
+2555340	2557340	and then only forward, backward and update
+2557340	2559340	on that little many batch and then
+2559340	2561340	we iterate on those many batches.
+2561340	2563340	So in pytorch we can for example
+2563340	2565340	use torch.randint
+2565340	2567340	and we can generate numbers between 0
+2567340	2569340	and 5 and make 32 of them.
+2571340	2573340	I believe the size has to
+2573340	2575340	be a tuple
+2575340	2577340	in pytorch.
+2577340	2579340	So we can have a tuple
+2579340	2581340	32 of numbers between 0 and 5
+2581340	2583340	but actually we want x.shape
+2583340	2585340	of 0 here
+2585340	2587340	and so this creates integers
+2587340	2589340	that index into our dataset
+2589340	2591340	and there's 32 of them.
+2591340	2593340	So if our many batch size is 32
+2593340	2595340	then we can come here and we can first do
+2595340	2597340	a many batch
+2597340	2599340	construct.
+2599340	2601340	So integers
+2601340	2603340	that we want to optimize in this
+2603340	2605340	single iteration
+2605340	2607340	are in the ix
+2607340	2609340	and then we want to index into
+2609340	2611340	x with
+2611340	2613340	ix to only grab those
+2613340	2615340	rows. So we're only getting 32
+2615340	2617340	rows of x and therefore
+2617340	2619340	embeddings will again be 32 by 3
+2619340	2621340	by 2, not 200,000
+2621340	2623340	by 3 by 2.
+2623340	2625340	And then this ix has to be used not just
+2625340	2627340	to index into x but also
+2627340	2629340	to index into y.
+2629340	2631340	And now this
+2631340	2633340	should be many batches and this should be
+2633340	2635340	much much faster.
+2635340	2637340	So it's instant almost.
+2637340	2639340	So this way we can run
+2639340	2641340	many many examples
+2641340	2643340	nearly instantly and decrease
+2643340	2645340	the loss much much faster.
+2645340	2647340	Now because we're only dealing with many batches
+2647340	2649340	the quality of our gradient
+2649340	2651340	is lower. So the direction is not
+2651340	2653340	as reliable. It's not the actual gradient
+2653340	2655340	direction. But
+2655340	2657340	the gradient direction is good enough even
+2657340	2659340	when it's estimating on only 32
+2659340	2661340	examples that it is useful.
+2661340	2663340	And so it's much better
+2663340	2665340	to have an approximate gradient and
+2665340	2667340	just make more steps than it is to
+2667340	2669340	evaluate the exact gradient and take
+2669340	2671340	fewer steps. So that's why
+2671340	2673340	in practice this works
+2673340	2675340	quite well. So let's now continue
+2675340	2677340	the optimization.
+2677340	2679340	Let me take out
+2679340	2681340	this loss.item from here.
+2681340	2683340	And place it
+2683340	2685340	over here at the end.
+2685340	2687340	Okay so we're hovering around 2.5
+2687340	2689340	or so.
+2689340	2691340	However this is only the loss
+2691340	2693340	for that many batch. So let's actually evaluate
+2693340	2695340	the loss here
+2695340	2697340	for all of x
+2697340	2699340	and for all of y.
+2699340	2701340	Just so we have a full
+2701340	2703340	sense of exactly how well the model is
+2703340	2705340	doing right now.
+2705340	2707340	So right now we're at about 2.7 on the
+2707340	2709340	entire training set.
+2709340	2711340	So let's run the optimization for a while.
+2711340	2713340	Okay we're at
+2713340	2715340	2.6
+2715340	2717340	2.57
+2717340	2719340	2.53
+2721340	2723340	Okay.
+2723340	2725340	So one issue of course is
+2725340	2727340	we don't know if we're stepping too slow
+2727340	2729340	or too fast.
+2729340	2731340	So at this point one I just guessed it.
+2731340	2733340	So one question is
+2733340	2735340	how do you determine this learning rate?
+2735340	2737340	And how do we gain confidence
+2737340	2739340	that we're stepping in the right
+2739340	2741340	sort of speed?
+2741340	2743340	So let's try to determine a reasonable learning rate.
+2743340	2745340	It works as follows.
+2745340	2747340	Let's reset our parameters
+2747340	2749340	to the initial
+2749340	2751340	settings.
+2751340	2753340	And now let's print
+2753340	2755340	in every step.
+2755340	2757340	But let's only do 10 steps or so.
+2757340	2759340	Or maybe
+2759340	2761340	100 steps.
+2761340	2763340	We want to find a very reasonable
+2763340	2765340	search range if you will.
+2765340	2767340	So for example if this is very low
+2767340	2769340	then
+2769340	2771340	we see that the loss is barely
+2771340	2773340	decreasing. So that's not
+2773340	2775340	that's like too low basically.
+2775340	2777340	So let's try this one.
+2777340	2779340	Okay so we're
+2779340	2781340	decreasing the loss but like not very quickly.
+2781340	2783340	So that's a pretty good low range.
+2783340	2785340	Now let's reset it again.
+2785340	2787340	And now let's try to find the place
+2787340	2789340	at which the loss kind of explodes.
+2789340	2791340	So maybe at negative one.
+2793340	2795340	Okay we see that we're minimizing the loss
+2795340	2797340	but you see how it's kind of unstable.
+2797340	2799340	It goes up and down quite a bit.
+2799340	2801340	So negative one is probably like a
+2801340	2803340	fast learning rate.
+2803340	2805340	Let's try negative ten.
+2805340	2807340	Okay so this isn't
+2807340	2809340	optimizing. This is not working very well.
+2809340	2811340	So negative ten is way too big.
+2811340	2813340	Negative one was already kind of big.
+2813340	2815340	So
+2815340	2817340	therefore negative one was like
+2817340	2819340	somewhat reasonable if I reset.
+2819340	2821340	So I'm thinking that the right
+2821340	2823340	learning rate is somewhere between
+2823340	2825340	negative 0.001
+2825340	2827340	and negative one.
+2827340	2829340	So the way we can do this
+2829340	2831340	here is we can use Torch.lin
+2831340	2833340	space.
+2833340	2835340	And we want to basically do something like this.
+2835340	2837340	Between zero and one.
+2839340	2841340	Oh number of steps is one more parameter
+2841340	2843340	that's required. Let's do a thousand steps.
+2843340	2845340	This creates one thousand
+2845340	2847340	numbers between
+2847340	2849340	0.001 and one.
+2849340	2851340	But it doesn't really make sense to
+2851340	2853340	step between these linearly.
+2853340	2855340	So instead let me create learning rate
+2855340	2857340	exponent. And instead of
+2857340	2859340	0.001 this will be
+2859340	2861340	a negative three and this will be a zero.
+2861340	2863340	And then the actual LRs
+2863340	2865340	that we want to search over are going to be
+2865340	2867340	ten to the power of LRE.
+2867340	2869340	So now what we're doing is
+2869340	2871340	we're stepping linearly between the exponents
+2871340	2873340	of these learning rates. This is 0.001
+2873340	2875340	and this is one.
+2875340	2877340	Because ten to the power of zero
+2877340	2879340	is one. And therefore
+2879340	2881340	we are spaced exponentially in this interval.
+2881340	2883340	So these are the candidate
+2883340	2885340	learning rates that we want
+2885340	2887340	to sort of like search over roughly.
+2887340	2889340	So now what we're going to do is
+2889340	2891340	here
+2891340	2893340	we are going to run the optimization for
+2893340	2895340	one thousand steps. And instead of using
+2895340	2897340	a fixed number we are going to
+2897340	2899340	use learning rate
+2899340	2901340	indexing into here LRs
+2901340	2903340	of i and make this
+2903340	2905340	i.
+2905340	2907340	So basically let me reset this
+2907340	2909340	to be again starting
+2909340	2911340	from random. Creating these learning
+2911340	2913340	rates between negative
+2913340	2915340	between 0.001 and
+2915340	2917340	one
+2917340	2919340	but exponentially stepped.
+2919340	2921340	And here what we're doing is
+2921340	2923340	we're iterating a thousand times
+2923340	2925340	we're going to use the learning rate
+2925340	2927340	that's in the beginning
+2927340	2929340	very very low. In the beginning it's going to be
+2929340	2931340	0.001 but by the end it's
+2931340	2933340	going to be one.
+2933340	2935340	And then we're going to step with that
+2935340	2937340	learning rate.
+2937340	2939340	And now what we want to do is we want to keep track
+2939340	2941340	of the
+2943340	2945340	learning rates that we used.
+2945340	2947340	And we want to look at the losses
+2947340	2949340	that resulted.
+2949340	2951340	And so here let me
+2951340	2953340	track stats.
+2953340	2955340	So LRI dot append
+2955340	2957340	LR and
+2957340	2959340	loss side dot append
+2959340	2961340	loss dot item.
+2961340	2963340	Okay.
+2963340	2965340	So again reset everything
+2965340	2967340	and then
+2967340	2969340	run.
+2969340	2971340	And so basically we started
+2971340	2973340	with a very low learning rate and we went all the way up
+2973340	2975340	to learning rate of negative one.
+2975340	2977340	And now what we can do is we can
+2977340	2979340	plt dot plot and
+2979340	2981340	we can plot the two. So we can plot
+2981340	2983340	the learning rates on the x-axis
+2983340	2985340	and the losses we saw on the y-axis.
+2985340	2987340	And often you're going to find
+2987340	2989340	that your plot looks something like this.
+2989340	2991340	Where in the beginning
+2991340	2993340	you had very low learning rates
+2993340	2995340	basically anything
+2995340	2997340	barely anything happened.
+2997340	2999340	Then we got to like a nice spot
+2999340	3001340	here and then as we increased
+3001340	3003340	the learning rate enough
+3003340	3005340	we basically started to be kind of unstable here.
+3005340	3007340	So a good learning rate turns out
+3007340	3009340	to be somewhere around here.
+3009340	3011340	And because
+3011340	3013340	we have LRI here
+3013340	3015340	we actually
+3015340	3017340	may want to
+3019340	3021340	do not LR
+3021340	3023340	not the learning rate but the exponent.
+3023340	3025340	So that would be the LRE at i
+3025340	3027340	is maybe what we want to log.
+3027340	3029340	So let me reset this and redo that
+3029340	3031340	calculation. But now on the x-axis
+3031340	3033340	we have the
+3033340	3035340	exponent of the learning rate.
+3035340	3037340	And so we can see that the exponent
+3037340	3039340	of the learning rate that is good to use
+3039340	3041340	would be sort of like roughly in the value here
+3041340	3043340	because here the learning rates are just way too low
+3043340	3045340	and then here we expect
+3045340	3047340	relatively good learning rates somewhere here
+3047340	3049340	and then here things are starting to explode.
+3049340	3051340	So somewhere around negative 1
+3051340	3053340	as the exponent of the learning rate is a pretty good setting.
+3053340	3055340	And 10 to the
+3055340	3057340	negative 1 is 0.1
+3057340	3059340	So 0.1 was actually
+3059340	3061340	a fairly good learning rate around here.
+3061340	3063340	And that's what we had
+3063340	3065340	in the initial setting
+3065340	3067340	but that's roughly how you would determine it.
+3067340	3069340	And so here now we can
+3069340	3071340	take out the tracking of these
+3071340	3073340	and we can
+3073340	3075340	just simply set LRE to be
+3075340	3077340	10 to the negative 1
+3077340	3079340	or basically otherwise 0.1
+3079340	3081340	as it was before.
+3081340	3083340	And now we have some confidence that this is actually a fairly good
+3083340	3085340	learning rate. And so now what we can do
+3085340	3087340	is we can crank up the iterations
+3087340	3089340	we can reset our optimization
+3089340	3091340	and
+3091340	3093340	we can run for
+3093340	3095340	a pretty long time using this learning rate
+3095340	3097340	oops
+3097340	3099340	and we don't want to print, it's way too much printing
+3099340	3101340	so let me again reset
+3101340	3103340	and run 10,000 steps.
+3107340	3109340	Okay so we're at
+3109340	3111340	2.48 roughly.
+3111340	3113340	Let's run another 10,000 steps.
+3117340	3119340	2.46
+3119340	3121340	And now let's do
+3121340	3123340	one learning rate decay. What this means is
+3123340	3125340	we're going to take our learning rate and we're going to
+3125340	3127340	10x lower it. And so
+3127340	3129340	we're at the late stages of training potentially
+3129340	3131340	and we may want to go
+3131340	3133340	a little bit slower. Let's do one more actually
+3133340	3135340	at 0.1 just to see if
+3137340	3139340	we're making a dent here.
+3139340	3141340	Okay we're still making a dent. And by the way the
+3141340	3143340	bigram loss that we
+3143340	3145340	achieved last video was 2.45
+3145340	3147340	so we've already surpassed
+3147340	3149340	the bigram model.
+3149340	3151340	And once I get a sense that this is actually kind of starting
+3151340	3153340	to plateau off, people like to do
+3153340	3155340	as I mentioned this learning rate decay.
+3155340	3157340	So let's try to decay the loss
+3157340	3159340	the learning rate I mean.
+3161340	3163340	And we achieve
+3163340	3165340	it about 2.3 now.
+3165340	3167340	Obviously this is janky
+3167340	3169340	and not exactly how you would train it in
+3169340	3171340	production but this is roughly what you're going
+3171340	3173340	through. You first find a decent learning
+3173340	3175340	rate using the approach that I showed you.
+3175340	3177340	Then you start with that learning rate
+3177340	3179340	and you train for a while. And then at
+3179340	3181340	the end people like to do a learning rate decay
+3181340	3183340	where you decay the learning rate by say a factor
+3183340	3185340	of 10 and you do a few more steps
+3185340	3187340	and then you get a trained network
+3187340	3189340	roughly speaking. So we've achieved
+3189340	3191340	2.3 and dramatically
+3191340	3193340	improved on the bigram language model
+3193340	3195340	using this simple neural net
+3195340	3197340	as described here.
+3197340	3199340	Using these 3400 parameters.
+3199340	3201340	Now there's something we have to be careful with.
+3201340	3203340	I said that we have
+3203340	3205340	a better model because we are achieving
+3205340	3207340	a lower loss. 2.3
+3207340	3209340	much lower than 2.45 with the bigram
+3209340	3211340	model previously. Now that's not
+3211340	3213340	exactly true. And the reason that's not
+3213340	3215340	true is that
+3217340	3219340	this is actually a fairly small model
+3219340	3221340	but these models can get larger and larger
+3221340	3223340	if you keep adding neurons and parameters.
+3223340	3225340	So you can imagine that we don't
+3225340	3227340	potentially have a thousand parameters. We could have
+3227340	3229340	10,000 or 100,000 or millions of parameters.
+3229340	3231340	And as the capacity of the neural
+3231340	3233340	network grows, it
+3233340	3235340	becomes more and more capable of
+3235340	3237340	overfitting your training set.
+3237340	3239340	What that means is that the loss on the
+3239340	3241340	training set, on the data that you're training
+3241340	3243340	on, will become very very low.
+3243340	3245340	As low as zero.
+3245340	3247340	But all that the model is doing is memorizing
+3247340	3249340	your training set verbatim.
+3249340	3251340	So if you take that model and it looks like it's working
+3251340	3253340	well, but you try to sample from it,
+3253340	3255340	you will basically only get examples
+3255340	3257340	exactly as they are in the training set.
+3257340	3259340	You won't get any new data.
+3259340	3261340	In addition to that, if you try to evaluate the
+3261340	3263340	loss on some withheld names
+3263340	3265340	or other words, you will
+3265340	3267340	actually see that the loss on those
+3267340	3269340	can be very high. And so basically
+3269340	3271340	it's not a good model.
+3271340	3273340	So the standard in the field is to split up
+3273340	3275340	your data set into three splits,
+3275340	3277340	as we call them. We have the training split,
+3277340	3279340	the def split, or the validation
+3279340	3281340	split, and the test split.
+3281340	3283340	So,
+3283340	3285340	training split,
+3285340	3287340	test or, sorry,
+3287340	3289340	def or validation split,
+3289340	3291340	and test split.
+3291340	3293340	And typically, this would be
+3293340	3295340	say 80% of your data set, this could be
+3295340	3297340	10%, and this 10% roughly.
+3297340	3299340	So you have these three splits
+3299340	3301340	of the data.
+3301340	3303340	Now, these 80% of your training
+3303340	3305340	of the data set, the training set,
+3305340	3307340	is used to optimize the parameters of the model.
+3307340	3309340	Just like we're doing here, using Gradient Descent.
+3309340	3311340	These 10%
+3311340	3313340	of the examples,
+3313340	3315340	the def or validation split, they're used
+3315340	3317340	for development over all the hyper
+3317340	3319340	parameters of your model. So
+3319340	3321340	hyper parameters are, for example, the size
+3321340	3323340	of this hidden layer, the size of
+3323340	3325340	the embedding. So this is a 100 or
+3325340	3327340	a 2 for us, but we could try different things.
+3327340	3329340	The strength of the regularization,
+3329340	3331340	which we aren't using yet so far.
+3331340	3333340	So there's lots of different hyper
+3333340	3335340	parameters and settings that go into defining
+3335340	3337340	a neural net. And you can try many different
+3337340	3339340	variations of them and see whichever
+3339340	3341340	one works best on your
+3341340	3343340	validation split.
+3343340	3345340	So this is used to train the parameters.
+3345340	3347340	This is used to train the
+3347340	3349340	hyper parameters. And test
+3349340	3351340	split is used to evaluate
+3351340	3353340	basically the performance of the model at the end.
+3353340	3355340	So we're only evaluating
+3355340	3357340	the loss on the test split very, very sparingly
+3357340	3359340	and very few times. Because
+3359340	3361340	every single time you evaluate your test
+3361340	3363340	loss and you learn something from it,
+3363340	3365340	you are basically starting to
+3365340	3367340	also train on the test split.
+3367340	3369340	So you are only allowed
+3369340	3371340	to test the loss on the test
+3371340	3373340	set very, very
+3373340	3375340	few times. Otherwise you risk
+3375340	3377340	overfitting to it as well
+3377340	3379340	as you experiment on your model.
+3379340	3381340	So let's also split up our training
+3381340	3383340	data into train, dev,
+3383340	3385340	and test. And then we are going to
+3385340	3387340	train on train and only evaluate
+3387340	3389340	on test very, very sparingly.
+3389340	3391340	Okay, so here we go.
+3391340	3393340	Here is where we took all the words
+3393340	3395340	and put them into x and y tensors.
+3395340	3397340	So instead, let me create
+3397340	3399340	a new cell here and let me just copy paste
+3399340	3401340	some code here. Because I don't
+3401340	3403340	think it's that complex.
+3403340	3405340	But
+3405340	3407340	we're going to try to save a little bit of time.
+3407340	3409340	I'm converting this to be a function now.
+3409340	3411340	And this function takes some list
+3411340	3413340	of words and builds the arrays
+3413340	3415340	x and y for those words only.
+3415340	3417340	And then here
+3417340	3419340	I am shuffling up all the
+3419340	3421340	words. So these are the input words
+3421340	3423340	that we get. We are randomly shuffling
+3423340	3425340	them all up. And then
+3425340	3427340	we're going to
+3427340	3429340	set n1 to be
+3429340	3431340	the number of examples. There's
+3431340	3433340	80% of the words and n2 to be
+3433340	3435340	90% of the weight of
+3435340	3437340	the words. So basically if length
+3437340	3439340	of words is 32,000
+3439340	3441340	n1 is
+3441340	3443340	oh sorry, I should probably run this.
+3443340	3445340	n1 is
+3445340	3447340	25,000 and n2 is 28,000.
+3447340	3449340	And so here we see that
+3449340	3451340	I'm calling build data set
+3451340	3453340	to build the training set x and y
+3453340	3455340	by indexing into
+3455340	3457340	up to n1. So we're going to have
+3457340	3459340	only 25,000 training words.
+3459340	3461340	And then we're going to have
+3461340	3463340	roughly
+3463340	3465340	n2 minus n1
+3465340	3467340	3,000 validation
+3467340	3469340	examples or dev
+3469340	3471340	examples and we're going to have
+3473340	3475340	length of words basically
+3475340	3477340	minus n2
+3477340	3479340	or 3,204
+3479340	3481340	examples here
+3481340	3483340	for the test set.
+3483340	3485340	So now we have
+3485340	3487340	x's and y's for
+3487340	3489340	all those three splits.
+3491340	3493340	Oh yeah
+3493340	3495340	I'm printing their size here inside the function as well.
+3499340	3501340	But here we don't have words but these are already
+3501340	3503340	the individual examples made from those words.
+3505340	3507340	So let's now scroll down here
+3507340	3509340	and the data set now for training
+3509340	3511340	is
+3511340	3513340	more like this.
+3513340	3515340	And then when we reset the network
+3517340	3519340	when we're training
+3519340	3521340	we're only going to be training using
+3521340	3523340	x train
+3523340	3525340	x train
+3525340	3527340	and y train.
+3527340	3529340	So that's the only thing we're
+3529340	3531340	training on.
+3537340	3539340	Let's see where we are
+3539340	3541340	on the single batch.
+3541340	3543340	Let's now train maybe
+3543340	3545340	a few more steps.
+3547340	3549340	Training of neural networks can take a while.
+3549340	3551340	Usually you don't do it inline.
+3551340	3553340	You launch a bunch of jobs
+3553340	3555340	and you wait for them to finish.
+3555340	3557340	It can take multiple days and so on.
+3557340	3559340	Luckily this is a very small network.
+3561340	3563340	Okay so the loss is pretty good.
+3563340	3565340	Oh we accidentally used
+3565340	3567340	a learning rate that is way too low.
+3567340	3569340	So let me actually come back.
+3569340	3571340	We used the decay learning rate
+3571340	3573340	of 0.01.
+3575340	3577340	So this will train much faster.
+3577340	3579340	And then here when we evaluate
+3579340	3581340	let's use the depth set here.
+3581340	3583340	x dev
+3583340	3585340	and y dev
+3585340	3587340	to evaluate the loss.
+3589340	3591340	And let's not decay the learning rate
+3591340	3593340	and only do say 10,000 examples.
+3595340	3597340	And let's evaluate the dev loss
+3597340	3599340	once here.
+3599340	3601340	Okay so we're getting about 2.3 on dev.
+3601340	3603340	And so the neural network when it was training
+3603340	3605340	did not see these dev examples.
+3605340	3607340	It hasn't optimized on them.
+3607340	3609340	And yet when we evaluate the loss
+3609340	3611340	on these dev we actually get a pretty decent loss.
+3611340	3613340	And so
+3613340	3615340	we can also look at what the
+3615340	3617340	loss is on all of training set.
+3619340	3621340	Oops.
+3621340	3623340	And so we see that the training and the dev loss
+3623340	3625340	are about equal.
+3625340	3627340	So we're not overfitting.
+3627340	3629340	This model is not powerful enough
+3629340	3631340	to just be purely memorizing the data.
+3631340	3633340	And so far we are what's called underfitting.
+3633340	3635340	Because the training loss
+3635340	3637340	and the dev or test losses
+3637340	3639340	are roughly equal.
+3639340	3641340	So what we can do is
+3641340	3643340	is that our network is very tiny.
+3643340	3645340	Very small.
+3645340	3647340	And we expect to make performance improvements
+3647340	3649340	by scaling up the size of this neural net.
+3649340	3651340	So let's do that now.
+3651340	3653340	So let's come over here
+3653340	3655340	and let's increase the size of the neural net.
+3655340	3657340	The easiest way to do this
+3657340	3659340	is we can come here to the hidden layer
+3659340	3661340	which currently has 100 neurons.
+3661340	3663340	And let's just bump this up.
+3663340	3665340	So let's do 300 neurons.
+3665340	3667340	And then this is also 300 biases.
+3667340	3669340	And here we have 300 inputs
+3669340	3671340	that initialize our neural net.
+3671340	3673340	We now have 10,000 parameters
+3673340	3675340	instead of 3,000 parameters.
+3675340	3677340	And then we're not using this.
+3677340	3679340	And then here what I'd like to do
+3679340	3681340	is I'd like to actually
+3681340	3683340	keep track of
+3687340	3689340	Okay, let's just do this.
+3689340	3691340	Let's keep stats again.
+3691340	3693340	And here when we're keeping track of the
+3693340	3695340	loss
+3695340	3697340	let's just also keep track of
+3697340	3699340	the steps.
+3699340	3701340	I have an eye here.
+3701340	3703340	And let's train on 30,000
+3703340	3705340	or rather say
+3705340	3707340	Okay, let's try 30,000.
+3707340	3709340	And we are at 0.1
+3711340	3713340	And we should
+3713340	3715340	be able to run this
+3715340	3717340	and optimize the neural net.
+3717340	3719340	And then here basically
+3719340	3721340	I want to plt.plot
+3721340	3723340	the steps against
+3723340	3725340	the loss.
+3729340	3731340	So these are the x's and the y's.
+3731340	3733340	And this is
+3733340	3735340	the loss function
+3735340	3737340	and how it's being optimized.
+3737340	3739340	Now you see that there's quite a bit of
+3739340	3741340	thickness to this.
+3741340	3743340	And that's because we are optimizing over these mini-batches.
+3743340	3745340	And the mini-batches create a little bit of noise
+3745340	3747340	in this.
+3747340	3749340	Where are we in the def set?
+3749340	3751340	We are at 2.5.
+3751340	3753340	So we still haven't optimized this neural net very well.
+3753340	3755340	And that's probably because we made it bigger.
+3755340	3757340	It might take longer for this neural net to converge.
+3757340	3759340	And so let's continue training.
+3761340	3763340	Yeah, let's just
+3763340	3765340	continue training.
+3765340	3767340	One possibility
+3767340	3769340	is that the batch size is so low
+3769340	3771340	that we just have way too much
+3771340	3773340	noise in the training.
+3773340	3775340	And we may want to increase the batch size so that we have a bit more
+3775340	3777340	correct gradient.
+3777340	3779340	And we are not thrashing too much.
+3779340	3781340	And we can actually optimize more properly.
+3787340	3789340	This will now become
+3789340	3791340	meaningless because we've
+3791340	3793340	re-initialized these.
+3793340	3795340	This looks not
+3795340	3797340	pleasing right now.
+3797340	3799340	But there probably is a tiny improvement
+3799340	3801340	but it's so hard to tell.
+3801340	3803340	Let's go again.
+3803340	3805340	2.52
+3805340	3807340	Let's try to decrease the learning rate
+3807340	3809340	by a factor of 2.
+3817340	3831340	Okay, we're at 2.32.
+3831340	3833340	Let's continue training.
+3845340	3847340	We basically expect to see a lower
+3847340	3849340	loss than what we had before.
+3849340	3851340	Because now we have a much much bigger model
+3851340	3853340	and we were underfitting.
+3853340	3855340	So we'd expect that increasing the size of the model should help the neural net.
+3855340	3857340	2.32
+3857340	3859340	Okay, so that's not happening too well.
+3859340	3861340	Now one other concern is that
+3861340	3863340	even though we've made the 10H layer here
+3863340	3865340	or the hidden layer much much bigger
+3865340	3867340	it could be that the bottleneck of the network
+3867340	3869340	right now are these embeddings
+3869340	3871340	that are two-dimensional.
+3871340	3873340	It can be that we're just cramming way too many characters
+3873340	3875340	into just two dimensions
+3875340	3877340	and the neural net is not able to really use that space effectively.
+3877340	3879340	And that is sort of like
+3879340	3881340	the bottleneck to our network's performance.
+3881340	3883340	Okay, 2.23
+3883340	3885340	So just by decreasing the learning rate
+3885340	3887340	I was able to make quite a bit of progress.
+3887340	3889340	Let's run this one more time.
+3891340	3893340	And then evaluate the training
+3893340	3895340	and the dev loss.
+3895340	3897340	Now one more thing
+3897340	3899340	after training that I'd like to do
+3899340	3901340	is I'd like to visualize
+3901340	3903340	the embedding vectors
+3903340	3905340	for these
+3905340	3907340	characters before we scale up
+3907340	3909340	the embedding size from 2.
+3909340	3911340	Because we'd like to make
+3911340	3913340	this bottleneck potentially go away.
+3913340	3915340	But once I make this greater than 2
+3915340	3917340	we won't be able to visualize them.
+3917340	3919340	So here, okay we're at 2.23
+3919340	3921340	and 2.24
+3921340	3923340	so we're not improving
+3923340	3925340	much more and maybe the bottleneck now
+3925340	3927340	is the character embedding size which is 2.
+3927340	3929340	So here I have a bunch
+3929340	3931340	of code that will create a figure
+3931340	3933340	and then we're going to visualize
+3933340	3935340	the embeddings that were trained
+3935340	3937340	by the neural net on these characters.
+3937340	3939340	Because right now the embedding size is just 2
+3939340	3941340	so we can visualize all the characters
+3941340	3943340	with the x and the y coordinates
+3943340	3945340	as the two embedding locations
+3945340	3947340	for each of these characters.
+3947340	3949340	And so here are the
+3949340	3951340	x coordinates and the y coordinates
+3951340	3953340	which are the columns of C
+3953340	3955340	and then for each one I also include
+3955340	3957340	the text of the little character.
+3957340	3959340	So here what we see
+3959340	3961340	is actually kind of interesting.
+3961340	3963340	The network has
+3963340	3965340	basically learned to separate out
+3965340	3967340	the characters and cluster them a little bit
+3967340	3969340	so for example you see how the vowels
+3969340	3971340	a, e, i, o, u
+3971340	3973340	are clustered up here
+3973340	3975340	so what that's telling us is that the neural net
+3975340	3977340	treats these as very similar
+3977340	3979340	because when they feed into the neural net
+3979340	3981340	the embedding for all these characters
+3981340	3983340	is very similar and so the neural net
+3983340	3985340	thinks that they're very similar
+3985340	3987340	and kind of like interchangeable
+3987340	3989340	if that makes sense.
+3989340	3991340	Then the points that are like
+3991340	3993340	really far away are for example Q
+3993340	3995340	Q is kind of treated as an exception
+3995340	3997340	and Q has a very special embedding vector
+3997340	3999340	so to speak.
+3999340	4001340	Similarly dot, which is a special character
+4001340	4003340	is all the way out here
+4003340	4005340	and a lot of the other letters are sort of like
+4005340	4007340	clustered up here.
+4007340	4009340	And so it's kind of interesting that there's
+4009340	4011340	a little bit of structure here
+4011340	4013340	after the training and it's not
+4013340	4015340	definitely not random and these embeddings
+4015340	4017340	make sense.
+4017340	4019340	So we're now going to scale up the embedding size
+4019340	4021340	and won't be able to visualize it directly
+4021340	4023340	but we expect that because we're underfitting
+4023340	4025340	and we made this layer
+4025340	4027340	much bigger and did not sufficiently
+4027340	4029340	improve the loss, we're thinking that the
+4029340	4031340	constraint
+4031340	4033340	to better performance right now
+4033340	4035340	could be these embedding vectors.
+4035340	4037340	So let's make them bigger.
+4037340	4039340	So let's scroll up here and now we don't have
+4039340	4041340	two dimensional embeddings, we are going to have
+4041340	4043340	say 10 dimensional embeddings
+4043340	4045340	for each word.
+4045340	4047340	Then this layer will receive
+4047340	4049340	3 times 10
+4049340	4051340	so 30 inputs
+4051340	4053340	will go into
+4053340	4055340	the hidden layer.
+4055340	4057340	Let's also make the hidden layer a bit smaller
+4057340	4059340	so instead of 300 let's just do 200
+4059340	4061340	neurons in that hidden layer.
+4061340	4063340	So now the total number of elements
+4063340	4065340	will be slightly bigger at
+4065340	4067340	11,000.
+4067340	4069340	And then here we have to be a bit careful because
+4069340	4071340	the learning rate
+4071340	4073340	we set to 0.1
+4073340	4075340	here we are hardcoding 6
+4075340	4077340	and obviously if you're working in production
+4077340	4079340	you don't want to be hardcoding magic numbers
+4079340	4081340	but instead of 6 this should now be 30.
+4083340	4085340	And let's run for
+4085340	4087340	50,000 iterations and let me
+4087340	4089340	split out the initialization here
+4089340	4091340	outside so that
+4091340	4093340	when we run this multiple times it's not going
+4093340	4095340	to wipe out our loss.
+4097340	4099340	In addition to that
+4099340	4101340	here let's instead
+4101340	4103340	of logging loss.item let's actually
+4103340	4105340	log the
+4105340	4107340	let's do log10
+4107340	4109340	I believe
+4109340	4111340	that's a function of the loss
+4111340	4113340	and I'll show you
+4113340	4115340	why in a second. Let's optimize this.
+4115340	4117340	This
+4117340	4119340	basically I'd like to plot the log loss
+4119340	4121340	instead of the loss because when you plot
+4121340	4123340	the loss many times it can have this hockey stick
+4123340	4125340	appearance and log
+4125340	4127340	squashes it in.
+4127340	4129340	So it just kind of like looks nicer.
+4129340	4131340	So the x-axis is step i
+4131340	4133340	and the y-axis will be the loss
+4133340	4135340	i.
+4141340	4143340	And then here this is 30.
+4143340	4145340	Ideally we wouldn't be hardcoding these
+4145340	4149340	because let's look
+4149340	4151340	at the loss.
+4151340	4153340	It's again very thick because
+4153340	4155340	the mini-batch size is very small
+4155340	4157340	but the total loss over the training set
+4157340	4159340	is 2.3 and the test
+4159340	4161340	or the def set is 2.38 as well.
+4161340	4163340	So far so good.
+4163340	4165340	Let's try to now decrease the learning rate
+4165340	4167340	by a factor of 10
+4169340	4171340	and train for another 50,000 iterations.
+4175340	4177340	We'd hope that we would be able to beat
+4177340	4179340	2.32.
+4183340	4185340	But again we're just kind of like doing this very
+4185340	4187340	haphazardly so I don't actually have
+4187340	4189340	confidence that our learning rate is set
+4189340	4191340	very well, that our learning rate decay
+4191340	4193340	which we just do at random
+4193340	4195340	is set very well.
+4195340	4197340	And so the optimization here
+4197340	4199340	is kind of suspect to be honest and this is
+4199340	4201340	not how you would do it typically in production.
+4201340	4203340	In production you would create parameters
+4203340	4205340	or hyperparameters out of all these settings
+4205340	4207340	and then you would run lots of experiments
+4207340	4209340	and see whichever ones are working well for you.
+4211340	4213340	Okay.
+4213340	4215340	So we have 2.17 now
+4215340	4217340	and 2.2.
+4217340	4219340	So you see how the training and the validation
+4219340	4221340	performance are starting to
+4221340	4223340	slightly slowly depart.
+4223340	4225340	So maybe we're getting the sense that the neural net
+4225340	4227340	is getting good enough
+4227340	4229340	or that number of parameters
+4229340	4231340	is large enough
+4231340	4233340	that we are slowly starting to overfit.
+4233340	4235340	Let's maybe run
+4235340	4237340	one more iteration of this
+4237340	4239340	and see where we get.
+4241340	4243340	But yeah, basically you would be running
+4243340	4245340	lots of experiments and then you are slowly
+4245340	4247340	scrutinizing whichever ones give you the best
+4247340	4249340	depth performance. And then once you find
+4249340	4251340	all the hyperparameters that make
+4251340	4253340	your depth performance good
+4253340	4255340	you take that model and you evaluate the test set
+4255340	4257340	performance a single time.
+4257340	4259340	And that's the number that you report in your paper
+4259340	4261340	or wherever else you want to talk about
+4261340	4263340	and brag about your model.
+4265340	4267340	So let's then rerun the plot
+4267340	4269340	and rerun the train and dev.
+4271340	4273340	And because we're getting lower loss now
+4273340	4275340	it is the case that the embedding size
+4275340	4277340	of these was holding us back very likely.
+4279340	4281340	Okay, so 2.16, 2.19
+4281340	4283340	is what we're roughly getting.
+4283340	4285340	So there's many ways
+4285340	4287340	to go from here.
+4287340	4289340	We can continue tuning the optimization.
+4289340	4291340	We can continue
+4291340	4293340	for example playing with the size of the neural net.
+4293340	4295340	Or we can increase the number of
+4295340	4297340	words or characters
+4297340	4299340	in our case that we are taking as an input.
+4299340	4301340	So instead of just three characters we could be taking
+4301340	4303340	more characters as an input.
+4303340	4305340	And that could further improve
+4305340	4307340	the loss. Okay, so I changed
+4307340	4309340	the code slightly so we have here
+4309340	4311340	200,000 steps of the optimization
+4311340	4313340	and in the first 100,000 we're using
+4313340	4315340	a learning rate of 0.1 and then in the next
+4315340	4317340	100,000 we're using a learning rate of 0.01.
+4317340	4319340	This is the loss
+4319340	4321340	that I achieve and these are the
+4321340	4323340	performance on the training and validation loss.
+4323340	4325340	And in particular the best
+4325340	4327340	validation loss I've been able to obtain in the last
+4327340	4329340	30 minutes or so is 2.17.
+4329340	4331340	So now I invite
+4331340	4333340	you to beat this number. And you have
+4333340	4335340	quite a few knobs available to you to I think
+4335340	4337340	surpass this number.
+4337340	4339340	So number one, you can of course change the number of
+4339340	4341340	neurons in the hidden layer of this model.
+4341340	4343340	You can change the dimensionality of the
+4343340	4345340	embedding lookup table.
+4345340	4347340	You can change the number of characters that are feeding
+4347340	4349340	in as an input
+4349340	4351340	as the context into this model.
+4351340	4353340	And then of course you can
+4353340	4355340	change the details of the optimization.
+4355340	4357340	How long are we running? Where is the learning rate?
+4357340	4359340	How does it change over time?
+4359340	4361340	How does it decay?
+4361340	4363340	You can change the batch size and you may be able to
+4363340	4365340	actually achieve a much better convergence
+4365340	4367340	speed in terms of
+4367340	4369340	how many seconds or minutes it takes to train
+4369340	4371340	the model and get
+4371340	4373340	your result in terms of really good
+4373340	4375340	loss.
+4375340	4377340	And then of course I actually invite you to
+4377340	4379340	read this paper. It is 19 pages
+4379340	4381340	but at this point you should actually be able to
+4381340	4383340	read a good chunk of this paper and understand
+4383340	4385340	a pretty good
+4385340	4387340	chunks of it.
+4387340	4389340	And this paper also has quite a few ideas for
+4389340	4391340	improvements that you can play with.
+4391340	4393340	So all of those are knobs available to you
+4393340	4395340	and you should be able to beat this number.
+4395340	4397340	I'm leaving that as an exercise to the reader
+4397340	4399340	and that's it for now and I'll see you
+4399340	4401340	next time.
+4403340	4405340	Before we wrap up I also
+4405340	4407340	wanted to show how you would sample from the model.
+4407340	4409340	So we're going to
+4409340	4411340	generate 20 samples.
+4411340	4413340	At first we begin with all dots
+4413340	4415340	so that's the context.
+4415340	4417340	And then until we generate
+4417340	4419340	the 0th character again
+4419340	4421340	we're going to embed
+4421340	4423340	the current context
+4423340	4425340	using the embedding table C.
+4425340	4427340	Now usually
+4427340	4429340	here the first dimension was the size
+4429340	4431340	of the training set. But here we're only working
+4431340	4433340	with a single example that we're generating
+4433340	4435340	so this is just dimension 1
+4435340	4437340	just for simplicity.
+4437340	4439340	And so this
+4439340	4441340	embedding then gets projected into
+4441340	4443340	the state. You get the logits.
+4443340	4445340	Now we calculate the probabilities.
+4445340	4447340	For that you can use f.softmax
+4447340	4449340	of logits
+4449340	4451340	and that just basically
+4451340	4453340	exponentiates the logits and makes them sum to 1.
+4453340	4455340	And similar to cross entropy
+4455340	4457340	it is careful that there's no overflows.
+4457340	4459340	Once we have the probabilities
+4459340	4461340	we sample from them using
+4461340	4463340	torsh.multinomial to get our next index
+4463340	4465340	and then we shift the context window
+4465340	4467340	to append index and record it.
+4467340	4469340	And then we can just
+4469340	4471340	decode all the integers to strings
+4471340	4473340	and print them out.
+4473340	4475340	And so these are some example samples.
+4475340	4477340	And you can see that the model now
+4477340	4479340	works much better.
+4479340	4481340	So the words here are much more word-like
+4481340	4483340	or name-like. So we have things like
+4483340	4485340	ham,
+4485340	4487340	joes,
+4487340	4489340	lila.
+4489340	4491340	It's starting to sound a little bit more name-like.
+4491340	4493340	So we're definitely making progress
+4493340	4495340	but we can still improve on this model quite a lot.
+4495340	4497340	Okay sorry, there's some bonus content.
+4497340	4499340	I wanted to mention that
+4499340	4501340	I want to make these notebooks more accessible.
+4501340	4503340	And so I don't want you to have to
+4503340	4505340	install Jupyter notebooks and torsh and everything else
+4505340	4507340	so I will be sharing a link
+4507340	4509340	to a Google Colab
+4509340	4511340	and the Google Colab will look like a notebook
+4511340	4513340	in your browser.
+4513340	4515340	And you can just go to the URL
+4515340	4517340	and you'll be able to execute all of the code that you saw
+4517340	4519340	in the Google Colab.
+4519340	4521340	And so this is me executing the code
+4521340	4523340	in this lecture and I shortened it a little bit.
+4523340	4525340	But basically you're able to train
+4525340	4527340	the exact same network and then
+4527340	4529340	plot and sample from the model
+4529340	4531340	and everything is ready for you to tinker with the numbers
+4531340	4533340	right there in your browser
+4533340	4535340	no installation necessary.
+4535340	4537340	So I just wanted to point that out
+4537340	4539340	and the link to this will be in the video description.
