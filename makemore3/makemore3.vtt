@@ -1,0 +1,5531 @@
+WEBVTT
+
+00:00.000 --> 00:03.440
+Hi everyone. Today we are continuing our implementation of MakeMore.
+
+00:04.080 --> 00:07.440
+Now in the last lecture we implemented the multilayer perceptron along the lines of
+
+00:07.440 --> 00:12.080
+Bengio et al. 2003 for character level language modeling. So we followed this paper,
+
+00:12.080 --> 00:16.240
+took in a few characters in the past, and used an MLP to predict the next character in a sequence.
+
+00:17.120 --> 00:21.360
+So what we'd like to do now is we'd like to move on to more complex and larger neural networks,
+
+00:21.360 --> 00:25.360
+like recurrent neural networks and their variations like the GRU, LSTM, and so on.
+
+00:25.360 --> 00:30.400
+Now before we do that though, we have to stick around the level of multilayer perceptron for a
+
+00:30.400 --> 00:34.480
+bit longer. And I'd like to do this because I would like us to have a very good intuitive
+
+00:34.480 --> 00:39.440
+understanding of the activations in the neural net during training, and especially the gradients
+
+00:39.440 --> 00:44.240
+that are flowing backwards, and how they behave, and what they look like. This is going to be very
+
+00:44.240 --> 00:47.360
+important to understand the history of the development of these architectures,
+
+00:47.920 --> 00:51.840
+because we'll see that recurrent neural networks, while they are very expressive
+
+00:51.840 --> 00:55.280
+in that they are a universal approximator and can in principle implement
+
+00:55.280 --> 00:55.360
+a very complex neural network, they are very expressive in that they are a universal approximator,
+
+00:55.760 --> 01:01.120
+all the algorithms, we'll see that they are not very easily optimisable with the first order of
+
+01:01.120 --> 01:05.360
+gradient based techniques that we have available to us and that we use all the time. And the key
+
+01:05.360 --> 01:10.560
+to understanding why they are not optimisable easily is to understand the activations and the
+
+01:10.560 --> 01:14.720
+gradients and how they behave during training. And we'll see that a lot of the variants since
+
+01:14.720 --> 01:20.800
+recurrent neural networks have tried to improve that situation. And so that's the path that we
+
+01:20.800 --> 01:24.400
+have to take, and let's get started. So the starting code for this lecture is
+
+01:24.400 --> 01:29.040
+largely the code from before, but I've cleaned it up a little bit. So you'll see that we are
+
+01:29.040 --> 01:35.360
+importing all the Torch and Mathplotlib utilities. We're reading in the words just like before.
+
+01:35.360 --> 01:40.240
+These are eight example words. There's a total of 32,000 of them. Here's a vocabulary of all
+
+01:40.240 --> 01:47.600
+the lowercase letters and the special dot token. Here we are reading the dataset and processing it
+
+01:47.600 --> 01:54.320
+and creating three splits, the train, dev, and the test split. Now in the MLP,
+
+01:54.320 --> 01:58.960
+this is the identical same MLP, except you see that I removed a bunch of magic numbers that we
+
+01:58.960 --> 02:03.680
+had here. And instead we have the dimensionality of the embedding space of the characters and the
+
+02:03.680 --> 02:08.320
+number of hidden units in the hidden layer. And so I've pulled them outside here so that we don't
+
+02:08.320 --> 02:12.640
+have to go in and change all these magic numbers all the time. We have the same neural net with
+
+02:12.640 --> 02:18.480
+11,000 parameters that we optimize now over 200,000 steps with a batch size of 32. And you'll
+
+02:18.480 --> 02:23.760
+see that I've refactored the code here a little bit, but there are no functional changes. I just
+
+02:24.320 --> 02:30.240
+have a few extra variables, a few more comments, and I removed all the magic numbers. And otherwise
+
+02:30.240 --> 02:35.360
+it's the exact same thing. Then when we optimize, we saw that our loss looked something like this.
+
+02:36.160 --> 02:44.480
+We saw that the train and val loss were about 2.16 and so on. Here I refactored the code a little bit
+
+02:44.480 --> 02:49.360
+for the evaluation of arbitrary splits. So you pass in a string of which split you'd like to
+
+02:49.360 --> 02:54.160
+evaluate. And then here, depending on train, val, or test, I index in,
+
+02:54.160 --> 02:57.840
+get the correct split. And then this is the forward pass of the network and evaluation
+
+02:57.840 --> 03:04.400
+of the loss and printing it. So just making it nicer. One thing that you'll notice here is
+
+03:05.200 --> 03:11.280
+I'm using a decorator torch.nograd, which you can also look up and read documentation of.
+
+03:11.280 --> 03:16.560
+Basically what this decorator does on top of a function is that whatever happens in this function
+
+03:17.600 --> 03:23.840
+is assumed by torch to never require any gradients. So it will not do any of the bookkeeping,
+
+03:24.160 --> 03:28.720
+that it does to keep track of all the gradients in anticipation of an eventual backward pass.
+
+03:29.440 --> 03:33.040
+It's almost as if all the tensors that get created here have a requires grad
+
+03:33.040 --> 03:37.360
+of false. And so it just makes everything much more efficient because you're telling torch that
+
+03:37.360 --> 03:41.440
+I will not call dot backward on any of this computation, and you don't need to maintain
+
+03:41.440 --> 03:47.760
+the graph under the hood. So that's what this does. And you can also use a context manager
+
+03:48.400 --> 03:54.080
+with torch.nograd, and you can look those up. Then here we have the sampling from
+
+03:54.160 --> 03:59.440
+a model just as before, just before passive and neural net, getting the distribution,
+
+03:59.440 --> 04:04.160
+sampling from it, adjusting the context window, and repeating until we get the special end token.
+
+04:04.720 --> 04:09.680
+And we see that we are starting to get much nicer looking words sampled from the model.
+
+04:09.680 --> 04:12.640
+It's still not amazing, and they're still not fully name-like,
+
+04:13.200 --> 04:19.040
+but it's much better than what we had to with the bigram model. So that's our starting point.
+
+04:19.040 --> 04:23.920
+Now, the first thing I would like to scrutinize is the initialization. I can tell that our
+
+04:24.160 --> 04:28.240
+work is very improperly configured at initialization, and there's multiple
+
+04:28.240 --> 04:32.720
+things wrong with it, but let's just start with the first one. Look here on the zeroth iteration,
+
+04:32.720 --> 04:38.880
+the very first iteration, we are recording a loss of 27, and this rapidly comes down to roughly one
+
+04:38.880 --> 04:43.360
+or two or so. So I can tell that the initialization is all messed up because this is way too high.
+
+04:44.240 --> 04:48.320
+In training of neural nets, it is almost always the case that you will have a rough idea for what
+
+04:48.320 --> 04:53.760
+loss to expect at initialization, and that just depends on the loss function and the problem setup.
+
+04:54.640 --> 04:59.440
+In this case, I do not expect 27. I expect a much lower number, and we can calculate it together.
+
+05:00.560 --> 05:07.120
+Basically, at initialization, what we'd like is that there's 27 characters that could come next
+
+05:07.120 --> 05:11.840
+for any one training example. At initialization, we have no reason to believe any characters to be
+
+05:11.840 --> 05:16.640
+much more likely than others. And so we'd expect that the probability distribution that comes out
+
+05:16.640 --> 05:22.160
+initially is a uniform distribution assigning about equal probability to all the 27 characters.
+
+05:23.360 --> 05:24.080
+So, basically, we're going to start with the initialization. We're going to start with the
+
+05:24.080 --> 05:28.560
+initialization. Basically, what we'd like is the probability for any character would be roughly
+
+05:28.560 --> 05:35.440
+1 over 27. That is the probability we should record, and then the loss is the negative log
+
+05:35.440 --> 05:42.160
+probability. So let's wrap this in a tensor, and then we can take the log of it. And then
+
+05:42.160 --> 05:49.040
+the negative log probability is the loss we would expect, which is 3.29, much, much lower than 27.
+
+05:49.680 --> 05:53.680
+And so what's happening right now is that at initialization, the neural net is creating
+
+05:53.680 --> 05:57.920
+probability distributions that are all messed up. Some characters are very confident,
+
+05:57.920 --> 06:02.000
+and some characters are very not confident. And then, basically, what's happening is that
+
+06:02.000 --> 06:10.480
+the network is very confidently wrong, and that's what makes it record very high loss.
+
+06:10.480 --> 06:14.320
+So here's a smaller four-dimensional example of the issue. Let's say we only have
+
+06:14.320 --> 06:18.480
+four characters, and then we have logits that come out of the neural net,
+
+06:18.480 --> 06:23.200
+and they are very, very close to 0. Then when we take the softmax of all 0s,
+
+06:23.680 --> 06:29.600
+we get probabilities there are a diffuse distribution so sums to one and is exactly
+
+06:29.600 --> 06:35.840
+uniform and then in this case if the label is say two it doesn't actually matter if this if the
+
+06:35.840 --> 06:40.720
+label is two or three or one or zero because it's a uniform distribution we're recording the exact
+
+06:40.720 --> 06:45.520
+same loss in this case 1.38 so this is the loss we would expect for a four-dimensional example
+
+06:46.160 --> 06:50.960
+and i can see of course that as we start to manipulate these logits we're going to be
+
+06:50.960 --> 06:56.640
+changing the loss here so it could be that we lock out and by chance this could be a very high
+
+06:56.640 --> 07:00.960
+number like you know five or something like that then in that case we'll record a very low loss
+
+07:00.960 --> 07:05.760
+because we're assigning the correct probability at initialization by chance to the correct label
+
+07:06.640 --> 07:14.640
+much more likely it is that some other dimension will have a high logit and then what will happen
+
+07:14.640 --> 07:19.360
+is we start to record much higher loss and what can come what can happen is basically the logits
+
+07:19.360 --> 07:20.960
+come out like something like this
+
+07:21.680 --> 07:26.000
+you know and they take on extreme values and we record really high loss
+
+07:28.400 --> 07:35.680
+for example if we have torch.random of four so these are uniform so these are normally distributed
+
+07:36.800 --> 07:45.280
+numbers four of them and here we can also print the logits probabilities that come out of it
+
+07:45.280 --> 07:50.800
+and loss and so because these logits are near zero for the most part
+
+07:50.960 --> 07:56.240
+the loss that comes out is is okay but suppose this is like times 10 now
+
+07:58.960 --> 08:04.320
+you see how because these are more extreme values it's very unlikely that you're going to be guessing
+
+08:04.320 --> 08:10.400
+the correct bucket and then you're confidently wrong and recording very high loss if your logits
+
+08:10.400 --> 08:16.800
+are coming up even more extreme you might get extremely insane losses like infinity even at
+
+08:16.800 --> 08:17.600
+initialization
+
+08:18.400 --> 08:18.880
+um
+
+08:20.960 --> 08:27.760
+this is not good and we want the logits to be roughly zero um when the network is initialized
+
+08:27.760 --> 08:31.120
+in fact the logits can don't have to be just zero they just have to be equal
+
+08:31.120 --> 08:36.560
+so for example if all the logits are one then because of the normalization inside the softmax
+
+08:36.560 --> 08:41.120
+this will actually come out okay but by symmetry we don't want it to be any arbitrary positive or
+
+08:41.120 --> 08:46.240
+negative number we just want it to be all zeros and record the loss that we expect at initialization
+
+08:46.240 --> 08:50.720
+so let's now concretely see where things go wrong in our example here we have the initialization
+
+08:51.360 --> 08:56.160
+let me reinitialize the neural net and here let me break after the very first iteration so we
+
+08:56.160 --> 09:02.560
+only see the initial loss which is 27. so that's way too high and intuitively now we can expect
+
+09:02.560 --> 09:07.440
+the variables involved and we see that the logits here if we just print some of these
+
+09:09.360 --> 09:12.960
+if we just print the first row we see that the logits take on quite extreme values
+
+09:13.680 --> 09:20.960
+and that's what's creating the fake confidence in incorrect answers and makes the loss um get the
+
+09:20.960 --> 09:26.400
+very very high so these logits should be much much closer to zero so now let's think through
+
+09:26.400 --> 09:32.800
+how we can achieve logits coming out of this neural net to be more closer to zero you see
+
+09:32.800 --> 09:38.560
+here that logits are calculated as the hidden states multiplied by w2 plus b2 so first of all
+
+09:38.560 --> 09:46.480
+currently we're initializing b2 as random values of the right size but because we want roughly zero
+
+09:46.480 --> 09:50.720
+we don't actually want to be adding a bias of random numbers so in fact i'm going to add it times
+
+09:50.960 --> 09:58.960
+zero here to make sure that b2 is just basically zero at initialization and second this is h
+
+09:58.960 --> 10:04.720
+multiplied by w2 so if we want logits to be very very small then we would be multiplying w2 and
+
+10:04.720 --> 10:12.720
+making that smaller so for example if we scale down w2 by 0.1 all the elements then if i do
+
+10:12.720 --> 10:17.200
+again just the very first iteration you see that we are getting much closer to what we expect
+
+10:17.200 --> 10:20.720
+so the rough roughly what we want is about 3.29 this is
+
+10:20.960 --> 10:28.000
+0.2 i can make this maybe even smaller 3.32 okay so we're getting closer and closer
+
+10:28.560 --> 10:31.920
+now you're probably wondering can we just set this to zero
+
+10:33.040 --> 10:39.280
+then we get of course exactly what we're looking for at initialization and the reason i don't
+
+10:39.280 --> 10:44.560
+usually do this is because i'm i'm very nervous and i'll show you in a second why you don't want
+
+10:44.560 --> 10:50.480
+to be setting w's or weights of a neural net exactly to zero you usually want it to be small
+
+10:50.960 --> 10:57.360
+instead of exactly zero for this output layer in this specific case i think it would be fine but
+
+10:57.360 --> 11:01.200
+i'll show you in a second where things go wrong very quickly if you do that so let's just go with
+
+11:01.200 --> 11:08.320
+0.01 in that case our loss is close enough but has some entropy it's not exactly zero
+
+11:08.320 --> 11:12.560
+it's got some little entropy and that's used for symmetry breaking as we'll see in a second
+
+11:13.520 --> 11:20.400
+logits are now coming out much closer to zero and everything is well and good so if i just erase these
+
+11:21.040 --> 11:27.680
+and i now take away the break statement we can run the optimization with this new initialization
+
+11:28.240 --> 11:35.040
+and let's just see what losses we record okay so i'll let it run and you see that we started off
+
+11:35.040 --> 11:41.280
+good and then we came down a bit the plot of the loss uh now doesn't have this hockey shape
+
+11:41.280 --> 11:47.360
+appearance um because basically what's happening in the hockey stick the very first few iterations
+
+11:47.360 --> 11:50.960
+of the loss what's happening during the optimization is the optimization of the loss is
+
+11:50.960 --> 11:55.920
+just squashing down the logits and then it's rearranging the logits so basically we took
+
+11:55.920 --> 12:00.960
+away this easy part of the loss function where just the the weights were just being shrunk down
+
+12:01.760 --> 12:05.600
+and so therefore we don't we don't get these easy gains in the beginning
+
+12:05.600 --> 12:08.720
+and we're just getting some of the hard games of training the actual neural net
+
+12:08.720 --> 12:14.000
+and so there's no hockey stick appearance so good things are happening in that both number
+
+12:14.000 --> 12:20.000
+one loss initialization is what we expect and the the loss doesn't look like a hockey stick
+
+12:20.960 --> 12:26.880
+is true for any neural net you might train and something to look out for and second the loss
+
+12:26.880 --> 12:31.760
+that came out is actually quite a bit improved unfortunately i erased what we had here before
+
+12:31.760 --> 12:39.920
+i believe this was 2.12 and this was this was 2.16 so we get a slightly improved result
+
+12:39.920 --> 12:45.520
+and the reason for that is because we're spending more cycles more time optimizing the neural net
+
+12:45.520 --> 12:50.720
+actually instead of just uh spending the first several thousand iterations probably just
+
+12:50.960 --> 12:56.000
+squashing down the weights because they are so way too high in the beginning in the initialization
+
+12:56.720 --> 13:01.600
+so something to look out for and uh that's number one now let's look at the second problem
+
+13:01.600 --> 13:05.200
+let me re-initialize our neural net and let me reintroduce the break statement
+
+13:06.000 --> 13:10.240
+so we have a reasonable initial loss so even though everything is looking good on the level
+
+13:10.240 --> 13:14.800
+of the loss and we get something that we expect there's still a deeper problem lurking inside
+
+13:14.800 --> 13:20.720
+this neural net and its initialization so the logits are now okay the problem now is
+
+13:20.960 --> 13:27.440
+the values of h the activations of the hidden states now if we just visualize this vector
+
+13:27.440 --> 13:31.840
+sorry this tensor h it's kind of hard to see but the problem here roughly speaking is you
+
+13:31.840 --> 13:38.960
+see how many of the elements are one or negative one now recall that torch.10h the 10-H function
+
+13:38.960 --> 13:43.840
+is a squashing function it takes arbitrary numbers and it squashes them into a range of negative 1 and
+
+13:43.840 --> 13:49.040
+1 and it does so smoothly so let's look at the histogram of h to get a better idea of the
+
+13:49.040 --> 13:57.360
+distribution of the values inside this tensor we can do this first well we can see that h is 32
+
+13:57.360 --> 14:04.000
+examples and 200 activations in each example we can view it as negative 1 to stretch it out into
+
+14:04.000 --> 14:12.720
+one large vector and we can then call to list to convert this into one large python list of floats
+
+14:12.720 --> 14:20.320
+and then we can pass this into plt.hist for histogram and we say we want 50 bins and a
+
+14:20.320 --> 14:26.220
+semicolon to suppress a bunch of output we don't want so we see this histogram and we see that most
+
+14:26.220 --> 14:33.640
+of the values by far take on value of negative 1 and 1 so this 10h is very very active and we can
+
+14:33.640 --> 14:40.380
+also look at basically why that is we can look at the pre-activations that feed into the 10h
+
+14:40.380 --> 14:42.700
+and we can also look at the pre-activations that feed into the 10h
+
+14:42.700 --> 14:42.720
+and we can also look at the pre-activations that feed into the 10h
+
+14:42.720 --> 14:47.820
+and we can see that the distribution of the pre-activations are is very very broad these take
+
+14:47.820 --> 14:53.100
+numbers between negative 15 and 15 and that's why in the torture 10h everything is being squashed
+
+14:53.100 --> 14:57.560
+and capped to be in the range of negative 1 and 1 and lots of numbers here take on very extreme
+
+14:57.560 --> 15:02.940
+values now if you are new to neural networks you might not actually see this as an issue
+
+15:02.940 --> 15:08.100
+but if you're well versed in the dark arts of back propagation and then have an intuitive sense of
+
+15:08.100 --> 15:12.160
+how these gradients flow through a neural net you are looking at your distribution of 10h
+
+15:12.160 --> 15:17.440
+activations here and you are sweating so let me show you why we have to keep in mind that during
+
+15:17.440 --> 15:21.980
+back propagation just like we saw in micrograd we are doing backward pass starting at the loss
+
+15:21.980 --> 15:26.420
+and flowing through the network backwards in particular we're going to back propagate through
+
+15:26.420 --> 15:32.680
+this torch.10h and this layer here is made up of 200 neurons for each one of these examples
+
+15:32.680 --> 15:39.020
+and it implements an elementwise 10h so let's look at what happens in 10h in the backward pass
+
+15:39.020 --> 15:42.140
+we can actually go back to our previous micrograd and we're going to look at the network backwards
+
+15:42.160 --> 15:48.560
+by the code in the very first lecture and see how we implement a 10h we saw that the input here was x
+
+15:49.120 --> 15:54.880
+and then we calculate t which is the 10h of x so that's t and t is between negative 1 and 1 it's
+
+15:54.880 --> 15:59.120
+the output of the 10h and then in the backward pass how do we back propagate through a 10h
+
+16:00.000 --> 16:06.000
+we take out that grad and then we multiply it this is the chain rule with the local gradient
+
+16:06.000 --> 16:12.000
+which took the form of 1 minus t squared so what happens if the outputs of your 10h are very close
+
+16:12.160 --> 16:19.040
+to negative 1 or 1 if you plug in t equals 1 here you're going to get 0 multiplying out that grad
+
+16:19.600 --> 16:25.040
+no matter what that grad is we are killing the gradient and we're stopping effectively the back
+
+16:25.040 --> 16:30.480
+propagation through this 10h unit similarly when t is negative 1 this will again become 0
+
+16:30.480 --> 16:36.400
+and out that grad just stops and intuitively this makes sense because this is a 10h neuron
+
+16:37.520 --> 16:42.080
+and what's happening is if its output is very close to one then we are in a tail
+
+16:42.080 --> 16:51.360
+of this tanh and so changing basically the input is not going to impact the output of the tanh too
+
+16:51.360 --> 16:57.360
+much because it's it's so it's in the flat region of the tanh and so therefore there's no impact on
+
+16:57.360 --> 17:04.560
+the loss and so indeed the the weights and the biases along with this tanh neuron do not impact
+
+17:04.560 --> 17:08.880
+the loss because the output of this tanh unit is in the flat region of the tanh and there's
+
+17:08.880 --> 17:13.280
+no influence we can we can be changing them whatever we want however we want and the loss
+
+17:13.280 --> 17:18.160
+is not impacted that's that's another way to justify that indeed the gradient would be
+
+17:18.160 --> 17:28.320
+basically zero it vanishes indeed when t equals zero we get one times out that grad so when the
+
+17:28.320 --> 17:35.600
+tanh takes on exactly value of zero then out that grad is just passed through so basically what this
+
+17:35.600 --> 17:38.640
+is doing right is if t is equal to zero then this
+
+17:38.880 --> 17:45.760
+the tanh unit is sort of inactive and gradient just passes through but the more you are in the
+
+17:45.760 --> 17:52.000
+flat tails the more degrading is squashed so in fact you'll see that the the gradient flowing
+
+17:52.000 --> 17:59.840
+through tanh can only ever decrease and the amount that it decreases is proportional through a square
+
+17:59.840 --> 18:06.000
+here depending on how far you are in the flat tails of this tanh and so that's kind of what's
+
+18:09.120 --> 18:14.000
+the concern here is that if all of these um outputs h are in the flat regions of negative
+
+18:14.000 --> 18:19.040
+one and one then the gradients that are flowing through the network will just get destroyed at
+
+18:19.040 --> 18:25.520
+this layer now there is some redeeming quality here and that we can actually get a sense of the
+
+18:25.520 --> 18:31.040
+problem here as follows i wrote some code here and basically what we want to do here is we want
+
+18:31.040 --> 18:38.720
+to take a look at h take the absolute value and see how often it is in the in a flat uh region so
+
+18:39.300 --> 18:46.860
+say greater than 0.99 and what you get is the following and this is a boolean tensor so uh
+
+18:46.860 --> 18:53.180
+in CSS- solid you get a white if this is true and black if this is false and so basically what we
+
+18:53.180 --> 18:59.580
+have here is the 32 examples and 200 hidden neurons and we see that a lot of this is white
+
+19:00.180 --> 19:07.020
+and what that's telling us is that all these tanh neurons were very very active and they're
+
+19:07.020 --> 19:08.380
+in the flat tail and we type a 0 to
+
+19:08.880 --> 19:14.720
+And so, in all these cases, the backward gradient would get destroyed.
+
+19:16.240 --> 19:21.840
+Now, we would be in a lot of trouble if, for any one of these 200 neurons,
+
+19:22.460 --> 19:25.560
+if it was the case that the entire column is white.
+
+19:26.000 --> 19:28.260
+Because in that case, we have what's called a dead neuron.
+
+19:28.660 --> 19:31.780
+And this could be a 10H neuron where the initialization of the weights and the biases
+
+19:31.780 --> 19:39.380
+could be such that no single example ever activates this 10H in the sort of active part of the 10H.
+
+19:39.640 --> 19:44.500
+If all the examples land in the tail, then this neuron will never learn.
+
+19:44.780 --> 19:45.700
+It is a dead neuron.
+
+19:46.760 --> 19:51.360
+And so, just scrutinizing this and looking for columns of completely white,
+
+19:51.840 --> 19:53.620
+we see that this is not the case.
+
+19:54.080 --> 19:58.600
+So, I don't see a single neuron that is all of, you know, white.
+
+19:59.380 --> 20:01.760
+And so, therefore, it is the case that for every one of these,
+
+20:01.780 --> 20:08.720
+these 10H neurons, we do have some examples that activate them in the active part of the 10H.
+
+20:09.040 --> 20:11.720
+And so, some gradients will flow through, and this neuron will learn.
+
+20:12.280 --> 20:15.120
+And the neuron will change, and it will move, and it will do something.
+
+20:16.260 --> 20:19.800
+But you can sometimes get yourself in cases where you have dead neurons.
+
+20:20.300 --> 20:24.740
+And the way this manifests is that for a 10H neuron, this would be when,
+
+20:25.020 --> 20:27.060
+no matter what inputs you plug in from your data set,
+
+20:27.260 --> 20:31.100
+this 10H neuron always fires completely one or completely negative one.
+
+20:31.100 --> 20:31.760
+And then it will.
+
+20:31.780 --> 20:35.400
+And then it will just not learn, because all the gradients will be just zeroed out.
+
+20:36.480 --> 20:40.840
+This is true not just for 10H, but for a lot of other nonlinearities that people use in neural networks.
+
+20:41.160 --> 20:44.820
+So, we certainly use 10H a lot, but sigmoid will have the exact same issue,
+
+20:45.100 --> 20:46.920
+because it is a squashing neuron.
+
+20:47.580 --> 20:53.320
+And so, the same will be true for sigmoid, but, you know,
+
+20:54.540 --> 20:56.460
+basically the same will actually apply to sigmoid.
+
+20:57.000 --> 20:58.440
+The same will also apply to ReLU.
+
+20:58.920 --> 21:01.680
+So, ReLU has a completely flat region here.
+
+21:01.780 --> 21:08.320
+So, if you have a ReLU neuron, then it is a pass-through, if it is positive.
+
+21:08.680 --> 21:12.260
+And if the pre-activation is negative, it will just shut it off.
+
+21:12.660 --> 21:16.340
+Since the region here is completely flat, then during backpropagation,
+
+21:16.880 --> 21:19.660
+this would be exactly zeroing out the gradient.
+
+21:19.840 --> 21:23.900
+Like, all of the gradient would be set exactly to zero, instead of just like a very,
+
+21:23.900 --> 21:27.580
+very small number, depending on how positive or negative T is.
+
+21:28.540 --> 21:31.100
+And so, you can get, for example, a dead ReLU neuron,
+
+21:31.100 --> 21:34.420
+and a dead ReLU neuron would basically look like...
+
+21:35.320 --> 21:40.520
+Basically, what it is, is if a neuron with a ReLU nonlinearity never activates,
+
+21:41.160 --> 21:45.160
+so, for any examples that you plug in in the dataset, it never turns on,
+
+21:45.260 --> 21:49.220
+it's always in this flat region, then this ReLU neuron is a dead neuron.
+
+21:49.500 --> 21:52.040
+Its weights and bias will never learn.
+
+21:52.120 --> 21:54.680
+They will never get a gradient, because the neuron never activated.
+
+21:55.780 --> 21:58.680
+And this can sometimes happen at initialization, because the weights
+
+21:58.680 --> 22:00.660
+and the biases just make it so that, by chance,
+
+22:00.660 --> 22:01.060
+some neuron will never activate.
+
+22:01.100 --> 22:04.540
+So, the neurons are just forever dead, but it can also happen during optimization.
+
+22:04.920 --> 22:07.340
+If you have, like, a too high of a learning rate, for example,
+
+22:07.600 --> 22:10.100
+sometimes you have these neurons that get too much of a gradient,
+
+22:10.420 --> 22:12.540
+and they get knocked out of the data manifold.
+
+22:12.540 --> 22:17.660
+And what happens is that, from then on, no example ever activates this neuron,
+
+22:17.860 --> 22:19.340
+so this neuron remains dead forever.
+
+22:19.420 --> 22:23.200
+So, it's kind of like a permanent brain damage in a mind of a network.
+
+22:23.900 --> 22:27.220
+And so, sometimes what can happen is, if your learning rate is very high, for example,
+
+22:27.360 --> 22:30.480
+and you have a neural net with ReLU neurons, you train the neural net,
+
+22:30.480 --> 22:31.080
+and you get some...
+
+22:31.100 --> 22:32.120
+last loss.
+
+22:32.580 --> 22:35.860
+But then, actually, what you do is, you go through the entire training set,
+
+22:36.280 --> 22:41.600
+and you forward your examples, and you can find neurons that never activate.
+
+22:42.020 --> 22:43.560
+They are dead neurons in your network.
+
+22:44.080 --> 22:46.000
+And so, those neurons will never turn on.
+
+22:46.440 --> 22:48.040
+And usually, what happens is that, during training,
+
+22:48.400 --> 22:50.280
+these ReLU neurons are changing, moving, etc.
+
+22:50.440 --> 22:53.840
+And then, because of a high gradient, somewhere, by chance, they get knocked off.
+
+22:54.380 --> 22:56.180
+And then, nothing ever activates them.
+
+22:56.340 --> 22:57.740
+And from then on, they are just dead.
+
+22:58.740 --> 23:01.060
+So, that's kind of like a permanent brain damage that can happen.
+
+23:01.220 --> 23:04.180
+So, that's kind of like a permanent brain damage that can happen to some of these neurons.
+
+23:04.940 --> 23:08.520
+These other nonlinearities, like Leaky ReLU, will not suffer from this issue as much,
+
+23:08.780 --> 23:11.600
+because you can see that it doesn't have flat tails.
+
+23:11.860 --> 23:13.640
+You'll almost always get gradients.
+
+23:14.420 --> 23:17.220
+And ReLU is also fairly frequently used.
+
+23:18.000 --> 23:20.720
+It also might suffer from this issue, because it has flat parts.
+
+23:21.840 --> 23:25.420
+So, that's just something to be aware of, and something to be concerned about.
+
+23:25.680 --> 23:29.780
+And in this case, we have way too many activations H,
+
+23:29.780 --> 23:31.060
+that take on extreme values.
+
+23:31.260 --> 23:34.380
+So, because there's no column of white, I think we will be okay.
+
+23:34.380 --> 23:37.200
+And indeed, the network optimizes, and gives us a pretty decent loss.
+
+23:37.720 --> 23:40.280
+But it's just not optimal, and this is not something you want,
+
+23:40.540 --> 23:42.060
+especially during initialization.
+
+23:42.320 --> 23:44.620
+And so, basically, what's happening is that
+
+23:44.880 --> 23:47.700
+this H pre-activation, that's flowing to 10H,
+
+23:48.720 --> 23:50.000
+it's too extreme.
+
+23:50.260 --> 23:50.780
+It's too large.
+
+23:51.020 --> 23:56.920
+It's creating a distribution that is too saturated in both sides of the 10H.
+
+23:57.180 --> 24:00.500
+And it's not something you want, because it means that there's less training
+
+24:00.500 --> 24:01.020
+because there's no column of white.
+
+24:01.260 --> 24:05.420
+And it's not something you want for these neurons, because they update less frequently.
+
+24:05.660 --> 24:06.700
+So, how do we fix this?
+
+24:07.200 --> 24:12.320
+Well, H pre-activation is MCAT, which comes from C.
+
+24:12.580 --> 24:14.380
+So, these are uniform Gaussian.
+
+24:14.880 --> 24:16.940
+But then it's multiplied by W1 plus B1.
+
+24:17.440 --> 24:21.020
+And H pre-act is too far off from 0, and that's causing the issue.
+
+24:21.540 --> 24:26.140
+So, we want this pre-activation to be closer to 0, very similar to what we had with logits.
+
+24:27.180 --> 24:30.240
+So, here, we want actually something very, very similar.
+
+24:31.060 --> 24:34.900
+Now, it's okay to set the biases to a very small number.
+
+24:35.160 --> 24:38.220
+We can either multiply by 001 to get a little bit of entropy.
+
+24:39.500 --> 24:42.320
+I sometimes like to do that, just so that
+
+24:43.600 --> 24:46.680
+there's a little bit of variation and diversity in the original
+
+24:46.940 --> 24:49.240
+initialization of these 10H neurons.
+
+24:49.500 --> 24:52.560
+And I find in practice that that can help optimization a little bit.
+
+24:53.580 --> 24:56.140
+And then the weights, we can also just squash.
+
+24:56.400 --> 24:58.460
+So, let's multiply everything by 0.1.
+
+24:59.220 --> 25:00.500
+Let's rerun the first batch.
+
+25:01.580 --> 25:02.600
+And now, let's look at this.
+
+25:03.100 --> 25:05.160
+And, well, first, let's look at here.
+
+25:06.940 --> 25:09.260
+You see now, because we multiplied W by 0.1,
+
+25:09.500 --> 25:10.780
+we have a much better histogram.
+
+25:11.040 --> 25:14.620
+And that's because the pre-activations are now between negative 1.5 and 1.5.
+
+25:14.880 --> 25:16.680
+And this, we expect much, much less
+
+25:17.180 --> 25:17.700
+white.
+
+25:18.460 --> 25:20.260
+Okay, there's no white.
+
+25:20.780 --> 25:26.920
+So, basically, that's because there are no neurons that saturated above 0.99 in either direction.
+
+25:27.940 --> 25:29.980
+So, it's actually a pretty decent place to be.
+
+25:31.060 --> 25:34.380
+Maybe we can go up a little bit.
+
+25:36.700 --> 25:39.000
+Sorry, am I changing W1 here?
+
+25:39.260 --> 25:40.540
+So, maybe we can go to 0.2.
+
+25:42.060 --> 25:45.900
+Okay, so maybe something like this is a nice distribution.
+
+25:46.420 --> 25:48.720
+So, maybe this is what our initialization should be.
+
+25:49.240 --> 25:52.300
+So, let me now erase these.
+
+25:53.340 --> 25:56.140
+And let me, starting with initialization,
+
+25:56.400 --> 25:59.980
+let me run the full optimization without the break.
+
+26:00.500 --> 26:01.020
+And
+
+26:01.220 --> 26:02.820
+let's see what we get.
+
+26:03.060 --> 26:04.600
+Okay, so the optimization finished.
+
+26:04.860 --> 26:05.880
+And I re-run the loss.
+
+26:06.140 --> 26:07.420
+And this is the result that we get.
+
+26:07.940 --> 26:11.520
+And then, just as a reminder, I put down all the losses that we saw previously in this lecture.
+
+26:12.540 --> 26:14.840
+So, we see that we actually do get an improvement here.
+
+26:15.100 --> 26:16.120
+And just as a reminder,
+
+26:16.380 --> 26:19.460
+we started off with a validation loss of 2.17 when we started.
+
+26:19.960 --> 26:22.020
+By fixing the softmax being confidently wrong,
+
+26:22.520 --> 26:23.800
+we came down to 2.13.
+
+26:24.060 --> 26:26.360
+And by fixing the 10-inch layer being way too saturated,
+
+26:26.620 --> 26:28.160
+we came down to 2.10.
+
+26:28.920 --> 26:30.460
+And the reason this is happening, of course, is because
+
+26:30.460 --> 26:30.980
+I don't initialize.
+
+26:31.220 --> 26:31.780
+Initialization is better.
+
+26:32.040 --> 26:34.340
+And so we're spending more time doing productive training
+
+26:34.600 --> 26:35.120
+instead of
+
+26:36.660 --> 26:39.720
+not very productive training because our gradients are set to zero.
+
+26:39.980 --> 26:42.800
+And we have to learn very simple things like
+
+26:43.060 --> 26:45.100
+the overconfidence of the softmax in the beginning.
+
+26:45.360 --> 26:48.180
+And we're spending cycles just like squashing down the weight matrix.
+
+26:48.940 --> 26:49.460
+So,
+
+26:49.960 --> 26:50.980
+this is illustrating
+
+26:51.240 --> 26:54.060
+basically initialization and its impacts
+
+26:54.320 --> 26:55.340
+on performance
+
+26:55.600 --> 26:58.420
+just by being aware of the internals of these neural nets
+
+26:58.660 --> 26:59.700
+and their activations and their gradients.
+
+26:59.700 --> 27:00.980
+Now,
+
+27:01.240 --> 27:02.520
+we're working with a very small network.
+
+27:02.780 --> 27:05.080
+This is just one-layer multi-layer perception.
+
+27:05.580 --> 27:07.640
+So because the network is so shallow,
+
+27:07.900 --> 27:09.680
+the optimization problem is actually quite easy
+
+27:09.940 --> 27:10.960
+and very forgiving.
+
+27:11.480 --> 27:13.260
+So even though our initialization was terrible,
+
+27:13.520 --> 27:14.540
+the network still learned
+
+27:14.800 --> 27:16.860
+eventually. It just got a bit worse result.
+
+27:17.360 --> 27:19.160
+This is not the case in general, though.
+
+27:19.420 --> 27:20.440
+Once we actually start
+
+27:21.200 --> 27:22.480
+working with much deeper networks
+
+27:22.740 --> 27:24.020
+that have, say, 50 layers,
+
+27:24.540 --> 27:26.580
+things can get much more complicated
+
+27:27.100 --> 27:29.400
+and these problems stack up
+
+27:29.700 --> 27:30.220
+over the years.
+
+27:30.720 --> 27:34.820
+And so you can actually get into a place where the network is basically not training at all
+
+27:35.080 --> 27:36.860
+if your initialization is bad enough.
+
+27:37.900 --> 27:41.220
+And the deeper your network is and the more complex it is, the less forgiving it is
+
+27:41.480 --> 27:42.500
+to some of these errors.
+
+27:43.020 --> 27:44.300
+And so
+
+27:44.800 --> 27:45.820
+it's something to definitely be aware of
+
+27:46.340 --> 27:47.100
+and
+
+27:47.360 --> 27:49.160
+something to scrutinize, something to plot
+
+27:49.420 --> 27:50.440
+and something to be careful with.
+
+27:53.500 --> 27:55.300
+Okay, so that's great that that worked for us.
+
+27:55.560 --> 27:58.880
+But what we have here now is all these magic numbers like .2.
+
+27:59.140 --> 27:59.660
+Like where do I come from?
+
+27:59.700 --> 28:03.780
+up with this and how am i supposed to set these if i have a large neural net with lots and lots
+
+28:03.780 --> 28:09.140
+of layers and so obviously no one does this by hand there's actually some relatively principled
+
+28:09.140 --> 28:15.220
+ways of setting these scales that i would like to introduce to you now so let me paste some code
+
+28:15.220 --> 28:20.580
+here that i prepared just to motivate the discussion of this so what i'm doing here is
+
+28:20.580 --> 28:27.220
+we have some random input here x that is drawn from a gaussian and there's 1000 examples that
+
+28:27.220 --> 28:32.900
+are 10 dimensional and then we have a weighting layer here that is also initialized using gaussian
+
+28:32.900 --> 28:39.620
+just like we did here and we these neurons in the hidden layer look at 10 inputs and there are 200
+
+28:39.620 --> 28:46.260
+neurons in this hidden layer and then we have here just like here in this case the multiplication x
+
+28:46.260 --> 28:53.060
+multiplied by w to get the preactivations of these neurons and basically the analysis here looks at
+
+28:53.060 --> 28:57.060
+okay suppose these are unit from gaussian and these weights are unit from gaussian
+
+28:57.060 --> 28:57.220
+and they kind of begin to self-deitaire and at the same time they are infected from this train
+
+28:57.220 --> 29:04.500
+I do x times w and we forget for now the bias and the non-linearity then what is the mean and the
+
+29:04.500 --> 29:10.180
+standard deviation of these gaussians so in the beginning here the input is just a normal gaussian
+
+29:10.180 --> 29:14.900
+distribution mean zero and the standard deviation is one and the standard deviation again is just
+
+29:14.900 --> 29:20.420
+the measure of a spread of the gaussian but then once we multiply here and we look at the
+
+29:20.420 --> 29:27.380
+histogram of y we see that the mean of course stays the same it's about zero because this is
+
+29:27.380 --> 29:31.780
+a symmetric operation but we see here that the standard deviation has expanded to three
+
+29:32.420 --> 29:36.900
+so the input standard deviation was one but now we've grown to three and so what you're seeing
+
+29:36.900 --> 29:43.700
+in the histogram is that this gaussian is expanding and so we're expanding this gaussian
+
+29:44.580 --> 29:48.500
+from the input and we don't want that we want most of the neural nets to have
+
+29:48.500 --> 29:49.940
+relatively similar activations
+
+29:50.420 --> 29:55.380
+so unit gaussian roughly throughout the neural net and so the question is how do we scale these
+
+29:55.380 --> 30:04.180
+w's to preserve the um to preserve this distribution to remain a gaussian and so
+
+30:04.180 --> 30:10.180
+intuitively if i multiply here these elements of w by a large number let's say by five
+
+30:11.860 --> 30:15.780
+then this gaussian grows and grows in standard deviation
+
+30:15.780 --> 30:20.020
+so now we're at 15. so basically these numbers here in the output y
+
+30:20.020 --> 30:20.340
+take
+
+30:20.420 --> 30:27.300
+more and more extreme values but if we scale it down like say 0.2 then conversely this gaussian
+
+30:27.300 --> 30:33.140
+is getting smaller and smaller and it's shrinking and you can see that the standard deviation is 0.6
+
+30:33.780 --> 30:39.300
+and so the question is what do i multiply by here to exactly preserve the standard deviation
+
+30:39.300 --> 30:43.700
+to be one and it turns out that the correct answer mathematically when you work out through
+
+30:43.700 --> 30:50.420
+the variance of uh this multiplication here is that you are supposed to divide by the square root
+
+30:50.420 --> 30:56.980
+of the fan in the fan in is the basically the uh number of input elements here 10.
+
+30:57.620 --> 31:02.100
+so we are supposed to divide by 10 square root and this is one way to do the square root you
+
+31:02.100 --> 31:07.860
+raise it to a power of 0.5 and that's the same as doing a square root so when you divide by the
+
+31:08.740 --> 31:16.260
+square root of 10 then we see that the output gaussian it has exactly standard deviation of
+
+31:16.260 --> 31:20.260
+1. now unsurprisingly a number of papers have looked into how this works so the number of papers
+
+31:20.420 --> 31:25.680
+but to best initialize neural networks and in the case of multi-layer perceptrons we can have
+
+31:25.680 --> 31:30.400
+fairly deep networks that have these non-linearities in between and we want to make sure that the
+
+31:30.400 --> 31:34.720
+activations are well behaved and they don't expand to infinity or shrink all the way to zero
+
+31:34.720 --> 31:38.520
+and the question is how do we initialize the weights so that these activations take on
+
+31:38.520 --> 31:43.280
+reasonable values throughout the network. Now one paper that has studied this in quite a bit of
+
+31:43.280 --> 31:48.260
+detail that is often referenced is this paper by Kaiming He et al called Delving Deep Interactive
+
+31:48.260 --> 31:53.000
+Fires. Now in this case they actually study convolutional neural networks and they study
+
+31:53.000 --> 31:59.320
+especially the ReLU non-linearity and the P-ReLU non-linearity instead of a 10H non-linearity
+
+31:59.320 --> 32:07.400
+but the analysis is very similar and basically what happens here is for them the ReLU non-linearity
+
+32:07.400 --> 32:13.080
+that they care about quite a bit here is a squashing function where all the negative numbers
+
+32:13.080 --> 32:18.240
+are simply clamped to zero. So the positive numbers are a pass-through but everything
+
+32:18.240 --> 32:23.960
+negative is just set to zero and because you are basically throwing away half of the distribution
+
+32:23.960 --> 32:28.780
+they find in their analysis of the forward activations in the neural net that you have
+
+32:28.780 --> 32:36.700
+to compensate for that with a gain and so here they find that basically when they initialize
+
+32:36.700 --> 32:40.860
+their weights they have to do it with a zero mean Gaussian whose standard deviation is square root
+
+32:40.860 --> 32:47.380
+of two over the fanon. What we have here is we are initializing the Gaussian with the square root
+
+32:47.380 --> 32:48.120
+of fanon.
+
+32:48.240 --> 32:55.920
+This NL here is the fanon. So what we have is square root of one over the fanon because we have
+
+32:55.920 --> 33:01.900
+a division here. Now they have to add this factor of two because of the ReLU which basically
+
+33:01.900 --> 33:06.600
+discards half of the distribution and clamps it at zero and so that's where you get an initial
+
+33:06.600 --> 33:12.880
+factor. Now in addition to that this paper also studies not just the sort of behavior of the
+
+33:12.880 --> 33:17.140
+activations in the forward pass of the neural net but it also studies the back propagation
+
+33:17.140 --> 33:18.220
+and we have to make sure that we have a good distribution of the NeuralNet and we have to
+
+33:18.240 --> 33:23.920
+make sure that the gradients also are well behaved and so because ultimately they end up
+
+33:23.920 --> 33:28.900
+updating our parameters and what they find here through a lot of the analysis that I invite you
+
+33:28.900 --> 33:34.720
+to read through but it's not exactly approachable what they find is basically if you properly
+
+33:34.720 --> 33:40.360
+initialize the forward pass the backward pass is also approximately initialized up to a constant
+
+33:40.360 --> 33:47.580
+factor that has to do with the size of the number of hidden neurons in an early and a late layer.
+
+33:48.240 --> 33:54.400
+But basically they find empirically that this is not a choice that matters too much. Now this
+
+33:54.400 --> 34:00.480
+kymene initialization is also implemented in pytorch so if you go to torch.nn.init documentation
+
+34:00.480 --> 34:05.440
+you'll find kymene normal and in my opinion this is probably the most common way of initializing
+
+34:05.440 --> 34:11.040
+neural networks now and it takes a few keyword arguments here. So number one it wants to know
+
+34:11.760 --> 34:15.600
+the mode. Would you like to normalize the activations or would you like to normalize
+
+34:15.600 --> 34:17.840
+the gradients to to be always the same or would you like to normalize the gradients to to be always
+
+34:18.400 --> 34:23.840
+gaussian with zero mean and a unit or one standard deviation and because they find in the paper that
+
+34:23.840 --> 34:27.440
+this doesn't matter too much most of the people just leave it as the default which is pan in
+
+34:28.160 --> 34:32.240
+and then second pass in the non-linearity that you are using because depending on the
+
+34:32.240 --> 34:37.360
+non-linearity we need to calculate a slightly different gain and so if your non-linearity is
+
+34:37.360 --> 34:43.280
+just linear so there's no non-linearity then the gain here will be one and we have the exact same
+
+34:43.840 --> 34:48.080
+kind of formula that we've got here but if the non-linearity is something else we're going to
+
+34:48.240 --> 34:53.520
+slightly different gain and so if we come up here to the top we see that for example in the case of
+
+34:53.520 --> 34:58.800
+ReLU this gain is a square root of 2 and the reason it's a square root because in this paper
+
+35:02.960 --> 35:09.920
+you see how the 2 is inside of the square root so the gain is a square root of 2. In a case of
+
+35:09.920 --> 35:16.000
+linear or identity we just get a gain of 1. In a case of 10h which is what we're using here
+
+35:16.000 --> 35:17.920
+the advised gain is a 5 over 3.
+
+35:18.720 --> 35:24.640
+And intuitively why do we need a gain on top of the initialization? It's because 10h just like ReLU
+
+35:24.640 --> 35:29.200
+is a contractive transformation so what that means is you're taking the output
+
+35:29.200 --> 35:33.680
+distribution from this matrix multiplication and then you are squashing it in some way now
+
+35:33.680 --> 35:37.600
+ReLU squashes it by taking everything below zero and clamping it to zero.
+
+35:37.600 --> 35:41.920
+10h also squashes it because it's a contractive operation it will take the tails and it will
+
+35:42.960 --> 35:48.220
+squeeze them in and so in order to fight the squeezing in we need to boost the weight of the
+
+35:48.240 --> 35:54.020
+a little bit so that we renormalize everything back to unit standard deviation. So that's why
+
+35:54.020 --> 35:58.200
+there's a little bit of a gain that comes out. Now, I'm skipping through this section a little
+
+35:58.200 --> 36:01.840
+bit quickly, and I'm doing that actually intentionally. And the reason for that is
+
+36:01.840 --> 36:07.660
+because about seven years ago when this paper was written, you had to actually be extremely careful
+
+36:07.660 --> 36:12.260
+with the activations and the gradients and their ranges and their histograms, and you had to be
+
+36:12.260 --> 36:16.360
+very careful with the precise setting of gains and the scrutinizing of the nonlinearities used and so
+
+36:16.360 --> 36:21.120
+on. And everything was very finicky and very fragile, and it had to be very properly arranged
+
+36:21.120 --> 36:25.340
+for the neural net to train, especially if your neural net was very deep. But there are a number
+
+36:25.340 --> 36:29.260
+of modern innovations that have made everything significantly more stable and more well-behaved,
+
+36:29.360 --> 36:34.540
+and it's become less important to initialize these networks exactly right. And some of those
+
+36:34.540 --> 36:38.420
+modern innovations, for example, are residual connections, which we will cover in the future,
+
+36:39.080 --> 36:44.640
+the use of a number of normalization layers, like for example, batch normalization,
+
+36:44.640 --> 36:46.340
+layer normalization, group normalization, and so on.
+
+36:46.360 --> 36:52.860
+And number three, much better optimizers, not just stochastic gradient descent, the simple
+
+36:52.860 --> 36:58.620
+optimizer we're basically using here, but slightly more complex optimizers like RMSPROP and especially
+
+36:58.620 --> 37:03.980
+ADAM. And so all of these modern innovations make it less important for you to precisely calibrate
+
+37:03.980 --> 37:08.920
+the initialization of the neural net. All that being said, in practice, what should we do?
+
+37:09.420 --> 37:14.340
+In practice, when I initialize these neural nets, I basically just normalize my weights by the square
+
+37:14.340 --> 37:14.640
+root of the fan-in. So basically, I'm going to normalize my weights by the square root of the
+
+37:14.640 --> 37:16.340
+fan-in. And so I'm going to normalize my weights by the square root of the fan-in. So basically,
+
+37:16.360 --> 37:23.880
+roughly what we did here is what I do. Now, if we want to be exactly accurate here, and go by
+
+37:24.920 --> 37:31.000
+init of kind of normal, this is how we would implement it. We want to set the standard deviation
+
+37:31.000 --> 37:38.840
+to be gain over the square root of fan-in, right? So to set the standard deviation of our weights,
+
+37:38.840 --> 37:44.600
+we will proceed as follows. Basically, when we have torch dot random, and let's say I just create
+
+37:44.600 --> 37:46.340
+a thousand numbers, we can look at the standard deviation of our weights, we can look at the
+
+37:46.360 --> 37:50.200
+standard deviation of this and, of course, that's one, that's the amount of spread. Let's make
+
+37:50.200 --> 37:55.920
+this a bit bigger, so it's closer to one. So that's the spread of the Gaussian of zero mean
+
+37:55.920 --> 38:00.280
+and unit standard deviation. Now, basically, when you take these, and you multiply by,
+
+38:00.280 --> 38:05.780
+say, point two, that basically scales down the Gaussian, and that makes its standard deviation
+
+38:05.780 --> 38:09.780
+point two. So basically, the number that you multiply by here ends up being the standard
+
+38:09.780 --> 38:13.800
+deviation of this Gaussian. So here, this is a standard deviation point two Gaussian. So this is
+
+38:13.800 --> 38:14.780
+a standard deviation point two Gaussian. And then you can right click the selection tool, and you
+
+38:14.780 --> 38:15.680
+can do something with the name of the operation. So in the aposemetics and the operation, that is going to
+
+38:15.680 --> 38:15.840
+give you the desired values, if you see an unnecessary deviation from one to the other. And itack will also
+
+38:15.840 --> 38:23.040
+Gaussian here when we sample rw1. But we want to set the standard deviation to gain over square
+
+38:23.040 --> 38:30.660
+root of fan mode, which is fanon. So in other words, we want to multiply by gain, which for 10h
+
+38:30.660 --> 38:49.180
+is 5 over 3. 5 over 3 is the gain. And then times, or I guess, sorry, divide square root of
+
+38:49.180 --> 38:55.260
+the fanon. And in this example here, the fanon was 10. And I just noticed that actually here,
+
+38:55.480 --> 39:00.420
+the fanon for w1 is actually n embed times block size, which as you will recall,
+
+39:00.520 --> 39:00.640
+is actually 10. And so we want to set the standard deviation to gain over square root of
+
+39:00.640 --> 39:04.740
+30. And that's because each character is 10 dimensional, but then we have three of them,
+
+39:04.780 --> 39:09.120
+and we concatenate them. So actually, the fanon here was 30. And I should have used 30 here,
+
+39:09.220 --> 39:15.500
+probably. But basically, we want 30 square root. So this is the number, this is what our standard
+
+39:15.500 --> 39:21.020
+deviation we want to be. And this number turns out to be 0.3. Whereas here, just by fiddling
+
+39:21.020 --> 39:25.140
+with it and looking at the distribution and making sure it looks okay, we came up with 0.2.
+
+39:25.660 --> 39:30.120
+And so instead, what we want to do here is we want to make the standard deviation be,
+
+39:30.120 --> 39:42.420
+5 over 3, which is our gain, divide this amount times 0.2 square root. And these brackets here
+
+39:42.420 --> 39:47.280
+are not that necessary, but I'll just put them here for clarity. This is basically what we want.
+
+39:47.480 --> 39:53.100
+This is the kymene in it, in our case, for a 10h non-linearity. And this is how we would
+
+39:53.100 --> 39:59.660
+initialize the neural net. And so we're multiplying by 0.3 instead of multiplying by 0.2.
+
+40:00.120 --> 40:07.380
+And so we can initialize this way. And then we can train the neural net and see what we get.
+
+40:08.040 --> 40:12.760
+Okay, so I trained the neural net, and we end up in roughly the same spot. So looking at the
+
+40:12.760 --> 40:18.300
+validation loss, we now get 2.10. And previously, we also had 2.10. And there's a little bit of a
+
+40:18.300 --> 40:22.340
+difference, but that's just the randomness of the process, I suspect. But the big deal, of course,
+
+40:22.340 --> 40:29.840
+is we get to the same spot. But we did not have to introduce any magic numbers that we got from just
+
+40:30.120 --> 40:34.660
+that histograms and guess and checking. We have something that is semi-principled and will scale
+
+40:34.660 --> 40:40.740
+us to much bigger networks and something that we can sort of use as a guide. So I mentioned that
+
+40:40.740 --> 40:45.120
+the precise setting of these initializations is not as important today due to some modern
+
+40:45.120 --> 40:48.780
+innovations. And I think now is a pretty good time to introduce one of those modern innovations,
+
+40:49.340 --> 40:54.900
+and that is batch normalization. So batch normalization came out in 2015 from a team at
+
+40:54.900 --> 40:59.880
+Google. And it was an extremely impactful paper because it made it possible to train
+
+41:00.120 --> 41:05.800
+very deep neural nets quite reliably. And it basically just worked. So here's what batch
+
+41:05.800 --> 41:12.120
+normalization does, and let's implement it. Basically, we have these hidden states,
+
+41:12.120 --> 41:19.860
+H preact, right? And we were talking about how we don't want these pre-activation states to be way
+
+41:19.860 --> 41:25.200
+too small, because then the 10H is not doing anything. But we don't want them to be too large,
+
+41:25.200 --> 41:29.860
+because then the 10H is saturated. In fact, we want them to be roughly, roughly gaussian.
+
+41:30.120 --> 41:35.120
+So zero mean and a unit or one standard deviation, at least at initialization.
+
+41:35.120 --> 41:40.500
+So the insight from the batch normalization paper is, okay, you have these hidden states,
+
+41:40.500 --> 41:46.380
+and you'd like them to be roughly gaussian, then why not take the hidden states and just
+
+41:46.380 --> 41:51.360
+normalize them to be gaussian? And it sounds kind of crazy, but you can just do that because
+
+41:51.360 --> 41:58.320
+standardizing hidden states so that they're unit gaussian is a perfectly differentiable operation,
+
+41:58.320 --> 42:00.100
+as we'll soon see. And so that was kind of the first step. And then the second step was to
+
+42:00.120 --> 42:04.360
+kind of like the big insight in this paper. And when I first read it, my mind was blown,
+
+42:04.360 --> 42:08.120
+because you can just normalize these hidden states. And if you'd like unit gaussian states
+
+42:08.120 --> 42:13.480
+in your network, at least initialization, you can just normalize them to be unit gaussian.
+
+42:14.120 --> 42:19.080
+So let's see how that works. So we're going to scroll to our pre activations here just before
+
+42:19.080 --> 42:23.880
+they enter into the 10H. Now, the idea again, is remember, we're trying to make these roughly
+
+42:23.880 --> 42:29.640
+gaussian. And that's because if these are way too small numbers, then the 10H here is kind of inactive.
+
+42:30.120 --> 42:35.800
+But if these are very large numbers, then the 10H is way too saturated and gradient in the flow.
+
+42:36.320 --> 42:41.400
+So we'd like this to be roughly gaussian. So the insight in batch normalization, again,
+
+42:41.500 --> 42:48.320
+is that we can just standardize these activations so they are exactly gaussian. So here, H preact
+
+42:48.320 --> 42:55.000
+has a shape of 32 by 200, 32 examples by 200 neurons in the hidden layer.
+
+42:55.660 --> 42:59.900
+So basically, what we can do is we can take H preact, and we can just calculate the mean,
+
+43:01.080 --> 43:07.240
+and the mean we want to calculate across the zero dimension. And we want to also keep them as true,
+
+43:07.880 --> 43:15.400
+so that we can easily broadcast this. So the shape of this is one by 200. In other words,
+
+43:15.400 --> 43:22.520
+we are doing the mean over all the elements in the batch. And similarly, we can calculate
+
+43:22.520 --> 43:30.040
+the standard deviation of these activations. And that will also be one by 200. Now in this paper,
+
+43:30.120 --> 43:36.620
+they have the sort of prescription here. And see, here we are calculating the mean,
+
+43:36.880 --> 43:44.440
+which is just taking the average value of any neuron's activation. And then their standard
+
+43:44.440 --> 43:50.700
+deviation is basically kind of like the measure of the spread that we've been using, which is
+
+43:50.700 --> 43:57.440
+the distance of every one of these values away from the mean, and that squared and averaged.
+
+43:58.080 --> 43:59.040
+So that's the...
+
+44:00.120 --> 44:03.660
+That's the variance. And then if you want to take the standard deviation you would
+
+44:03.660 --> 44:09.100
+square root the variance to get the standard deviation. So these are the two that we're
+
+44:09.100 --> 44:14.300
+calculating. And now we're going to normalize or standardize these x's by subtracting the mean,
+
+44:14.300 --> 44:21.540
+and dividing by the standard deviation. So basically, we're taking H preact, and we subtract
+
+44:23.140 --> 44:23.640
+the mean,
+
+44:23.640 --> 44:36.640
+and then we divide by the standard deviation this is exactly what these two std and mean
+
+44:36.640 --> 44:44.380
+are calculating oops sorry this is the mean and this is the variance you see how the sigma is
+
+44:44.380 --> 44:48.280
+the standard deviation usually so this is sigma square which is variance is the square of the
+
+44:48.280 --> 44:54.560
+standard deviation so this is how you standardize these values and what this will do is that every
+
+44:54.560 --> 45:00.540
+single neuron now and its firing rate will be exactly unit gaussian on these 32 examples at
+
+45:00.540 --> 45:05.320
+least of this batch that's why it's called batch normalization we are normalizing these batches
+
+45:05.320 --> 45:11.460
+and then we could in principle train this notice that calculating the mean and your standard
+
+45:11.460 --> 45:15.660
+deviation these are just mathematical formulas they're perfectly differentiable all this is
+
+45:15.660 --> 45:17.760
+perfectly differentiable and we can just train this
+
+45:17.760 --> 45:24.420
+the problem is you actually won't achieve a very good result with this and the reason for that is
+
+45:24.420 --> 45:31.260
+we want these to be roughly gaussian but only at initialization but we don't want these to be to
+
+45:31.260 --> 45:37.640
+be forced to be gaussian always we we'd like to allow the neural net to move this around to
+
+45:37.640 --> 45:42.460
+potentially make it more diffuse to make it more sharp to make some 10h neurons maybe be more
+
+45:42.460 --> 45:47.280
+trigger more trigger happy or less trigger happy so we'd like this distribution to move around
+
+45:47.280 --> 45:47.740
+and we'd like to allow the neural net to move around and we'd like to allow the distribution
+
+45:47.740 --> 45:51.420
+to move around and we'd like the back propagation to tell us how the distribution should move around
+
+45:52.300 --> 45:58.220
+and so in addition to this idea of standardizing the activations at any point in the network
+
+45:59.180 --> 46:04.540
+we have to also introduce this additional component in the paper here described as scale
+
+46:04.540 --> 46:09.580
+and shift and so basically what we're doing is we're taking these normalized inputs and we are
+
+46:09.580 --> 46:15.420
+additionally scaling them by some gain and offsetting them by some bias to get our final
+
+46:15.420 --> 46:16.780
+output from this layer
+
+46:17.740 --> 46:22.860
+and so what that amounts to is the following we are going to allow a batch normalization gain
+
+46:23.740 --> 46:30.460
+to be initialized at just a once and the once will be in the shape of one by n hidden
+
+46:32.300 --> 46:36.620
+and then we also will have a bn bias which will be torched at zeros
+
+46:37.580 --> 46:45.900
+and it will also be of the shape n by one by n hidden and then here the bn gain will multiply this
+
+46:45.900 --> 46:51.900
+and the bn bias will offset it here so because this is initialized to one and this to zero
+
+46:51.900 --> 46:58.380
+initialization each neuron's firing values in this batch will be exactly unit gaussian
+
+46:58.860 --> 47:02.460
+and we'll have nice numbers no matter what the distribution of the hp act is coming in
+
+47:03.580 --> 47:07.180
+coming out it will be unit gaussian for each neuron and that's roughly what we want at least
+
+47:07.740 --> 47:13.820
+at initialization and then during optimization we'll be able to break down gash data to a bunch
+
+47:13.820 --> 47:15.740
+of neurons or groups of neurons and we could
+
+47:15.740 --> 47:21.740
+backpropagate into bngain and bmbias and change them so the network is given the full ability to
+
+47:21.740 --> 47:27.740
+do with this whatever it wants internally. Here we just have to make sure that we
+
+47:29.260 --> 47:33.260
+include these in the parameters of the neural net because they will be trained with
+
+47:33.260 --> 47:39.180
+backpropagation. So let's initialize this and then we should be able to train.
+
+47:39.180 --> 47:51.180
+And then we're going to also copy this line which is the batch normalization layer
+
+47:51.740 --> 47:55.660
+here on a single line of code and we're going to swing down here and we're also going to
+
+47:56.380 --> 47:58.060
+do the exact same thing at test time here.
+
+48:01.660 --> 48:04.140
+So similar to train time we're going to normalize
+
+48:04.860 --> 48:08.940
+and then scale and that's going to give us our train and validation loss.
+
+48:09.740 --> 48:12.620
+And we'll see in a second that we're actually going to change this a little bit but for now
+
+48:12.620 --> 48:17.660
+I'm going to keep it this way. So I'm just going to wait for this to converge. Okay so I allowed
+
+48:17.660 --> 48:21.900
+the neural nets to converge here and when we scroll down we see that our validation loss here
+
+48:21.900 --> 48:27.740
+is 2.10 roughly which I wrote down here and we see that this is actually kind of comparable to some
+
+48:27.740 --> 48:33.340
+of the results that we've achieved previously. Now I'm not actually expecting an improvement in this
+
+48:33.340 --> 48:37.740
+case and that's because we are dealing with a very simple neural net that has just a single hidden
+
+48:37.740 --> 48:38.780
+layer. So we're going to go ahead and do that.
+
+48:39.340 --> 48:43.500
+So in fact in this very simple case of just one hidden layer we were able to
+
+48:43.500 --> 48:48.300
+actually calculate what the scale of w should be to make these pre-activations
+
+48:48.300 --> 48:52.460
+already have a roughly Gaussian shape. So the batch normalization is not doing much here
+
+48:53.100 --> 48:57.020
+but you might imagine that once you have a much deeper neural net that has lots of different
+
+48:57.020 --> 49:02.220
+types of operations and there's also for example residual connections which we'll cover and so on
+
+49:02.780 --> 49:09.020
+it will become basically very very difficult to tune the scales of your weight matrices such
+
+49:09.020 --> 49:13.900
+that all the activations throughout the neural net are roughly Gaussian and so that's going to
+
+49:13.900 --> 49:19.340
+become very quickly intractable but compared to that it's going to be much much easier to sprinkle
+
+49:19.340 --> 49:25.100
+batch normalization layers throughout the neural net so in particular it's common to look at every
+
+49:25.100 --> 49:29.420
+single linear layer like this one this is a linear layer multiplying by a weight matrix and adding a
+
+49:29.420 --> 49:36.140
+bias or for example convolutions which we'll cover later and also perform basically a multiplication
+
+49:36.140 --> 49:41.420
+with a weight matrix but in a more spatially structured format it's custom it's customary
+
+49:41.420 --> 49:46.860
+to take this linear layer or convolutional layer and append a batch normalization layer right after
+
+49:46.860 --> 49:52.380
+it to control the scale of these activations at every point in the neural net so we'd be adding
+
+49:52.380 --> 49:56.380
+these batch norm layers throughout the neural net and then this controls the scale of these
+
+49:56.380 --> 50:02.060
+activations throughout the neural net it doesn't require us to do perfect mathematics and care
+
+50:02.060 --> 50:05.900
+about the activation distributions for all these different types of neural network
+
+50:06.140 --> 50:08.620
+in general but it does require us to do perfect mathematics in order to be able to do this
+
+50:08.620 --> 50:13.420
+so what we're doing here is we're taking a bunch of basic lego building blocks that you might want
+
+50:13.420 --> 50:17.660
+to introduce into your neural net and it significantly stabilizes the training and
+
+50:17.660 --> 50:21.820
+that's why these layers are quite popular now the stability offered by batch normalization
+
+50:21.820 --> 50:26.380
+actually comes at a terrible cost and that cost is that if you think about what's happening here
+
+50:27.020 --> 50:33.420
+something something terribly strange and unnatural is happening it used to be that we have a single
+
+50:33.420 --> 50:35.020
+example feeding into a neural net and then we calculate its activations and its logits and this
+
+50:35.020 --> 50:35.760
+is a deterministic
+
+50:36.140 --> 50:41.720
+sort of process so you arrive at some logits for this example and then because of efficiency of
+
+50:41.720 --> 50:46.120
+training we suddenly started to use batches of examples but those batches of examples were
+
+50:46.120 --> 50:50.980
+processed independently and it was just an efficiency thing but now suddenly in batch
+
+50:50.980 --> 50:55.140
+normalization because of the normalization through the batch we are coupling these examples
+
+50:55.140 --> 51:01.100
+mathematically and in the forward pass and the backward pass of the neural net so now the hidden
+
+51:01.100 --> 51:06.540
+state activations h preact and your logits for any one input example are not just a function of
+
+51:06.540 --> 51:11.340
+that example and its input but they're also a function of all the other examples that happen
+
+51:11.340 --> 51:16.960
+to come for a ride in that batch and these examples are sampled randomly and so what's
+
+51:16.960 --> 51:20.980
+happening is for example when you look at h preact that's going to feed into h the hidden
+
+51:20.980 --> 51:26.000
+state activations for for example for for any one of these input examples is going to actually
+
+51:26.000 --> 51:31.080
+change slightly depending on what other examples there are in the batch and and
+
+51:31.080 --> 51:36.540
+depending on what other examples happen to come for a ride h is going to change suddenly and it's
+
+51:36.540 --> 51:41.040
+going to like jitter if you imagine sampling different examples because the statistics of
+
+51:41.040 --> 51:45.860
+the mean understanding deviation are going to be impacted and so you'll get a jitter for h and
+
+51:45.860 --> 51:51.920
+you'll get a jitter for logits and you think that this would be a bug or something undesirable
+
+51:51.920 --> 51:58.320
+but in a very strange way this actually turns out to be good in neural network training and
+
+51:58.320 --> 52:00.900
+as a side effect and the reason for that is that
+
+52:01.080 --> 52:05.560
+you can think of this as kind of like a regularizer because what's happening is you have your input
+
+52:05.560 --> 52:10.600
+and you get your h and then depending on the other examples this is jittering a bit and so what that
+
+52:10.600 --> 52:15.160
+does is that it's effectively padding out any one of these input examples and it's introducing a
+
+52:15.160 --> 52:20.600
+little bit of entropy and because of the padding out it's actually kind of like a form of data
+
+52:20.600 --> 52:25.720
+augmentation which we'll cover in the future and it's kind of like augmenting the input a little
+
+52:25.720 --> 52:30.700
+bit and it's jittering it and that makes it harder for the neural nets to overfit these concrete
+
+52:31.080 --> 52:36.180
+examples so by introducing all this noise it actually like pads out the examples and it
+
+52:36.180 --> 52:41.700
+regularizes the neural net and that's one of the reasons why deceivingly as a second order effect
+
+52:41.700 --> 52:47.160
+this is actually a regularizer and that has made it harder for us to remove the use of batch
+
+52:47.160 --> 52:52.900
+normalization because basically no one likes this property that the the examples in the batch are
+
+52:52.900 --> 52:58.260
+coupled mathematically and in the forward pass and at least all kinds of like strange results
+
+52:58.260 --> 53:00.300
+we'll go into some of that in a second as well
+
+53:01.080 --> 53:06.180
+um and it leads to a lot of bugs and um and so on and so no one likes this property
+
+53:06.940 --> 53:11.700
+and so people have tried to deprecate the use of batch normalization and move to other
+
+53:11.700 --> 53:15.900
+normalization techniques that do not couple the examples of a batch examples are layer
+
+53:15.900 --> 53:20.620
+normalization instance normalization group normalization and so on and we'll commerce
+
+53:20.620 --> 53:26.260
+we'll come or some of these uh later um but basically long story short batch normalization
+
+53:26.260 --> 53:30.220
+was the first kind of normalization layer to be introduced it worked extremely well
+
+53:31.080 --> 53:37.140
+it happened to have this regularizing effect it stabilized training and people have been trying
+
+53:37.140 --> 53:42.300
+to remove it and move to some of the other normalization techniques but it's been hard
+
+53:42.300 --> 53:46.860
+because it just works quite well and some of the reason that it works quite well is again because
+
+53:46.860 --> 53:52.100
+of this regularizing effect and because of the because it is quite effective at controlling the
+
+53:52.100 --> 53:56.940
+activations and their distributions so that's kind of like the brief story of batch normalization
+
+53:57.540 --> 54:00.140
+and i'd like to show you one of the other weird
+
+54:01.080 --> 54:05.940
+outcomes of this coupling so here's one of the strange outcomes that i only glossed over
+
+54:05.940 --> 54:12.100
+previously when i was evaluating the loss on the validation set basically once we've trained a
+
+54:12.100 --> 54:17.280
+neural net we'd like to deploy it in some kind of a setting and we'd like to be able to feed in a
+
+54:17.280 --> 54:22.300
+single individual example and get a prediction out from our neural net but how do we do that
+
+54:22.300 --> 54:26.960
+when our neural net now in a forward pass estimates the statistics of the mean understanding deviation
+
+54:26.960 --> 54:31.060
+of a batch the neural net expects batches as an input now so how do we feed in a batch
+
+54:31.080 --> 54:36.760
+in a single example and get sensible results out and so the proposal in the batch normalization
+
+54:36.760 --> 54:42.360
+paper is the following what we would like to do here is we would like to basically have a step
+
+54:42.920 --> 54:50.440
+after training that calculates and sets the bathroom mean and standard deviation a single time
+
+54:50.440 --> 54:54.600
+over the training set and so i wrote this code here in interest of time
+
+54:55.160 --> 54:59.960
+and we're going to call what's called calibrate the bathroom statistics and basically what we do
+
+54:59.960 --> 55:00.280
+is
+
+55:01.080 --> 55:07.320
+telling pytorch that none of this we will call a dot backward on and it's going to be a bit
+
+55:07.320 --> 55:12.200
+more efficient we're going to take the training set get the pre-activations for every single
+
+55:12.200 --> 55:16.680
+training example and then one single time estimate the mean and standard deviation over the entire
+
+55:16.680 --> 55:21.400
+training set and then we're going to get b and mean and b and standard deviation and now these
+
+55:21.400 --> 55:27.000
+are fixed numbers estimating over the entire training set and here instead of estimating it
+
+55:27.720 --> 55:30.840
+dynamically we are going to instead
+
+55:31.080 --> 55:36.680
+here use b and mean and here we're just going to use b and standard deviation
+
+55:38.120 --> 55:43.560
+so at test time we are going to fix these clamp them and use them during inference and now
+
+55:45.480 --> 55:51.080
+you see that we get basically identical result but the benefit that we've gained is that we
+
+55:51.080 --> 55:55.720
+can now also forward a single example because the mean and standard deviation are now fixed
+
+55:55.720 --> 56:00.760
+sort of tensors that said nobody actually wants to estimate this mean and standard deviation
+
+56:01.080 --> 56:06.920
+as a second stage after neural network training because everyone is lazy and so this batch
+
+56:06.920 --> 56:11.560
+normalization paper actually introduced one more idea which is that we can we can estimate the mean
+
+56:11.560 --> 56:17.320
+and standard deviation in a running matter running manner during training of the neural net and then
+
+56:17.320 --> 56:22.360
+we can simply just have a single stage of training and on the side of that training we are estimating
+
+56:22.360 --> 56:27.720
+the running mean and standard deviation so let's see what that would look like let me basically
+
+56:27.720 --> 56:32.280
+take the mean here that we are estimating on the batch and let me call this b and mean on the i
+
+56:32.280 --> 56:50.680
+iteration um and then here this is b and std um b and std i okay uh and the mean comes here and the
+
+56:50.680 --> 56:56.280
+std comes here so so far i've done nothing i've just moved around and i created these extra
+
+56:56.280 --> 56:57.640
+variables for the mean and standard deviation
+
+56:57.720 --> 57:02.840
+and i've put them here so so far nothing has changed but what we're going to do now is we're
+
+57:02.840 --> 57:07.480
+going to keep a running mean of both of these values during training so let me swing up here
+
+57:07.480 --> 57:17.400
+and let me create a bn mean underscore running and i'm going to initialize it at zeros and then bn std
+
+57:17.400 --> 57:27.160
+running which i'll initialize at once because in the beginning because of the way we initialized w1
+
+57:27.720 --> 57:32.520
+uh and b1 each preact will be roughly unit gaussian so the mean will be roughly zero and
+
+57:32.520 --> 57:37.720
+the standard deviation roughly one so i'm going to initialize these that way but then here i'm
+
+57:37.720 --> 57:44.680
+going to update these and in pytorch um these uh mean and standard deviation that are running
+
+57:45.320 --> 57:48.440
+they're not actually part of the gradient based optimization we're never going to derive
+
+57:48.440 --> 57:52.520
+gradients with respect to them they're they're updated on the side of training
+
+57:53.480 --> 57:57.320
+and so what we're going to do here is we're going to say with torch.nograd
+
+57:57.960 --> 58:03.000
+telling pytorch that the update here is not supposed to be building out a graph because
+
+58:03.000 --> 58:09.000
+there will be no dot backward but this running mean is basically going to be 0.99
+
+58:10.120 --> 58:20.520
+9 times the current value plus 0.001 times the this value this new mean and
+
+58:21.160 --> 58:25.640
+in the same way bn std running will be mostly what it used to be
+
+58:28.520 --> 58:32.920
+but it will receive a small update in the direction of what the current standard deviation is
+
+58:34.920 --> 58:39.080
+and as you're seeing here this update is outside and on the side of
+
+58:39.080 --> 58:44.360
+the gradient based optimization and it's simply being updated not using gradient descent it's just
+
+58:44.360 --> 58:51.960
+being updated using a janky like smooth sort of running mean manner
+
+58:53.080 --> 58:57.640
+and so while the network is training and these pre-activations are sort of changing your
+
+58:57.720 --> 59:02.720
+shifting around during back propagation, we are keeping track of the typical mean and standard
+
+59:02.720 --> 59:10.420
+deviation, and we're estimating them once. And when I run this, now I'm keeping track of this
+
+59:10.420 --> 59:15.100
+in a running manner. And what we're hoping for, of course, is that the bnmean underscore running
+
+59:15.100 --> 59:20.840
+and bnmean underscore std are going to be very similar to the ones that we've calculated here
+
+59:20.840 --> 59:26.500
+before. And that way, we don't need a second stage, because we've sort of combined the two stages,
+
+59:26.500 --> 59:29.700
+and we've put them on the side of each other, if you want to look at it that way.
+
+59:30.680 --> 59:35.660
+And this is how this is also implemented in the batch normalization layer in PyTorch. So during
+
+59:35.660 --> 59:40.500
+training, the exact same thing will happen. And then later, when you're using inference,
+
+59:41.040 --> 59:46.380
+it will use the estimated running mean of both the mean and standard deviation of those hidden
+
+59:46.380 --> 59:51.660
+states. So let's wait for the optimization to converge. And hopefully, the running mean and
+
+59:51.660 --> 59:56.280
+standard deviation are roughly equal to these two. And then we can simply use it here. And we don't
+
+59:56.280 --> 59:56.480
+need to do that. So let's wait for the optimization to converge. And hopefully, the running mean and
+
+59:56.480 --> 59:56.540
+standard deviation are roughly equal to these two. And then hopefully, the running mean and
+
+59:56.540 --> 59:56.660
+standard deviation are roughly equal to these two. And hopefully, the running mean and
+
+59:56.660 --> 01:00:02.180
+this stage of explicit calibration at the end. Okay, so the optimization finished. I'll rerun the
+
+01:00:02.180 --> 01:00:09.340
+explicit estimation. And then the bnmean from the explicit estimation is here. And bnmean from the
+
+01:00:09.340 --> 01:00:16.980
+running estimation during the optimization, you can see is very, very similar. It's not identical,
+
+01:00:16.980 --> 01:00:25.180
+but it's pretty close. And in the same way, bnstd is this. And bnstd running is this.
+
+01:00:25.180 --> 01:00:30.880
+As you can see that once again, they are fairly similar values, not identical, but pretty close.
+
+01:00:31.720 --> 01:00:36.680
+And so then here, instead of bnmean, we can use the bnmean running. Instead of bnstd,
+
+01:00:36.680 --> 01:00:43.080
+we can use bnstd running. And hopefully, the validation loss will not be impacted too much.
+
+01:00:44.320 --> 01:00:50.200
+Okay, so basically identical. And this way, we've eliminated the need for this explicit
+
+01:00:50.200 --> 01:00:54.960
+stage of calibration, because we are doing it inline over here. Okay, so we're almost done with
+
+01:00:54.960 --> 01:00:58.960
+batch normalization. There are only two more notes that I'd like to make. Number one, I've
+
+01:00:58.960 --> 01:01:04.160
+skipped a discussion over what is this plus epsilon doing here. This epsilon is usually like some small
+
+01:01:04.160 --> 01:01:08.240
+fixed number, for example, one e negative five by default. And what it's doing is that it's
+
+01:01:08.240 --> 01:01:13.520
+basically preventing a division by zero, in the case that the variance over your batch
+
+01:01:14.320 --> 01:01:19.600
+is exactly zero. In that case, here, we normally have a division by zero. But because of the plus
+
+01:01:19.600 --> 01:01:24.240
+epsilon, this is going to become a small number in the denominator instead, and things will be more
+
+01:01:24.240 --> 01:01:24.940
+well behaved.
+
+01:01:24.960 --> 01:01:29.520
+So feel free to also add a plus epsilon here of a very small number, it doesn't actually
+
+01:01:29.520 --> 01:01:33.760
+substantially change the result, I'm going to skip it in our case, just because this is unlikely to
+
+01:01:33.760 --> 01:01:38.400
+happen in our very simple example here. And the second thing I want you to notice is that we're
+
+01:01:38.400 --> 01:01:43.520
+being wasteful here. And it's very subtle. But right here, where we are adding the bias
+
+01:01:43.520 --> 01:01:49.440
+into H preact, these biases now are actually useless, because we're adding them to the H
+
+01:01:49.440 --> 01:01:54.240
+preact. But then we are calculating the mean for every one of these neurons,
+
+01:01:54.240 --> 01:01:59.760
+and subtracting it. So whatever bias you add here is going to get subtracted right here.
+
+01:02:00.640 --> 01:02:04.480
+And so these biases are not doing anything. In fact, they're being subtracted out,
+
+01:02:04.480 --> 01:02:08.560
+and they don't impact the rest of the calculation. So if you look at b1.grad,
+
+01:02:08.560 --> 01:02:12.480
+it's actually going to be zero, because it's being subtracted out and doesn't actually have any
+
+01:02:12.480 --> 01:02:17.120
+effect. And so whenever you're using batch normalization layers, then if you have any weight
+
+01:02:17.120 --> 01:02:22.080
+layers before, like a linear or a comb or something like that, you're better off coming here
+
+01:02:22.080 --> 01:02:23.600
+and just like not using bias.
+
+01:02:24.240 --> 01:02:27.680
+So you don't want to use bias. And then here, you don't want to
+
+01:02:28.400 --> 01:02:33.600
+add it because that's spurious. Instead, we have this batch normalization bias here.
+
+01:02:33.600 --> 01:02:38.800
+And that batch normalization bias is now in charge of the biasing of this distribution,
+
+01:02:38.800 --> 01:02:44.720
+instead of this b1 that we had here originally. And so basically, the batch normalization layer
+
+01:02:44.720 --> 01:02:49.920
+has its own bias. And there's no need to have a bias in the layer before it, because that bias
+
+01:02:49.920 --> 01:02:54.160
+is going to be subtracted out anyway. So that's the other small detail to be careful with sometimes.
+
+01:02:54.240 --> 01:02:59.360
+It's not going to do anything catastrophic. This b1 will just be useless. It will never get any
+
+01:02:59.360 --> 01:03:03.760
+gradient. It will not learn. It will stay constant. And it's just wasteful. But it doesn't actually
+
+01:03:04.400 --> 01:03:09.680
+really impact anything otherwise. Okay, so I rearranged the code a little bit with comments.
+
+01:03:09.680 --> 01:03:12.800
+And I just wanted to give a very quick summary of the batch normalization layer.
+
+01:03:13.520 --> 01:03:18.800
+We are using batch normalization to control the statistics of activations in the neural net.
+
+01:03:19.520 --> 01:03:24.160
+It is common to sprinkle batch normalization layer across the neural net. And usually, we will play
+
+01:03:24.240 --> 01:03:30.160
+it after layers that have multiplications, like for example, a linear layer or a convolutional
+
+01:03:30.160 --> 01:03:37.520
+layer, which we may cover in the future. Now, the batch normalization internally has parameters
+
+01:03:37.520 --> 01:03:43.440
+for the gain and the bias. And these are trained using backpropagation. It also has two buffers.
+
+01:03:44.240 --> 01:03:48.720
+The buffers are the mean and the standard deviation, the running mean and the running
+
+01:03:48.720 --> 01:03:53.520
+mean of the standard deviation. And these are not trained using backpropagation. These are trained
+
+01:03:53.520 --> 01:04:02.800
+using this janky update of kind of like a running mean update. So these are sort of the parameters
+
+01:04:02.800 --> 01:04:07.760
+and the buffers of batch normalization layer. And then really what it's doing is it's calculating the
+
+01:04:07.760 --> 01:04:12.000
+mean and standard deviation of the activations that are feeding into the batch normalization layer
+
+01:04:12.880 --> 01:04:17.760
+over that batch. Then it's centering that batch to be unit Gaussian.
+
+01:04:18.400 --> 01:04:22.720
+And then it's offsetting and scaling it by the learned bias and gain.
+
+01:04:24.080 --> 01:04:28.000
+And then on top of that, it's keeping track of the mean and standard deviation of the inputs.
+
+01:04:28.880 --> 01:04:33.600
+And it's maintaining this running mean and standard deviation. And this will later be
+
+01:04:33.600 --> 01:04:37.520
+used at inference so that we don't have to re-estimate the mean and standard deviation
+
+01:04:37.520 --> 01:04:42.560
+all the time. And in addition, that allows us to basically forward individual examples
+
+01:04:42.560 --> 01:04:47.120
+at test time. So that's the batch normalization layer. It's a fairly complicated layer,
+
+01:04:48.400 --> 01:04:52.560
+but this is what it's doing internally. Now, I wanted to show you a little bit of a real example.
+
+01:04:53.680 --> 01:04:59.680
+You can search ResNet, which is a residual neural network. And these are contacts of neural networks
+
+01:04:59.680 --> 01:05:05.840
+used for image classification. And of course, we haven't come to ResNets in detail. So I'm not going
+
+01:05:05.840 --> 01:05:11.520
+to explain all the pieces of it. But for now, just note that the image feeds into a ResNet on the top
+
+01:05:11.520 --> 01:05:16.480
+here. And there's many, many layers with repeating structure all the way to predictions of what's
+
+01:05:16.480 --> 01:05:21.760
+inside that image. This repeating structure is made up of these blocks. And these blocks are just
+
+01:05:21.760 --> 01:05:23.360
+sequentially stacked up in this
+
+01:05:23.720 --> 01:05:30.480
+deep neural network. Now, the code for this, the block basically that's used and repeated
+
+01:05:30.480 --> 01:05:38.800
+sequentially in series, is called this bottleneck block. And there's a lot here. This is all PyTorch.
+
+01:05:38.800 --> 01:05:42.240
+And of course, we haven't covered all of it. But I want to point out some small pieces of it.
+
+01:05:43.120 --> 01:05:47.600
+Here in the init is where we initialized the neural net. So this code of block here is basically
+
+01:05:47.600 --> 01:05:52.160
+the kind of stuff we're doing here. We're initializing all the layers. And in the forward,
+
+01:05:53.520 --> 01:05:58.960
+act once you actually have the input so this code here is along the lines of what we're doing here
+
+01:06:01.520 --> 01:06:07.440
+and now these blocks are replicated and stacked up serially and that's what a residual network
+
+01:06:07.440 --> 01:06:14.000
+would be and so notice what's happening here conv1 these are convolution layers
+
+01:06:14.800 --> 01:06:20.320
+and these convolution layers basically they're the same thing as a linear layer except convolution
+
+01:06:20.320 --> 01:06:26.400
+layers don't apply convolutional layers are used for images and so they have spatial structure
+
+01:06:26.400 --> 01:06:33.040
+and basically this linear multiplication and bias offset are done on patches instead of a map
+
+01:06:33.040 --> 01:06:38.560
+instead of the full input so because these images have structure spatial structure convolutions just
+
+01:06:38.560 --> 01:06:44.320
+basically do wx plus b but they do it on overlapping patches of the input but otherwise
+
+01:06:44.320 --> 01:06:50.080
+it's wx plus b then we have the norm layer which by default here is initialized to be a batch
+
+01:06:50.080 --> 01:06:50.240
+normal
+
+01:06:50.320 --> 01:06:56.720
+in 2d so two-dimensional bash normalization layer and then we have a non-linearity like relu so
+
+01:06:56.720 --> 01:07:04.400
+instead of uh here they use relu we are using tanh in this case but both both are just non-linearities
+
+01:07:04.400 --> 01:07:08.400
+and you can just use them relatively interchangeably for very deep networks
+
+01:07:08.400 --> 01:07:14.320
+relu's typically empirically work a bit better so see the motif that's being repeated here we have
+
+01:07:14.320 --> 01:07:20.080
+convolution batch normalization rather convolution batch normalization etc and then here this is
+
+01:07:20.080 --> 01:07:20.240
+residual
+
+01:07:20.320 --> 01:07:24.560
+connection that we haven't covered yet but basically that's the exact same pattern we have
+
+01:07:24.560 --> 01:07:32.720
+here we have a weight layer like a convolution or like a linear layer batch normalization and then
+
+01:07:33.280 --> 01:07:39.520
+tanh which is non-linearity but basically a weight layer a normalization layer and non-linearity and
+
+01:07:39.520 --> 01:07:43.920
+that's the motif that you would be stacking up when you create these deep neural networks exactly
+
+01:07:43.920 --> 01:07:48.880
+as it's done here and one more thing i'd like you to notice is that here when they are initializing
+
+01:07:48.880 --> 01:07:50.160
+the conf layers when they are initializing the conf layers when they are initializing the conf layers
+
+01:07:50.160 --> 01:07:57.040
+like conv one by one the depth for that is right here and so it's initializing an nn.conf2d which is
+
+01:07:57.040 --> 01:08:01.200
+a convolution layer in pytorch and there's a bunch of keyword arguments here that i'm not going to
+
+01:08:01.200 --> 01:08:06.400
+explain yet but you see how there's bias equals false the bias equals false is exactly for the
+
+01:08:06.400 --> 01:08:12.560
+same reason as bias is not used in our case you see how i erase the use of bias and the use of
+
+01:08:12.560 --> 01:08:17.120
+bias is spurious because after this weight layer there's a batch normalization and the batch normalization subtracts that bias and then has its own bias
+
+01:08:17.120 --> 01:08:19.120
+and the batch normalization subtracts that bias and then has its own bias and then has its own bias
+
+01:08:20.160 --> 01:08:22.240
+so there's no need to introduce these spurious
+
+01:08:22.240 --> 01:08:28.000
+parameters it wouldn't hurt performance it's just useless and so because they have this motif of
+
+01:08:28.000 --> 01:08:33.600
+conf they don't need a bias here because there's a bias inside here so
+
+01:08:34.640 --> 01:08:38.000
+by the way this example here is very easy to find just do resnet pytorch
+
+01:08:39.280 --> 01:08:44.720
+and uh it's this example here so this is kind of like the stock implementation of a residual neural
+
+01:08:44.720 --> 01:08:49.920
+network in pytorch and you can find that here but of course i haven't covered many of these parts yet
+
+01:08:50.640 --> 01:08:55.360
+and i would also like to briefly descend into the definitions of these pytorch layers and the
+
+01:08:55.360 --> 01:08:59.200
+parameters that they take now instead of a convolutional layer we're going to look at
+
+01:08:59.200 --> 01:09:04.560
+a linear layer because that's the one that we're using here this is a linear layer and i haven't
+
+01:09:04.560 --> 01:09:09.120
+covered convolutions yet but as i mentioned convolutions are basically linear layers except
+
+01:09:09.120 --> 01:09:16.720
+on patches so a linear layer performs a wx plus b except here they're calling the wa transpose
+
+01:09:16.720 --> 01:09:21.920
+so the calc is wx plus p very much like we did here to initialize this layer you need to know
+
+01:09:21.920 --> 01:09:30.160
+the fan in the fan out and that's so that they can initialize this w this is the fan in and the fan
+
+01:09:30.160 --> 01:09:35.840
+out so they know how how big the weight matrix should be you need to also pass in whether you
+
+01:09:35.840 --> 01:09:42.320
+whether or not you want a bias and if you set it to false then no bias will be inside this layer
+
+01:09:43.200 --> 01:09:46.160
+and you may want to do that exactly like in our case for instance
+
+01:09:46.720 --> 01:09:50.340
+if your layer is followed by a normalization layer such as batch norm.
+
+01:09:51.480 --> 01:09:53.620
+So this allows you to basically disable a bias.
+
+01:09:54.600 --> 01:09:56.600
+Now, in terms of the initialization, if we swing down here,
+
+01:09:57.060 --> 01:10:00.400
+this is reporting the variables used inside this linear layer.
+
+01:10:00.920 --> 01:10:05.240
+And our linear layer here has two parameters, the weight and the bias.
+
+01:10:05.720 --> 01:10:07.620
+In the same way, they have a weight and a bias.
+
+01:10:08.400 --> 01:10:11.020
+And they're talking about how they initialize it by default.
+
+01:10:11.720 --> 01:10:15.420
+So by default, PyTorch will initialize your weights by taking the fan in
+
+01:10:15.420 --> 01:10:19.700
+and then doing 1 over fan in square root.
+
+01:10:20.560 --> 01:10:24.880
+And then instead of a normal distribution, they are using a uniform distribution.
+
+01:10:25.540 --> 01:10:30.380
+So it's very much the same thing, but they are using a 1 instead of 5 over 3.
+
+01:10:30.500 --> 01:10:32.300
+So there's no gain being calculated here.
+
+01:10:32.300 --> 01:10:33.260
+The gain is just 1.
+
+01:10:33.620 --> 01:10:38.800
+But otherwise, it's exactly 1 over the square root of fan in, exactly as we have here.
+
+01:10:40.260 --> 01:10:44.440
+So 1 over the square root of k is the scale of the weights.
+
+01:10:45.000 --> 01:10:45.400
+But...
+
+01:10:45.420 --> 01:10:48.500
+But when they are drawing the numbers, they're not using a Gaussian by default.
+
+01:10:48.760 --> 01:10:51.020
+They're using a uniform distribution by default.
+
+01:10:51.500 --> 01:10:55.300
+And so they draw uniformly from negative square root of k to square root of k.
+
+01:10:55.880 --> 01:11:02.500
+But it's the exact same thing and the same motivation with respect to what we've seen in this lecture.
+
+01:11:03.040 --> 01:11:06.180
+And the reason they're doing this is if you have a roughly Gaussian input,
+
+01:11:06.600 --> 01:11:11.240
+this will ensure that out of this layer, you will have a roughly Gaussian output.
+
+01:11:11.560 --> 01:11:15.240
+And you basically achieve that by scaling the weights.
+
+01:11:15.420 --> 01:11:18.740
+So that's what this is doing.
+
+01:11:19.880 --> 01:11:22.820
+And then the second thing is the batch normalization layer.
+
+01:11:23.200 --> 01:11:25.120
+So let's look at what that looks like in PyTorch.
+
+01:11:25.920 --> 01:11:30.040
+So here we have a one-dimensional batch normalization layer, exactly as we are using here.
+
+01:11:30.640 --> 01:11:32.920
+And there are a number of keyword arguments going into it as well.
+
+01:11:33.340 --> 01:11:34.960
+So we need to know the number of features.
+
+01:11:35.500 --> 01:11:36.780
+For us, that is 200.
+
+01:11:37.240 --> 01:11:40.300
+And that is needed so that we can initialize these parameters here.
+
+01:11:40.820 --> 01:11:45.400
+The gain, the bias, and the buffers for the running mean and standard deviation.
+
+01:11:45.940 --> 01:11:49.240
+Then they need to know the value of epsilon here.
+
+01:11:49.920 --> 01:11:51.620
+And by default, this is 1, negative 5.
+
+01:11:51.720 --> 01:11:53.120
+You don't typically change this too much.
+
+01:11:53.960 --> 01:11:55.180
+Then they need to know the momentum.
+
+01:11:55.920 --> 01:12:02.080
+And the momentum here, as they explain, is basically used for these running mean and running standard deviation.
+
+01:12:02.800 --> 01:12:04.620
+So by default, the momentum here is 0.1.
+
+01:12:05.080 --> 01:12:08.240
+The momentum we are using here in this example is 0.001.
+
+01:12:09.740 --> 01:12:13.220
+And basically, you may want to change this sometimes.
+
+01:12:13.680 --> 01:12:14.620
+And roughly speaking,
+
+01:12:14.620 --> 01:12:16.560
+if you have a very large batch size,
+
+01:12:17.080 --> 01:12:20.560
+then typically what you'll see is that when you estimate the mean and standard deviation,
+
+01:12:21.420 --> 01:12:23.520
+for every single batch size, if it's large enough,
+
+01:12:23.680 --> 01:12:25.360
+you're going to get roughly the same result.
+
+01:12:26.160 --> 01:12:30.100
+And so therefore, you can use slightly higher momentum, like 0.1.
+
+01:12:30.860 --> 01:12:33.780
+But for a batch size as small as 32,
+
+01:12:34.440 --> 01:12:37.720
+the mean and standard deviation here might take on slightly different numbers
+
+01:12:37.720 --> 01:12:41.360
+because there's only 32 examples we are using to estimate the mean and standard deviation.
+
+01:12:41.840 --> 01:12:43.620
+So the value is changing around a lot.
+
+01:12:43.860 --> 01:12:44.600
+And if you have a very large batch size,
+
+01:12:44.600 --> 01:12:45.840
+if your momentum is 0.1,
+
+01:12:46.200 --> 01:12:48.880
+that might not be good enough for this value to settle
+
+01:12:48.880 --> 01:12:54.300
+and converge to the actual mean and standard deviation over the entire training set.
+
+01:12:55.220 --> 01:12:56.980
+And so basically, if your batch size is very small,
+
+01:12:57.440 --> 01:12:59.460
+momentum of 0.1 is potentially dangerous,
+
+01:12:59.760 --> 01:13:02.840
+and it might make it so that the running mean and standard deviation
+
+01:13:02.840 --> 01:13:04.960
+is thrashing too much during training,
+
+01:13:05.140 --> 01:13:07.160
+and it's not actually converging properly.
+
+01:13:09.260 --> 01:13:12.860
+affine equals true determines whether this batch normalization layer
+
+01:13:12.860 --> 01:13:14.360
+has these learnable affine parameters,
+
+01:13:14.600 --> 01:13:17.940
+the gain and the bias.
+
+01:13:18.500 --> 01:13:20.640
+And this is almost always kept to true.
+
+01:13:20.760 --> 01:13:23.900
+I'm not actually sure why you would want to change this to false.
+
+01:13:26.540 --> 01:13:29.280
+Then track running stats is determining whether or not
+
+01:13:29.400 --> 01:13:31.580
+batch normalization layer of PyTorch will be doing this.
+
+01:13:32.840 --> 01:13:37.220
+And one reason you may want to skip the running stats
+
+01:13:37.660 --> 01:13:39.200
+is because you may want to, for example,
+
+01:13:39.200 --> 01:13:43.000
+estimate them at the end as a stage two like this.
+
+01:13:43.360 --> 01:13:44.320
+And in that case, you don't want the batch normalization layer to be like this.
+
+01:13:44.320 --> 01:13:44.420
+And in that case, you don't want the batch normalization layer to be like this.
+
+01:13:44.420 --> 01:13:44.560
+And in that case, you don't want the batch normalization layer to be like this.
+
+01:13:44.600 --> 01:13:45.160
+And in that case, you don't want the batch normalization layer
+
+01:13:45.160 --> 01:13:47.340
+to be doing all this extra compute that you're not going to use.
+
+01:13:48.720 --> 01:13:51.840
+And finally, we need to know which device we're going to run
+
+01:13:51.840 --> 01:13:54.280
+this batch normalization on, a CPU or a GPU,
+
+01:13:54.740 --> 01:13:56.320
+and what the data type should be,
+
+01:13:56.600 --> 01:13:59.360
+half precision, single precision, double precision, and so on.
+
+01:14:00.800 --> 01:14:02.320
+So that's the batch normalization layer.
+
+01:14:02.600 --> 01:14:03.760
+Otherwise, they link to the paper.
+
+01:14:03.940 --> 01:14:05.480
+It's the same formula we've implemented,
+
+01:14:05.920 --> 01:14:09.360
+and everything is the same exactly as we've done here.
+
+01:14:10.620 --> 01:14:13.040
+Okay, so that's everything that I wanted to cover for this lecture.
+
+01:14:13.620 --> 01:14:14.420
+Really, what I wanted to talk about is the batch normalization layer.
+
+01:14:14.420 --> 01:14:16.440
+What I wanted to talk about is the importance of understanding
+
+01:14:16.440 --> 01:14:20.120
+the activations and the gradients and their statistics in neural networks.
+
+01:14:20.540 --> 01:14:21.940
+And this becomes increasingly important,
+
+01:14:22.080 --> 01:14:24.680
+especially as you make your neural networks bigger, larger, and deeper.
+
+01:14:25.560 --> 01:14:28.000
+We looked at the distributions basically at the output layer,
+
+01:14:28.300 --> 01:14:31.500
+and we saw that if you have two confident mispredictions
+
+01:14:31.500 --> 01:14:34.480
+because the activations are too messed up at the last layer,
+
+01:14:34.860 --> 01:14:36.820
+you can end up with these hockey stick losses.
+
+01:14:37.520 --> 01:14:40.220
+And if you fix this, you get a better loss at the end of training
+
+01:14:40.220 --> 01:14:43.040
+because your training is not doing wasteful work.
+
+01:14:43.660 --> 01:14:44.400
+Then we also saw that if you have two confident mispredictions,
+
+01:14:44.400 --> 01:14:45.920
+we saw that we need to control the activations.
+
+01:14:46.060 --> 01:14:50.160
+We don't want them to squash to zero or explode to infinity
+
+01:14:50.160 --> 01:14:52.800
+because that you can run into a lot of trouble
+
+01:14:52.800 --> 01:14:55.360
+with all of these nonlinearities in these neural nets.
+
+01:14:55.980 --> 01:14:57.960
+And basically, you want everything to be fairly homogeneous
+
+01:14:57.960 --> 01:14:58.860
+throughout the neural net.
+
+01:14:58.960 --> 01:15:01.320
+You want roughly Gaussian activations throughout the neural net.
+
+01:15:02.480 --> 01:15:06.260
+Then we talked about, okay, if we want roughly Gaussian activations,
+
+01:15:06.500 --> 01:15:09.200
+how do we scale these weight matrices and biases
+
+01:15:09.200 --> 01:15:10.920
+during initialization of the neural net
+
+01:15:10.920 --> 01:15:13.300
+so that we don't get, you know,
+
+01:15:13.300 --> 01:15:14.300
+so everything is S-controllable?
+
+01:15:14.400 --> 01:15:15.040
+S-controllable is possible.
+
+01:15:16.940 --> 01:15:19.260
+So that gave us a large boost in improvement.
+
+01:15:19.860 --> 01:15:25.040
+And then I talked about how that strategy is not actually possible
+
+01:15:25.040 --> 01:15:26.760
+for much, much deeper neural nets
+
+01:15:26.760 --> 01:15:30.160
+because when you have much deeper neural nets
+
+01:15:30.160 --> 01:15:31.900
+with lots of different types of layers,
+
+01:15:32.360 --> 01:15:35.700
+it becomes really, really hard to precisely set the weights
+
+01:15:35.700 --> 01:15:37.040
+and the biases in such a way
+
+01:15:37.040 --> 01:15:39.400
+that the activations are roughly uniform
+
+01:15:39.400 --> 01:15:40.520
+throughout the neural net.
+
+01:15:40.980 --> 01:15:43.900
+So then I introduced the notion of a normalization layer.
+
+01:15:44.400 --> 01:15:45.820
+Now, there are many normalization layers
+
+01:15:45.820 --> 01:15:47.580
+that people use in practice.
+
+01:15:47.960 --> 01:15:49.860
+Batch normalization, layer normalization,
+
+01:15:50.320 --> 01:15:52.220
+instance normalization, group normalization.
+
+01:15:52.520 --> 01:15:53.880
+We haven't covered most of them,
+
+01:15:54.060 --> 01:15:55.240
+but I've introduced the first one
+
+01:15:55.240 --> 01:15:58.060
+and also the one that I believe came out first,
+
+01:15:58.260 --> 01:15:59.580
+and that's called batch normalization.
+
+01:16:00.660 --> 01:16:02.180
+And we saw how batch normalization works.
+
+01:16:02.900 --> 01:16:04.400
+This is a layer that you can sprinkle
+
+01:16:04.400 --> 01:16:05.720
+throughout your deep neural net.
+
+01:16:06.320 --> 01:16:08.080
+And the basic idea is
+
+01:16:08.080 --> 01:16:09.920
+if you want roughly Gaussian activations,
+
+01:16:10.360 --> 01:16:11.640
+well, then take your activations
+
+01:16:11.640 --> 01:16:13.940
+and take the mean understanding deviation
+
+01:16:13.940 --> 01:16:15.840
+and standard deviation and center your data.
+
+01:16:16.440 --> 01:16:17.460
+And you can do that
+
+01:16:17.460 --> 01:16:20.360
+because the centering operation is differentiable.
+
+01:16:21.400 --> 01:16:22.500
+But on top of that,
+
+01:16:22.560 --> 01:16:24.440
+we actually had to add a lot of bells and whistles,
+
+01:16:24.960 --> 01:16:26.760
+and that gave you a sense of the complexities
+
+01:16:26.760 --> 01:16:28.060
+of the batch normalization layer
+
+01:16:28.060 --> 01:16:30.140
+because now we're centering the data.
+
+01:16:30.260 --> 01:16:30.640
+That's great.
+
+01:16:30.920 --> 01:16:32.940
+But suddenly, we need the gain and the bias,
+
+01:16:33.380 --> 01:16:34.380
+and now those are trainable.
+
+01:16:35.500 --> 01:16:37.100
+And then because we are coupling
+
+01:16:37.100 --> 01:16:38.260
+all of the training examples,
+
+01:16:38.540 --> 01:16:39.620
+now suddenly the question is,
+
+01:16:39.680 --> 01:16:40.500
+how do you do the inference?
+
+01:16:41.160 --> 01:16:42.500
+Well, to do the inference,
+
+01:16:42.500 --> 01:16:43.500
+we need to now estimate
+
+01:16:43.940 --> 01:16:46.760
+these mean and standard deviation
+
+01:16:46.760 --> 01:16:49.600
+once over the entire training set
+
+01:16:49.600 --> 01:16:50.960
+and then use those at inference.
+
+01:16:51.600 --> 01:16:53.380
+But then no one likes to do stage two.
+
+01:16:53.760 --> 01:16:55.040
+So instead, we fold everything
+
+01:16:55.040 --> 01:16:57.420
+into the batch normalization layer during training
+
+01:16:57.420 --> 01:17:00.160
+and try to estimate these in a running manner
+
+01:17:00.160 --> 01:17:01.560
+so that everything is a bit simpler.
+
+01:17:02.420 --> 01:17:04.580
+And that gives us the batch normalization layer.
+
+01:17:06.160 --> 01:17:07.460
+And as I mentioned,
+
+01:17:07.640 --> 01:17:08.720
+no one likes this layer.
+
+01:17:09.160 --> 01:17:10.920
+It causes a huge amount of bugs.
+
+01:17:12.320 --> 01:17:13.560
+And intuitively,
+
+01:17:13.560 --> 01:17:15.840
+it's because it is coupling examples
+
+01:17:15.840 --> 01:17:18.060
+in the forward-passive and neural net.
+
+01:17:18.800 --> 01:17:21.560
+And I've shot myself in the foot
+
+01:17:21.560 --> 01:17:24.640
+with this layer over and over again in my life,
+
+01:17:24.900 --> 01:17:27.160
+and I don't want you to suffer the same.
+
+01:17:28.180 --> 01:17:30.420
+So basically, try to avoid it as much as possible.
+
+01:17:31.700 --> 01:17:33.640
+Some of the other alternatives to these layers
+
+01:17:33.640 --> 01:17:35.020
+are, for example, group normalization
+
+01:17:35.020 --> 01:17:36.200
+or layer normalization,
+
+01:17:36.540 --> 01:17:37.900
+and those have become more common
+
+01:17:37.900 --> 01:17:40.220
+in more recent deep learning,
+
+01:17:40.720 --> 01:17:42.200
+but we haven't covered those yet.
+
+01:17:42.900 --> 01:17:43.540
+But definitely,
+
+01:17:43.560 --> 01:17:45.800
+batch normalization was very influential
+
+01:17:45.800 --> 01:17:48.380
+at the time when it came out in roughly 2015
+
+01:17:48.740 --> 01:17:50.360
+because it was kind of the first time
+
+01:17:50.360 --> 01:17:52.320
+that you could train reliably
+
+01:17:53.660 --> 01:17:54.880
+much deeper neural nets.
+
+01:17:55.380 --> 01:17:57.220
+And fundamentally, the reason for that is because
+
+01:17:57.620 --> 01:18:00.520
+this layer was very effective at controlling the statistics
+
+01:18:00.820 --> 01:18:02.080
+of the activations in the neural net.
+
+01:18:03.180 --> 01:18:04.800
+So that's the story so far.
+
+01:18:05.320 --> 01:18:07.600
+And that's all I wanted to cover.
+
+01:18:07.800 --> 01:18:09.000
+And in the future lectures,
+
+01:18:09.000 --> 01:18:11.000
+hopefully we can start going into recurring neural nets.
+
+01:18:11.560 --> 01:18:12.900
+And recurring neural nets,
+
+01:18:12.900 --> 01:18:15.860
+as we'll see, are just very, very deep networks
+
+01:18:15.860 --> 01:18:18.340
+because you unroll the loop
+
+01:18:18.340 --> 01:18:20.680
+when you actually optimize these neural nets.
+
+01:18:21.320 --> 01:18:25.040
+And that's where a lot of this analysis
+
+01:18:25.040 --> 01:18:26.700
+around the activation statistics
+
+01:18:26.700 --> 01:18:28.860
+and all these normalization layers
+
+01:18:28.860 --> 01:18:32.220
+will become very, very important for good performance.
+
+01:18:32.600 --> 01:18:33.600
+So we'll see that next time.
+
+01:18:34.060 --> 01:18:34.320
+Bye.
+
+01:18:35.240 --> 01:18:35.940
+Okay, so I lied.
+
+01:18:36.300 --> 01:18:38.620
+I would like us to do one more summary here as a bonus.
+
+01:18:39.040 --> 01:18:41.760
+And I think it's useful as to have one more summary
+
+01:18:41.760 --> 01:18:42.880
+of everything I've presented today.
+
+01:18:42.900 --> 01:18:43.420
+In this lecture.
+
+01:18:43.820 --> 01:18:45.200
+But also, I would like us to start
+
+01:18:45.200 --> 01:18:47.120
+by torchifying our code a little bit.
+
+01:18:47.260 --> 01:18:49.580
+So it looks much more like what you would encounter in PyTorch.
+
+01:18:50.040 --> 01:18:52.040
+So you'll see that I will structure our code
+
+01:18:52.040 --> 01:18:53.700
+into these modules,
+
+01:18:54.060 --> 01:18:56.300
+like a linear module
+
+01:18:56.300 --> 01:18:58.200
+and a batch form module.
+
+01:18:58.600 --> 01:19:00.800
+And I'm putting the code inside these modules
+
+01:19:00.800 --> 01:19:02.740
+so that we can construct neural networks
+
+01:19:02.740 --> 01:19:04.640
+very much like we would construct them in PyTorch.
+
+01:19:04.720 --> 01:19:05.940
+And I will go through this in detail.
+
+01:19:06.400 --> 01:19:07.800
+So we'll create our neural net.
+
+01:19:08.560 --> 01:19:10.880
+Then we will do the optimization loop
+
+01:19:10.880 --> 01:19:11.780
+as we did before.
+
+01:19:12.360 --> 01:19:14.200
+And then the one more thing that I want to do here
+
+01:19:14.200 --> 01:19:15.940
+is I want to look at the activation statistics
+
+01:19:15.940 --> 01:19:17.240
+both in the forward pass
+
+01:19:17.240 --> 01:19:18.780
+and in the backward pass.
+
+01:19:19.240 --> 01:19:20.720
+And then here we have the evaluation
+
+01:19:20.720 --> 01:19:22.100
+and sampling just like before.
+
+01:19:22.700 --> 01:19:24.600
+So let me rewind all the way up here
+
+01:19:24.600 --> 01:19:26.020
+and go a little bit slower.
+
+01:19:26.640 --> 01:19:28.600
+So here I am creating a linear layer.
+
+01:19:29.180 --> 01:19:30.820
+You'll notice that torch.nn
+
+01:19:30.820 --> 01:19:32.360
+has lots of different types of layers.
+
+01:19:32.740 --> 01:19:34.380
+And one of those layers is the linear layer.
+
+01:19:35.240 --> 01:19:37.260
+Torch.nn.linear takes a number of input features,
+
+01:19:37.420 --> 01:19:38.040
+output features,
+
+01:19:38.260 --> 01:19:39.440
+whether or not we should have bias,
+
+01:19:39.740 --> 01:19:41.420
+and then the device that we want to place
+
+01:19:41.420 --> 01:19:42.100
+this layer on,
+
+01:19:42.440 --> 01:19:43.220
+and the data type.
+
+01:19:43.800 --> 01:19:45.340
+So I will omit these two,
+
+01:19:45.720 --> 01:19:47.660
+but otherwise we have the exact same thing.
+
+01:19:48.140 --> 01:19:49.300
+We have the fanIn,
+
+01:19:49.380 --> 01:19:50.420
+which is the number of inputs,
+
+01:19:50.780 --> 01:19:52.820
+fanOut, the number of outputs,
+
+01:19:53.220 --> 01:19:54.620
+and whether or not we want to use a bias.
+
+01:19:55.240 --> 01:19:56.560
+And internally inside this layer,
+
+01:19:56.820 --> 01:19:58.240
+there's a weight and a bias,
+
+01:19:58.420 --> 01:19:59.080
+if you'd like it.
+
+01:19:59.720 --> 01:20:02.100
+It is typical to initialize the weight
+
+01:20:02.100 --> 01:20:05.380
+using, say, random numbers drawn from a Gaussian.
+
+01:20:05.880 --> 01:20:07.540
+And then here's the coming initialization
+
+01:20:07.540 --> 01:20:10.040
+that we discussed already in this lecture.
+
+01:20:10.100 --> 01:20:11.380
+And that's a good,
+
+01:20:11.420 --> 01:20:12.880
+the default and also the default
+
+01:20:12.880 --> 01:20:14.100
+that I believe PyTorch uses.
+
+01:20:14.760 --> 01:20:15.360
+And by default,
+
+01:20:15.360 --> 01:20:17.660
+the bias is usually initialized to zeros.
+
+01:20:18.380 --> 01:20:19.800
+Now, when you call this module,
+
+01:20:20.800 --> 01:20:23.060
+this will basically calculate w times x plus b,
+
+01:20:23.200 --> 01:20:24.200
+if you have nb.
+
+01:20:24.900 --> 01:20:27.320
+And then when you also call the parameters on this module,
+
+01:20:27.440 --> 01:20:29.600
+it will return the tensors
+
+01:20:29.780 --> 01:20:31.460
+that are the parameters of this layer.
+
+01:20:32.200 --> 01:20:34.300
+Now, next we have the batch normalization layer.
+
+01:20:34.520 --> 01:20:36.540
+So I've written that here.
+
+01:20:37.020 --> 01:20:40.460
+And this is very similar to PyTorch.nn.batchNormalization.nl.
+
+01:20:40.460 --> 01:20:40.860
+And this is very similar to PyTorch.nn.batchNormalization.nl.
+
+01:20:40.860 --> 01:20:41.400
+And this is very similar to PyTorch.nn.batchNormalization.nl.
+
+01:20:41.420 --> 01:20:45.180
+So PyTorch is showing is actually a normal one D layer as shown here.
+
+01:20:45.180 --> 01:20:48.020
+So I'm kind of taking these three parameters here,
+
+01:20:48.020 --> 01:20:48.980
+The dimensionality,
+
+01:20:48.980 --> 01:20:51.540
+the epsilon that we will use in the division,
+
+01:20:51.540 --> 01:20:53.300
+and the momentum that we will use
+
+01:20:53.300 --> 01:20:55.160
+in keeping track of these running stats
+
+01:20:55.160 --> 01:20:57.120
+the running mean and the running variance.
+
+01:20:58.220 --> 01:21:00.500
+Now PyTorch actually takes quite a few more things,
+
+01:21:00.500 --> 01:21:02.340
+but I'm assuming some of their settings.
+
+01:21:02.340 --> 01:21:03.960
+So for us affine will be true.
+
+01:21:03.960 --> 01:21:06.180
+That means that we will be using a Gamma and Beta
+
+01:21:06.180 --> 01:21:08.060
+after the normalization.
+
+01:21:08.060 --> 01:21:09.620
+The track running stats will be true.
+
+01:21:09.620 --> 01:21:10.860
+So we will be keeping track
+
+01:21:10.860 --> 01:21:16.380
+running mean and the running variance in the in the bastion our device by default is the cpu
+
+01:21:16.940 --> 01:21:23.740
+and the data type by default is float float32 so those are the defaults otherwise
+
+01:21:24.380 --> 01:21:28.700
+we are taking all the same parameters in this bastion layer so first i'm just saving them
+
+01:21:29.740 --> 01:21:34.620
+now here's something new there's a dot training which by default is true and pytorch nn modules
+
+01:21:34.620 --> 01:21:40.700
+also have this attribute dot training and that's because many modules and batch norm is included
+
+01:21:40.700 --> 01:21:45.500
+in that have a different behavior whether you are training your neural net and or whether you
+
+01:21:45.500 --> 01:21:49.900
+are running it in an evaluation mode and calculating your evaluation laws or using
+
+01:21:49.900 --> 01:21:55.020
+it for inference on some test examples and bastion is an example of this because when
+
+01:21:55.020 --> 01:21:59.020
+we are training we are going to be using the mean and the variance estimated from the current batch
+
+01:21:59.580 --> 01:22:03.020
+but during inference we are using the running mean and running variance
+
+01:22:03.900 --> 01:22:04.300
+and so
+
+01:22:04.780 --> 01:22:09.100
+also if we are training we are updating mean and variance but if we are testing then these
+
+01:22:09.100 --> 01:22:14.140
+are not being updated they're kept fixed and so this flag is necessary and by default true
+
+01:22:14.140 --> 01:22:19.820
+just like in pytorch now the parameters of bastion1d are the gamma and the beta here
+
+01:22:21.660 --> 01:22:28.140
+and then the running mean and running variance are called buffers in pytorch nomenclature and these
+
+01:22:28.140 --> 01:22:34.380
+buffers are trained using exponential moving average here explicitly and they are not part of
+
+01:22:34.620 --> 01:22:38.460
+the back propagation and stochastic gradient descent so they are not sort of like parameters
+
+01:22:38.460 --> 01:22:43.500
+of this layer and that's why when we calculate when we have a parameters here we only return
+
+01:22:43.500 --> 01:22:48.700
+gamma and beta we do not return the mean and the variance this is trained sort of like internally
+
+01:22:48.700 --> 01:22:55.580
+here every forward pass using exponential moving average so that's the initialization
+
+01:22:56.700 --> 01:23:02.380
+now in a forward pass if we are training then we use the mean and the variance estimated by the
+
+01:23:02.380 --> 01:23:04.300
+batch let me pull up the paper here
+
+01:23:05.580 --> 01:23:11.900
+we calculate the mean and the variance now up above i was estimating the standard deviation
+
+01:23:11.900 --> 01:23:16.380
+and keeping track of the standard deviation here in the running standard deviation instead of
+
+01:23:16.380 --> 01:23:22.140
+running variance but let's follow the paper exactly here they calculate the variance which
+
+01:23:22.140 --> 01:23:26.380
+is the standard deviation squared and that's what's kept track of in the running variance
+
+01:23:26.380 --> 01:23:31.660
+instead of a running standard deviation but those two would be very very similar i believe
+
+01:23:33.580 --> 01:23:34.460
+if we are not training
+
+01:23:34.620 --> 01:23:40.780
+then we use the running mean and variance we normalize and then here i am calculating the
+
+01:23:40.780 --> 01:23:46.540
+output of this layer and i'm also assigning it to an attribute called dot out now dot out is
+
+01:23:46.540 --> 01:23:51.500
+something that i'm using in our modules here this is not what you would find in pytorch we are
+
+01:23:51.500 --> 01:23:57.820
+slightly deviating from it i'm creating a dot out because i would like to very easily maintain all
+
+01:23:57.820 --> 01:24:02.860
+those variables so that we can create statistics of them and plot them but pytorch and modules will
+
+01:24:02.860 --> 01:24:04.380
+not have a dot out attribute
+
+01:24:05.260 --> 01:24:09.500
+and finally here we are updating the buffers using again as i mentioned exponential moving average
+
+01:24:10.700 --> 01:24:14.780
+provide given the provided momentum and importantly you'll notice that i'm using
+
+01:24:14.780 --> 01:24:20.380
+the torch.nograd context manager and i'm doing this because if we don't use this then pytorch
+
+01:24:20.380 --> 01:24:25.420
+will start building out an entire computational graph out of these tensors because it is expecting
+
+01:24:25.420 --> 01:24:29.660
+that we will eventually call a dot backward but we are never going to be calling dot backward
+
+01:24:29.660 --> 01:24:34.300
+on anything that includes running mean and running variance so that's why we need to use this context
+
+01:24:35.020 --> 01:24:41.020
+so that we are not sort of maintaining them using all this additional memory so this will make it
+
+01:24:41.020 --> 01:24:44.700
+more efficient and it's just telling pytorch that they're rolling no backward we just have a bunch
+
+01:24:44.700 --> 01:24:51.660
+of tensors we want to update them that's it and then we return okay now scrolling down we have the
+
+01:24:51.660 --> 01:24:59.020
+10h layer this is very very similar to torch.10h and it doesn't do too much it just calculates 10h
+
+01:24:59.020 --> 01:25:04.380
+as you might expect so that's torch.10h and there's no parameters in this layer
+
+01:25:05.020 --> 01:25:09.980
+but because these are layers it now becomes very easy to sort of like stack them up into
+
+01:25:10.700 --> 01:25:16.860
+basically just a list and we can do all the initializations that we're used to so we have the
+
+01:25:17.420 --> 01:25:21.260
+initial sort of embedding matrix we have our layers and we can call them sequentially
+
+01:25:22.060 --> 01:25:25.980
+and then again with torch.nograd there's some initializations here
+
+01:25:25.980 --> 01:25:31.100
+so we want to make the output softmax a bit less confident like we saw and in addition to that
+
+01:25:31.100 --> 01:25:34.380
+because we are using a six layer multilayer perceptron here
+
+01:25:34.620 --> 01:25:37.860
+So you see how I'm stacking linear, 10H, linear, 10H, etc.
+
+01:25:39.100 --> 01:25:41.160
+I'm going to be using the gain here.
+
+01:25:41.320 --> 01:25:42.700
+And I'm going to play with this in a second.
+
+01:25:42.880 --> 01:25:45.860
+So you'll see how, when we change this, what happens to the statistics.
+
+01:25:47.140 --> 01:25:51.860
+Finally, the parameters are basically the embedding matrix and all the parameters in all the layers.
+
+01:25:52.400 --> 01:25:56.100
+And notice here, I'm using a double list comprehension, if you want to call it that.
+
+01:25:56.100 --> 01:26:00.360
+But for every layer in layers, and for every parameter in each of those layers,
+
+01:26:00.560 --> 01:26:03.980
+we are just stacking up all those P's, all those parameters.
+
+01:26:04.840 --> 01:26:08.040
+Now, in total, we have 46,000 parameters.
+
+01:26:09.060 --> 01:26:12.100
+And I'm telling PyTorch that all of them require gradient.
+
+01:26:15.720 --> 01:26:19.900
+Then here, we have everything here we are actually mostly used to.
+
+01:26:20.380 --> 01:26:21.620
+We are sampling batch.
+
+01:26:21.940 --> 01:26:23.120
+We are doing forward pass.
+
+01:26:23.240 --> 01:26:26.640
+The forward pass now is just a linear application of all the layers in order,
+
+01:26:27.460 --> 01:26:28.480
+followed by the cross entropy.
+
+01:26:29.460 --> 01:26:31.960
+And then in the backward pass, you'll notice that for every single layer,
+
+01:26:32.220 --> 01:26:33.760
+I now iterate over all the outputs.
+
+01:26:34.180 --> 01:26:34.600
+And I'm telling you,
+
+01:26:34.820 --> 01:26:36.720
+I'm telling PyTorch to retain the gradient of them.
+
+01:26:37.420 --> 01:26:41.320
+And then here, we are already used to all the gradients set to none,
+
+01:26:41.720 --> 01:26:43.420
+do the backward to fill in the gradients,
+
+01:26:43.920 --> 01:26:45.820
+do an update using stochastic gradient send,
+
+01:26:46.320 --> 01:26:48.120
+and then track some statistics.
+
+01:26:48.720 --> 01:26:51.620
+And then I am going to break after a single iteration.
+
+01:26:52.020 --> 01:26:53.920
+Now, here in this cell, in this diagram,
+
+01:26:54.120 --> 01:26:58.420
+I'm visualizing the histograms of the forward pass activations,
+
+01:26:58.720 --> 01:27:01.220
+and I'm specifically doing it at the 10-inch layers.
+
+01:27:01.820 --> 01:27:04.120
+So iterating over all the layers,
+
+01:27:04.120 --> 01:27:05.520
+except for the very last one,
+
+01:27:05.720 --> 01:27:08.220
+which is basically just the softmax layer.
+
+01:27:10.220 --> 01:27:11.620
+If it is a 10-inch layer,
+
+01:27:11.820 --> 01:27:14.520
+and I'm using a 10-inch layer just because they have a finite output,
+
+01:27:14.720 --> 01:27:15.420
+negative one to one.
+
+01:27:15.620 --> 01:27:17.220
+And so it's very easy to visualize here.
+
+01:27:17.420 --> 01:27:18.820
+So you see negative one to one,
+
+01:27:19.020 --> 01:27:20.820
+and it's a finite range and easy to work with.
+
+01:27:21.820 --> 01:27:25.220
+I take the out tensor from that layer into T,
+
+01:27:25.620 --> 01:27:26.920
+and then I'm calculating the mean,
+
+01:27:27.120 --> 01:27:28.020
+the standard deviation,
+
+01:27:28.220 --> 01:27:30.020
+and the percent saturation of T.
+
+01:27:30.720 --> 01:27:32.720
+And the way I define the percent saturation is that
+
+01:27:32.920 --> 01:27:33.920
+T dot absolute value
+
+01:27:33.920 --> 01:27:35.020
+is greater than 0.97.
+
+01:27:35.520 --> 01:27:38.320
+So that means we are here at the tails of the 10-inch.
+
+01:27:38.720 --> 01:27:40.820
+And remember that when we are in the tails of the 10-inch,
+
+01:27:41.020 --> 01:27:42.420
+that will actually stop gradients.
+
+01:27:42.820 --> 01:27:44.420
+So we don't want this to be too high.
+
+01:27:45.620 --> 01:27:48.520
+Now, here I'm calling torch dot histogram,
+
+01:27:49.020 --> 01:27:50.720
+and then I am plotting this histogram.
+
+01:27:51.320 --> 01:27:52.620
+So basically what this is doing is that
+
+01:27:52.820 --> 01:27:53.920
+every different type of layer,
+
+01:27:54.120 --> 01:27:55.120
+and they all have a different color,
+
+01:27:55.420 --> 01:27:59.620
+we are looking at how many values in these tensors
+
+01:27:59.820 --> 01:28:03.520
+take on any of the values below on this axis here.
+
+01:28:03.920 --> 01:28:08.020
+So the first layer is fairly saturated here at 20%.
+
+01:28:08.220 --> 01:28:10.120
+So you can see that it's got tails here,
+
+01:28:10.320 --> 01:28:12.120
+but then everything sort of stabilizes.
+
+01:28:12.320 --> 01:28:13.820
+And if we had more layers here,
+
+01:28:14.020 --> 01:28:15.020
+it would actually just stabilize
+
+01:28:15.220 --> 01:28:17.420
+at around the standard deviation of about 0.65,
+
+01:28:17.620 --> 01:28:20.020
+and the saturation would be roughly 5%.
+
+01:28:20.220 --> 01:28:22.320
+And the reason that this stabilizes
+
+01:28:22.520 --> 01:28:24.120
+and gives us a nice distribution here
+
+01:28:24.320 --> 01:28:26.820
+is because gain is set to 5 over 3.
+
+01:28:27.020 --> 01:28:30.120
+Now, here, this gain,
+
+01:28:30.320 --> 01:28:33.320
+you see that by default we initialize with
+
+01:28:33.320 --> 01:28:34.920
+1 over square root of fan in.
+
+01:28:35.120 --> 01:28:36.720
+But then here during initialization,
+
+01:28:36.920 --> 01:28:38.620
+I come in and I iterate over all the layers,
+
+01:28:38.820 --> 01:28:41.420
+and if it's a linear layer, I boost that by the gain.
+
+01:28:41.620 --> 01:28:44.020
+Now, we saw that 1,
+
+01:28:44.220 --> 01:28:46.720
+so basically if we just do not use a gain,
+
+01:28:46.920 --> 01:28:47.920
+then what happens?
+
+01:28:48.120 --> 01:28:49.720
+If I redraw this,
+
+01:28:49.920 --> 01:28:53.720
+you will see that the standard deviation is shrinking,
+
+01:28:53.920 --> 01:28:56.420
+and the saturation is coming to 0.
+
+01:28:56.620 --> 01:28:58.120
+And basically what's happening is
+
+01:28:58.320 --> 01:29:00.520
+the first layer is pretty decent,
+
+01:29:00.720 --> 01:29:02.920
+but then further layers are just kind of like,
+
+01:29:03.320 --> 01:29:04.820
+shrinking down to 0.
+
+01:29:05.020 --> 01:29:07.520
+And it's happening slowly, but it's shrinking to 0.
+
+01:29:07.720 --> 01:29:09.420
+And the reason for that is
+
+01:29:09.620 --> 01:29:13.020
+when you just have a sandwich of linear layers alone,
+
+01:29:13.220 --> 01:29:17.820
+then initializing our weights in this manner,
+
+01:29:18.020 --> 01:29:19.020
+we saw previously,
+
+01:29:19.220 --> 01:29:22.020
+would have conserved the standard deviation of 1.
+
+01:29:22.220 --> 01:29:26.420
+But because we have this interspersed 10H layers in there,
+
+01:29:26.620 --> 01:29:29.420
+these 10H layers are squashing functions.
+
+01:29:29.620 --> 01:29:31.220
+And so they take your distribution
+
+01:29:31.420 --> 01:29:32.820
+and they slightly squash it.
+
+01:29:32.820 --> 01:29:36.920
+And so some gain is necessary to keep expanding it
+
+01:29:37.120 --> 01:29:39.720
+to fight the squashing.
+
+01:29:39.920 --> 01:29:43.220
+So it just turns out that 5 over 3 is a good value.
+
+01:29:43.420 --> 01:29:45.520
+So if we have something too small like 1,
+
+01:29:45.720 --> 01:29:48.820
+we saw that things will come towards 0.
+
+01:29:49.020 --> 01:29:52.220
+But if it's something too high, let's do 2.
+
+01:29:52.420 --> 01:29:56.420
+Then here we see that,
+
+01:29:56.620 --> 01:29:59.020
+well, let me do something a bit more extreme
+
+01:29:59.220 --> 01:30:00.320
+so it's a bit more visible.
+
+01:30:00.520 --> 01:30:02.320
+Let's try 3.
+
+01:30:02.320 --> 01:30:03.920
+So we see here that the saturations
+
+01:30:04.120 --> 01:30:05.920
+are trying to be way too large.
+
+01:30:06.120 --> 01:30:10.120
+So 3 would create way too saturated activations.
+
+01:30:10.320 --> 01:30:12.920
+So 5 over 3 is a good setting
+
+01:30:13.120 --> 01:30:17.120
+for a sandwich of linear layers with 10H activations.
+
+01:30:17.320 --> 01:30:20.120
+And it roughly stabilizes the standard deviation
+
+01:30:20.320 --> 01:30:22.120
+at a reasonable point.
+
+01:30:22.320 --> 01:30:24.120
+Now, honestly, I have no idea
+
+01:30:24.320 --> 01:30:26.120
+where 5 over 3 came from in PyTorch
+
+01:30:26.320 --> 01:30:29.120
+when we were looking at the coming initialization.
+
+01:30:29.320 --> 01:30:32.120
+I see empirically that it stabilizes
+
+01:30:32.320 --> 01:30:34.120
+a sandwich of linear and 10H
+
+01:30:34.320 --> 01:30:36.120
+and that the saturation is in a good range.
+
+01:30:36.320 --> 01:30:39.120
+But I don't actually know if this came out of some math formula.
+
+01:30:39.320 --> 01:30:42.120
+I tried searching briefly for where this comes from,
+
+01:30:42.320 --> 01:30:44.120
+but I wasn't able to find anything.
+
+01:30:44.320 --> 01:30:46.120
+But certainly we see that empirically
+
+01:30:46.320 --> 01:30:47.120
+these are very nice ranges.
+
+01:30:47.320 --> 01:30:49.120
+Our saturation is roughly 5%,
+
+01:30:49.320 --> 01:30:51.120
+which is a pretty good number.
+
+01:30:51.320 --> 01:30:55.120
+And this is a good setting of the gain in this context.
+
+01:30:55.320 --> 01:30:58.120
+Similarly, we can do the exact same thing with the gradients.
+
+01:30:58.320 --> 01:31:01.120
+So here is a very same loop if it's a 10H,
+
+01:31:01.120 --> 01:31:02.920
+but instead of taking the layer.out,
+
+01:31:03.120 --> 01:31:03.920
+I'm taking the grad.
+
+01:31:04.120 --> 01:31:06.920
+And then I'm also showing the mean and the standard deviation.
+
+01:31:07.120 --> 01:31:09.920
+And I'm plotting the histogram of these values.
+
+01:31:10.120 --> 01:31:11.920
+And so you'll see that the gradient distribution
+
+01:31:12.120 --> 01:31:12.920
+is fairly reasonable.
+
+01:31:13.120 --> 01:31:14.920
+And in particular, what we're looking for
+
+01:31:15.120 --> 01:31:17.920
+is that all the different layers in this sandwich
+
+01:31:18.120 --> 01:31:19.920
+has roughly the same gradient.
+
+01:31:20.120 --> 01:31:21.920
+Things are not shrinking or exploding.
+
+01:31:22.120 --> 01:31:23.920
+So we can, for example, come here
+
+01:31:24.120 --> 01:31:25.920
+and we can take a look at what happens
+
+01:31:26.120 --> 01:31:27.920
+if this gain was way too small.
+
+01:31:28.120 --> 01:31:29.920
+So this was 0.5.
+
+01:31:29.920 --> 01:31:31.720
+Then you see the...
+
+01:31:31.920 --> 01:31:33.720
+First of all, the activations are shrinking to 0,
+
+01:31:33.920 --> 01:31:35.720
+but also the gradients are doing something weird.
+
+01:31:35.920 --> 01:31:37.720
+The gradients started out here
+
+01:31:37.920 --> 01:31:40.720
+and then now they're like expanding out.
+
+01:31:40.920 --> 01:31:43.720
+And similarly, if we, for example, have a 2 high of a gain,
+
+01:31:43.920 --> 01:31:45.720
+so like 3,
+
+01:31:45.920 --> 01:31:47.720
+then we see that also the gradients have...
+
+01:31:47.920 --> 01:31:49.720
+There's some asymmetry going on where
+
+01:31:49.920 --> 01:31:51.720
+as you go into deeper and deeper layers,
+
+01:31:51.920 --> 01:31:53.720
+the activations are also changing.
+
+01:31:53.920 --> 01:31:55.720
+And so that's not what we want.
+
+01:31:55.920 --> 01:31:57.720
+And in this case, we saw that without the use of BatchNorm,
+
+01:31:57.920 --> 01:31:59.720
+as we are going through right now,
+
+01:31:59.920 --> 01:32:02.720
+we have to very carefully set those gains
+
+01:32:02.920 --> 01:32:04.720
+to get nice activations
+
+01:32:04.920 --> 01:32:07.720
+in both the forward pass and the backward pass.
+
+01:32:07.920 --> 01:32:09.720
+Now, before we move on to BatchNormalization,
+
+01:32:09.920 --> 01:32:11.720
+I would also like to take a look at what happens
+
+01:32:11.920 --> 01:32:13.720
+when we have no 10H units here.
+
+01:32:13.920 --> 01:32:16.720
+So erasing all the 10H nonlinearities,
+
+01:32:16.920 --> 01:32:18.720
+but keeping the gain at 5 over 3,
+
+01:32:18.920 --> 01:32:21.720
+we now have just a giant linear sandwich.
+
+01:32:21.920 --> 01:32:23.720
+So let's see what happens to the activations.
+
+01:32:23.920 --> 01:32:26.720
+As we saw before, the correct gain here is 1.
+
+01:32:26.920 --> 01:32:29.720
+That is the standard deviation preserving gain.
+
+01:32:29.720 --> 01:32:33.520
+So 1.667 is too high.
+
+01:32:33.720 --> 01:32:37.520
+And so what's going to happen now is the following.
+
+01:32:37.720 --> 01:32:39.520
+I have to change this to be linear,
+
+01:32:39.720 --> 01:32:42.520
+because there's no more 10H layers.
+
+01:32:42.720 --> 01:32:45.520
+And let me change this to linear as well.
+
+01:32:45.720 --> 01:32:47.520
+So what we're seeing is
+
+01:32:47.720 --> 01:32:50.520
+the activations started out on the blue
+
+01:32:50.720 --> 01:32:54.520
+and have, by layer 4, become very diffuse.
+
+01:32:54.720 --> 01:32:57.520
+So what's happening to the activations is this.
+
+01:32:57.720 --> 01:32:59.520
+And with the gradients,
+
+01:32:59.520 --> 01:33:01.320
+on the top layer, the activation,
+
+01:33:01.520 --> 01:33:04.320
+the gradient statistics are the purple,
+
+01:33:04.520 --> 01:33:07.320
+and then they diminish as you go down deeper in the layers.
+
+01:33:07.520 --> 01:33:10.320
+And so basically you have an asymmetry in the neural net.
+
+01:33:10.520 --> 01:33:13.320
+And you might imagine that if you have very deep neural networks,
+
+01:33:13.520 --> 01:33:15.320
+say like 50 layers or something like that,
+
+01:33:15.520 --> 01:33:18.320
+this is not a good place to be.
+
+01:33:18.520 --> 01:33:21.320
+So that's why before BatchNormalization,
+
+01:33:21.520 --> 01:33:24.320
+this was incredibly tricky to set.
+
+01:33:24.520 --> 01:33:27.320
+In particular, if this is too large of a gain, this happens.
+
+01:33:27.520 --> 01:33:29.320
+And if it's too little of a gain,
+
+01:33:29.520 --> 01:33:31.320
+then this happens.
+
+01:33:31.520 --> 01:33:33.320
+So the opposite of that basically happens.
+
+01:33:33.520 --> 01:33:39.320
+Here we have a shrinking and a diffusion,
+
+01:33:39.520 --> 01:33:42.320
+depending on which direction you look at it from.
+
+01:33:42.520 --> 01:33:44.320
+And so certainly this is not what you want.
+
+01:33:44.520 --> 01:33:45.320
+And in this case,
+
+01:33:45.520 --> 01:33:48.320
+the correct setting of the gain is exactly 1,
+
+01:33:48.520 --> 01:33:50.320
+just like we're doing at initialization.
+
+01:33:50.520 --> 01:33:53.320
+And then we see that the statistics
+
+01:33:53.520 --> 01:33:56.320
+for the forward and the backward pass are well behaved.
+
+01:33:56.520 --> 01:33:59.320
+And so the reason I want to show you this
+
+01:33:59.320 --> 01:34:02.120
+is that basically getting neural nets to train
+
+01:34:02.320 --> 01:34:04.120
+before these normalization layers
+
+01:34:04.320 --> 01:34:07.120
+and before the use of advanced optimizers like Atom,
+
+01:34:07.320 --> 01:34:09.120
+which we still have to cover,
+
+01:34:09.320 --> 01:34:11.120
+and residual connections and so on,
+
+01:34:11.320 --> 01:34:13.120
+training neural nets basically looked like this.
+
+01:34:13.320 --> 01:34:15.120
+It's like a total balancing act.
+
+01:34:15.320 --> 01:34:18.120
+You have to make sure that everything is precisely orchestrated
+
+01:34:18.320 --> 01:34:20.120
+and you have to care about the activations
+
+01:34:20.320 --> 01:34:22.120
+and the gradients and their statistics.
+
+01:34:22.320 --> 01:34:24.120
+And then maybe you can train something.
+
+01:34:24.320 --> 01:34:26.120
+But it was basically impossible to train very deep networks.
+
+01:34:26.320 --> 01:34:28.120
+And this is fundamentally the reason for that.
+
+01:34:28.120 --> 01:34:31.920
+You'd have to be very, very careful with your initialization.
+
+01:34:32.120 --> 01:34:34.920
+The other point here is you might be asking yourself,
+
+01:34:35.120 --> 01:34:36.920
+by the way, I'm not sure if I covered this.
+
+01:34:37.120 --> 01:34:39.920
+Why do we need these 10H layers at all?
+
+01:34:40.120 --> 01:34:42.920
+Why do we include them and then have to worry about the gain?
+
+01:34:43.120 --> 01:34:44.920
+And the reason for that, of course,
+
+01:34:45.120 --> 01:34:46.920
+is that if you just have a stack of linear layers,
+
+01:34:47.120 --> 01:34:49.920
+then certainly we're getting very easily
+
+01:34:50.120 --> 01:34:51.920
+nice activations and so on.
+
+01:34:52.120 --> 01:34:53.920
+But this is just a massive linear sandwich.
+
+01:34:54.120 --> 01:34:56.920
+And it turns out that it collapses to a single linear layer
+
+01:34:56.920 --> 01:34:58.720
+in terms of its representation power.
+
+01:34:58.920 --> 01:35:02.720
+So if you were to plot the output as a function of the input,
+
+01:35:02.920 --> 01:35:04.720
+you're just getting a linear function.
+
+01:35:04.920 --> 01:35:06.720
+No matter how many linear layers you stack up,
+
+01:35:06.920 --> 01:35:08.720
+you still just end up with a linear transformation.
+
+01:35:08.920 --> 01:35:13.720
+All the WX plus Bs just collapse into a large WX plus B
+
+01:35:13.920 --> 01:35:16.720
+with slightly different Ws and slightly different Bs.
+
+01:35:16.920 --> 01:35:19.720
+But interestingly, even though the forward pass collapses
+
+01:35:19.920 --> 01:35:22.720
+to just a linear layer, because of back propagation
+
+01:35:22.920 --> 01:35:25.720
+and the dynamics of the backward pass,
+
+01:35:25.720 --> 01:35:28.520
+the optimization actually is not identical.
+
+01:35:28.720 --> 01:35:32.520
+You actually end up with all kinds of interesting dynamics
+
+01:35:32.720 --> 01:35:35.520
+in the backward pass because of the way
+
+01:35:35.720 --> 01:35:37.520
+the chain rule is calculating it.
+
+01:35:37.720 --> 01:35:40.520
+And so optimizing a linear layer by itself
+
+01:35:40.720 --> 01:35:43.520
+and optimizing a sandwich of 10 linear layers,
+
+01:35:43.720 --> 01:35:45.520
+in both cases, those are just a linear transformation
+
+01:35:45.720 --> 01:35:47.520
+in the forward pass, but the training dynamics
+
+01:35:47.720 --> 01:35:48.520
+would be different.
+
+01:35:48.720 --> 01:35:50.520
+And there's entire papers that analyze, in fact,
+
+01:35:50.720 --> 01:35:53.520
+infinitely layered linear layers and so on.
+
+01:35:53.720 --> 01:35:55.520
+And so there's a lot of things
+
+01:35:55.520 --> 01:35:57.320
+that you can play with there.
+
+01:35:57.520 --> 01:36:00.320
+But basically, the 10-inch nonlinearities
+
+01:36:00.520 --> 01:36:05.320
+allow us to turn this sandwich
+
+01:36:05.520 --> 01:36:11.320
+from just a linear function into a neural network
+
+01:36:11.520 --> 01:36:14.320
+that can, in principle, approximate any arbitrary function.
+
+01:36:14.520 --> 01:36:17.320
+Okay, so now I've reset the code to use
+
+01:36:17.520 --> 01:36:20.320
+the linear 10-inch sandwich like before.
+
+01:36:20.520 --> 01:36:23.320
+And I reset everything, so the gain is 5 over 3.
+
+01:36:23.520 --> 01:36:25.320
+We can run a single step of optimization.
+
+01:36:25.520 --> 01:36:27.320
+And we can look at the activation statistics
+
+01:36:27.520 --> 01:36:29.320
+of the forward pass and the backward pass.
+
+01:36:29.520 --> 01:36:31.320
+But I've added one more plot here
+
+01:36:31.520 --> 01:36:33.320
+that I think is really important to look at
+
+01:36:33.520 --> 01:36:35.320
+when you're training your neural nets and to consider.
+
+01:36:35.520 --> 01:36:37.320
+And ultimately, what we're doing is
+
+01:36:37.520 --> 01:36:39.320
+we're updating the parameters of the neural net.
+
+01:36:39.520 --> 01:36:41.320
+So we care about the parameters
+
+01:36:41.520 --> 01:36:43.320
+and their values and their gradients.
+
+01:36:43.520 --> 01:36:45.320
+So here what I'm doing is I'm actually
+
+01:36:45.520 --> 01:36:47.320
+iterating over all the parameters available
+
+01:36:47.520 --> 01:36:50.320
+and then I'm only restricting it
+
+01:36:50.520 --> 01:36:52.320
+to the two-dimensional parameters,
+
+01:36:52.520 --> 01:36:54.320
+which are basically the weights of these linear layers.
+
+01:36:54.320 --> 01:36:56.120
+And I'm skipping the biases
+
+01:36:56.320 --> 01:36:59.120
+and I'm skipping the gammas and the betas
+
+01:36:59.320 --> 01:37:02.120
+in the bash term just for simplicity.
+
+01:37:02.320 --> 01:37:04.120
+But you can also take a look at those as well.
+
+01:37:04.320 --> 01:37:06.120
+But what's happening with the weights
+
+01:37:06.320 --> 01:37:08.120
+is instructive by itself.
+
+01:37:08.320 --> 01:37:12.120
+So here we have all the different weights, their shapes.
+
+01:37:12.320 --> 01:37:14.120
+So this is the embedding layer,
+
+01:37:14.320 --> 01:37:15.120
+the first linear layer,
+
+01:37:15.320 --> 01:37:17.120
+all the way to the very last linear layer.
+
+01:37:17.320 --> 01:37:18.120
+And then we have the mean,
+
+01:37:18.320 --> 01:37:21.120
+the standard deviation of all these parameters.
+
+01:37:21.320 --> 01:37:23.120
+The histogram, and you can see that
+
+01:37:23.120 --> 01:37:24.920
+it actually doesn't look that amazing.
+
+01:37:25.120 --> 01:37:26.920
+So there's some trouble in paradise.
+
+01:37:27.120 --> 01:37:28.920
+Even though these gradients looked okay,
+
+01:37:29.120 --> 01:37:30.920
+there's something weird going on here.
+
+01:37:31.120 --> 01:37:32.920
+I'll get to that in a second.
+
+01:37:33.120 --> 01:37:35.920
+And the last thing here is the gradient to data ratio.
+
+01:37:36.120 --> 01:37:37.920
+So sometimes I like to visualize this as well
+
+01:37:38.120 --> 01:37:39.920
+because what this gives you a sense of is
+
+01:37:40.120 --> 01:37:41.920
+what is the scale of the gradient
+
+01:37:42.120 --> 01:37:44.920
+compared to the scale of the actual values?
+
+01:37:45.120 --> 01:37:47.920
+And this is important because we're going to end up
+
+01:37:48.120 --> 01:37:49.920
+taking a step update
+
+01:37:50.120 --> 01:37:52.920
+that is the learning rate times the gradient
+
+01:37:52.920 --> 01:37:53.920
+to the data.
+
+01:37:54.120 --> 01:37:56.520
+And so if the gradient has too large of a magnitude,
+
+01:37:56.720 --> 01:37:58.120
+if the numbers in there are too large
+
+01:37:58.320 --> 01:37:59.920
+compared to the numbers in data,
+
+01:38:00.120 --> 01:38:01.520
+then you'd be in trouble.
+
+01:38:01.720 --> 01:38:05.120
+But in this case, the gradient to data is our low numbers.
+
+01:38:05.320 --> 01:38:09.120
+So the values inside grad are 1000 times smaller
+
+01:38:09.320 --> 01:38:13.720
+than the values inside data in these weights, most of them.
+
+01:38:13.920 --> 01:38:16.920
+Now, notably, that is not true about the last layer.
+
+01:38:17.120 --> 01:38:18.320
+And so the last layer actually here,
+
+01:38:18.520 --> 01:38:20.520
+the output layer is a bit of a troublemaker
+
+01:38:20.720 --> 01:38:22.520
+in the way that this is currently arranged,
+
+01:38:22.520 --> 01:38:28.320
+because you can see that the last layer here in pink
+
+01:38:28.520 --> 01:38:30.320
+takes on values that are much larger
+
+01:38:30.520 --> 01:38:35.320
+than some of the values inside the neural net.
+
+01:38:35.520 --> 01:38:38.320
+So the standard deviations are roughly 1 in negative 3 throughout,
+
+01:38:38.520 --> 01:38:41.320
+except for the last layer,
+
+01:38:41.520 --> 01:38:43.320
+which actually has roughly 1 in negative 2
+
+01:38:43.520 --> 01:38:45.320
+standard deviation of gradients.
+
+01:38:45.520 --> 01:38:47.320
+And so the gradients on the last layer
+
+01:38:47.520 --> 01:38:50.320
+are currently about 100 times greater,
+
+01:38:50.520 --> 01:38:52.320
+sorry, 10 times greater
+
+01:38:52.520 --> 01:38:55.720
+than all the other weights inside the neural net.
+
+01:38:55.920 --> 01:38:56.720
+And so that's problematic,
+
+01:38:56.920 --> 01:39:00.120
+because in the simple stochastic gradient descent setup,
+
+01:39:00.320 --> 01:39:03.520
+you would be training this last layer about 10 times faster
+
+01:39:03.720 --> 01:39:06.920
+than you would be training the other layers at initialization.
+
+01:39:07.120 --> 01:39:09.920
+Now, this actually kind of fixes itself a little bit
+
+01:39:10.120 --> 01:39:11.120
+if you train for a bit longer.
+
+01:39:11.320 --> 01:39:13.920
+So, for example, if I greater than 1000,
+
+01:39:14.120 --> 01:39:17.320
+only then do a break, let me reinitialize,
+
+01:39:17.520 --> 01:39:19.920
+and then let me do it 1000 steps.
+
+01:39:20.120 --> 01:39:22.320
+And after 1000 steps, we can look at the
+
+01:39:22.720 --> 01:39:24.120
+forward pass.
+
+01:39:24.320 --> 01:39:26.120
+OK, so you see how the neurons are a bit,
+
+01:39:26.320 --> 01:39:27.720
+are saturating a bit.
+
+01:39:27.920 --> 01:39:29.920
+And we can also look at the backward pass,
+
+01:39:30.120 --> 01:39:31.120
+but otherwise they look good.
+
+01:39:31.320 --> 01:39:33.920
+They're about equal and there's no shrinking to zero
+
+01:39:34.120 --> 01:39:36.120
+or exploding to infinities.
+
+01:39:36.320 --> 01:39:38.520
+And you can see that here in the weights,
+
+01:39:38.720 --> 01:39:40.120
+things are also stabilizing a little bit.
+
+01:39:40.320 --> 01:39:42.720
+So the tails of the last pink layer
+
+01:39:42.920 --> 01:39:46.320
+are actually coming in during the optimization.
+
+01:39:46.520 --> 01:39:48.720
+But certainly this is like a little bit troubling,
+
+01:39:48.920 --> 01:39:50.920
+especially if you are using a very simple update rule
+
+01:39:50.920 --> 01:39:52.520
+like stochastic gradient descent
+
+01:39:52.720 --> 01:39:55.120
+instead of a modern optimizer like Atom.
+
+01:39:55.320 --> 01:39:56.520
+Now I'd like to show you one more plot
+
+01:39:56.720 --> 01:39:58.920
+that I usually look at when I train neural networks.
+
+01:39:59.120 --> 01:40:01.720
+And basically the gradient to data ratio
+
+01:40:01.920 --> 01:40:03.120
+is not actually that informative
+
+01:40:03.320 --> 01:40:04.320
+because what matters at the end
+
+01:40:04.520 --> 01:40:06.120
+is not the gradient to data ratio,
+
+01:40:06.320 --> 01:40:08.320
+but the update to the data ratio,
+
+01:40:08.520 --> 01:40:09.520
+because that is the amount by which
+
+01:40:09.720 --> 01:40:12.920
+we will actually change the data in these tensors.
+
+01:40:13.120 --> 01:40:14.320
+So coming up here,
+
+01:40:14.520 --> 01:40:15.720
+what I'd like to do is I'd like to introduce
+
+01:40:15.920 --> 01:40:19.720
+a new update to data ratio.
+
+01:40:19.920 --> 01:40:20.820
+It's going to be less than,
+
+01:40:21.020 --> 01:40:23.120
+I'm going to build it out every single iteration.
+
+01:40:23.320 --> 01:40:25.720
+And here I'd like to keep track of basically
+
+01:40:25.920 --> 01:40:29.920
+the ratio every single iteration.
+
+01:40:30.120 --> 01:40:33.520
+So without any gradients,
+
+01:40:33.720 --> 01:40:34.920
+I'm comparing the update,
+
+01:40:35.120 --> 01:40:38.920
+which is learning rate times the gradient.
+
+01:40:39.120 --> 01:40:40.320
+That is the update that we're going to apply
+
+01:40:40.520 --> 01:40:42.520
+to every parameter.
+
+01:40:42.720 --> 01:40:44.520
+So see I'm iterating over all the parameters.
+
+01:40:44.720 --> 01:40:46.320
+And then I'm taking the basically standard deviation
+
+01:40:46.520 --> 01:40:48.120
+of the update we're going to apply
+
+01:40:48.320 --> 01:40:49.720
+and divide it
+
+01:40:49.820 --> 01:40:52.420
+by the actual content,
+
+01:40:52.620 --> 01:40:56.020
+the data of that parameter and its standard deviation.
+
+01:40:56.220 --> 01:40:58.020
+So this is the ratio of basically
+
+01:40:58.220 --> 01:41:02.220
+how great are the updates to the values in these tensors.
+
+01:41:02.420 --> 01:41:03.420
+Then we're going to take a log of it.
+
+01:41:03.620 --> 01:41:07.320
+And actually, I'd like to take a log 10
+
+01:41:07.520 --> 01:41:10.220
+just so it's a nicer visualization.
+
+01:41:10.420 --> 01:41:12.320
+So we're going to be basically looking at the exponents
+
+01:41:12.520 --> 01:41:16.620
+of this division here
+
+01:41:16.820 --> 01:41:19.620
+and then that item to pop out the float.
+
+01:41:19.920 --> 01:41:21.020
+I'm going to be keeping track of this
+
+01:41:21.220 --> 01:41:24.420
+for all the parameters and adding it to this UD tensor.
+
+01:41:24.620 --> 01:41:27.920
+So now let me re-initialize and run a thousand iterations.
+
+01:41:28.120 --> 01:41:30.920
+We can look at the activations,
+
+01:41:31.120 --> 01:41:33.220
+the gradients and the parameter gradients
+
+01:41:33.420 --> 01:41:34.520
+as we did before.
+
+01:41:34.720 --> 01:41:37.820
+But now I have one more plot here to introduce.
+
+01:41:38.020 --> 01:41:39.520
+And what's happening here is we're iterating over
+
+01:41:39.720 --> 01:41:42.120
+all the parameters and I'm constraining it again,
+
+01:41:42.320 --> 01:41:44.920
+like I did here, to just the weights.
+
+01:41:45.120 --> 01:41:48.120
+So the number of dimensions in these sensors is two.
+
+01:41:48.320 --> 01:41:49.420
+And then I'm basically plotting
+
+01:41:49.420 --> 01:41:54.320
+all of these update ratios over time.
+
+01:41:54.520 --> 01:41:56.520
+So when I plot this,
+
+01:41:56.720 --> 01:41:59.320
+I plot those ratios and you can see that they evolve over time
+
+01:41:59.520 --> 01:42:01.820
+during initialization to take on certain values.
+
+01:42:02.020 --> 01:42:04.020
+And then these updates sort of like start stabilizing
+
+01:42:04.220 --> 01:42:05.820
+usually during training.
+
+01:42:06.020 --> 01:42:07.220
+Then the other thing that I'm plotting here
+
+01:42:07.420 --> 01:42:09.220
+is I'm plotting here like an approximate value
+
+01:42:09.420 --> 01:42:12.720
+that is a rough guide for what it roughly should be.
+
+01:42:12.920 --> 01:42:15.320
+And it should be like roughly one in negative three.
+
+01:42:15.520 --> 01:42:19.320
+And so that means that basically there's some values in this tensor.
+
+01:42:19.520 --> 01:42:21.620
+And they take on certain values.
+
+01:42:21.820 --> 01:42:24.020
+And the updates to them at every single iteration
+
+01:42:24.220 --> 01:42:26.720
+are no more than roughly one thousandth
+
+01:42:26.920 --> 01:42:30.720
+of the actual like magnitude in those tensors.
+
+01:42:30.920 --> 01:42:33.220
+If this was much larger, like for example,
+
+01:42:33.420 --> 01:42:37.520
+if the log of this was like say negative one,
+
+01:42:37.720 --> 01:42:39.920
+this is actually updating those values quite a lot.
+
+01:42:40.120 --> 01:42:42.020
+They're undergoing a lot of change.
+
+01:42:42.220 --> 01:42:46.420
+But the reason that the final layer here is an outlier
+
+01:42:46.620 --> 01:42:49.220
+is because this layer was artificially
+
+01:42:49.520 --> 01:42:54.320
+struck down to keep the softmax unconfident.
+
+01:42:54.520 --> 01:42:59.220
+So here you see how we multiply the weight by 0.1
+
+01:42:59.420 --> 01:43:04.020
+in the initialization to make the last layer prediction less confident.
+
+01:43:04.220 --> 01:43:09.220
+That artificially made the values inside that tensor way too low.
+
+01:43:09.420 --> 01:43:12.020
+And that's why we're getting temporarily a very high ratio.
+
+01:43:12.220 --> 01:43:14.020
+But you see that that stabilizes over time
+
+01:43:14.220 --> 01:43:17.820
+once that weight starts to learn.
+
+01:43:18.020 --> 01:43:19.320
+But basically, I like to look at the evolution.
+
+01:43:19.520 --> 01:43:23.020
+Of this update ratio for all my parameters usually.
+
+01:43:23.220 --> 01:43:29.420
+And I like to make sure that it's not too much above one in negative three roughly.
+
+01:43:29.620 --> 01:43:32.820
+So around negative three on this log plot.
+
+01:43:33.020 --> 01:43:34.020
+If it's below negative three,
+
+01:43:34.220 --> 01:43:37.220
+usually that means that the parameters are not training fast enough.
+
+01:43:37.420 --> 01:43:38.820
+So if our learning rate was very low,
+
+01:43:39.020 --> 01:43:41.520
+let's do that experiment.
+
+01:43:41.720 --> 01:43:43.020
+Let's initialize.
+
+01:43:43.220 --> 01:43:47.320
+And then let's actually do a learning rate of say one in negative three here.
+
+01:43:47.520 --> 01:43:49.320
+So 0.001.
+
+01:43:49.620 --> 01:43:53.620
+If your learning rate is way too low,
+
+01:43:53.820 --> 01:43:56.220
+this plot will typically reveal it.
+
+01:43:56.420 --> 01:44:00.120
+So you see how all of these updates are way too small.
+
+01:44:00.320 --> 01:44:06.220
+So the size of the update is basically 10,000 times
+
+01:44:06.420 --> 01:44:10.520
+in magnitude to the size of the numbers in that tensor in the first place.
+
+01:44:10.720 --> 01:44:14.420
+So this is a symptom of training way too slow.
+
+01:44:14.620 --> 01:44:16.820
+So this is another way to sometimes set the learning rate
+
+01:44:17.020 --> 01:44:19.320
+and to get a sense of what that learning rate should be.
+
+01:44:19.520 --> 01:44:23.820
+So ultimately, this is something that you would keep track of.
+
+01:44:25.020 --> 01:44:29.320
+If anything, the learning rate here is a little bit on the higher side
+
+01:44:29.520 --> 01:44:33.920
+because you see that we're above the black line of negative three.
+
+01:44:34.120 --> 01:44:35.720
+We're somewhere around negative 2.5.
+
+01:44:35.920 --> 01:44:36.820
+It's like, OK.
+
+01:44:37.020 --> 01:44:39.620
+And but everything is like somewhat stabilizing.
+
+01:44:39.820 --> 01:44:43.820
+And so this looks like a pretty decent setting of learning rates and so on.
+
+01:44:44.020 --> 01:44:45.220
+But this is something to look at.
+
+01:44:45.420 --> 01:44:48.220
+And when things are miscalibrated, you will see very quickly.
+
+01:44:48.420 --> 01:44:49.320
+So for example,
+
+01:44:49.520 --> 01:44:52.020
+everything looks pretty well behaved, right?
+
+01:44:52.220 --> 01:44:55.020
+But just as a comparison, when things are not properly calibrated,
+
+01:44:55.220 --> 01:44:56.220
+what does that look like?
+
+01:44:56.420 --> 01:45:01.520
+Let me come up here and let's say that, for example, what do we do?
+
+01:45:01.720 --> 01:45:05.720
+Let's say that we forgot to apply this fan in normalization.
+
+01:45:05.920 --> 01:45:07.220
+So the weights inside the linear layers
+
+01:45:07.420 --> 01:45:10.520
+are just a sample from a Gaussian in all the stages.
+
+01:45:10.720 --> 01:45:14.220
+What happens to our how do we notice that something's off?
+
+01:45:14.420 --> 01:45:18.520
+Well, the activation plot will tell you, whoa, your neurons are way too saturated.
+
+01:45:18.620 --> 01:45:21.220
+The gradients are going to be all messed up.
+
+01:45:21.420 --> 01:45:25.020
+The histogram for these weights are going to be all messed up as well.
+
+01:45:25.220 --> 01:45:26.820
+And there's a lot of asymmetry.
+
+01:45:27.020 --> 01:45:30.420
+And then if we look here, I suspect it's all going to be also pretty messed up.
+
+01:45:30.620 --> 01:45:36.220
+So you see, there's a lot of discrepancy in how fast these layers are learning.
+
+01:45:36.420 --> 01:45:38.320
+And some of them are learning way too fast.
+
+01:45:38.520 --> 01:45:41.320
+So negative one, negative 1.5.
+
+01:45:41.520 --> 01:45:44.020
+Those are very large numbers in terms of this ratio.
+
+01:45:44.220 --> 01:45:48.420
+Again, you should be somewhere around negative three and not much more about that.
+
+01:45:48.620 --> 01:45:52.720
+So this is how miscalibrations of your neural nets are going to manifest.
+
+01:45:52.920 --> 01:45:58.220
+And these kinds of plots here are a good way of sort of bringing
+
+01:45:58.420 --> 01:46:02.520
+those miscalibrations sort of to your attention.
+
+01:46:02.720 --> 01:46:04.220
+And so you can address them.
+
+01:46:04.420 --> 01:46:08.020
+OK, so far we've seen that when we have this linear 10-H sandwich,
+
+01:46:08.220 --> 01:46:11.420
+we can actually precisely calibrate the gains and make the activations,
+
+01:46:11.620 --> 01:46:15.620
+the gradients and the parameters and the updates all look pretty decent.
+
+01:46:15.820 --> 01:46:18.420
+But it definitely feels a little bit like balancing
+
+01:46:18.620 --> 01:46:20.920
+of a pencil on your finger.
+
+01:46:21.120 --> 01:46:25.620
+And that's because this gain has to be very precisely calibrated.
+
+01:46:25.820 --> 01:46:29.720
+So now let's introduce batch normalization layers into the fix, into the mix.
+
+01:46:29.920 --> 01:46:33.620
+And let's see how that helps fix the problem.
+
+01:46:33.820 --> 01:46:38.120
+So here I'm going to take the BatchNorm1D class
+
+01:46:38.320 --> 01:46:40.820
+and I'm going to start placing it inside.
+
+01:46:41.020 --> 01:46:42.620
+And as I mentioned before,
+
+01:46:42.820 --> 01:46:46.920
+the standard typical place you would place it is between the linear layer.
+
+01:46:47.120 --> 01:46:48.420
+So right after it.
+
+01:46:48.620 --> 01:46:50.120
+So this is the non-linearity.
+
+01:46:50.320 --> 01:46:52.320
+But people have definitely played with that.
+
+01:46:52.520 --> 01:46:55.320
+And in fact, you can get very similar results,
+
+01:46:55.520 --> 01:46:58.320
+even if you place it after the non-linearity.
+
+01:46:58.520 --> 01:47:02.320
+And the other thing that I wanted to mention is it's totally fine to also place it at the end
+
+01:47:02.520 --> 01:47:05.320
+after the last linear layer and before the last function.
+
+01:47:05.520 --> 01:47:09.320
+So this is potentially fine as well.
+
+01:47:09.520 --> 01:47:14.320
+And in this case, this would be output, would be vocab size.
+
+01:47:14.520 --> 01:47:17.120
+Now, because the last layer is BatchNorm,
+
+01:47:17.220 --> 01:47:20.720
+we would not be changing the weight to make the softmax less confident.
+
+01:47:20.920 --> 01:47:23.120
+We'd be changing the gamma.
+
+01:47:23.320 --> 01:47:25.620
+Because gamma, remember, in the BatchNorm,
+
+01:47:25.820 --> 01:47:32.720
+is the variable that multiplicatively interacts with the output of that normalization.
+
+01:47:32.920 --> 01:47:35.920
+So we can initialize this sandwich now.
+
+01:47:36.120 --> 01:47:37.220
+We can train.
+
+01:47:37.420 --> 01:47:41.720
+And we can see that the activations are going to, of course, look very good.
+
+01:47:41.920 --> 01:47:46.820
+And they are going to necessarily look good because now before every single 10H layer,
+
+01:47:46.820 --> 01:47:49.020
+there is a normalization in the BatchNorm.
+
+01:47:49.220 --> 01:47:52.820
+So this is, unsurprisingly, all looks pretty good.
+
+01:47:53.020 --> 01:47:56.420
+It's going to be standard deviation of roughly 0.65, 2%,
+
+01:47:56.620 --> 01:47:59.620
+and roughly equal standard deviation throughout the entire layers.
+
+01:47:59.820 --> 01:48:02.520
+So everything looks very homogeneous.
+
+01:48:02.720 --> 01:48:04.520
+The gradients look good.
+
+01:48:04.720 --> 01:48:09.020
+The weights look good in their distributions.
+
+01:48:09.220 --> 01:48:14.020
+And then the updates also look pretty reasonable.
+
+01:48:14.220 --> 01:48:16.720
+We're going above negative three a little bit,
+
+01:48:16.820 --> 01:48:18.020
+but not by too much.
+
+01:48:18.220 --> 01:48:24.820
+So all the parameters are training at roughly the same rate here.
+
+01:48:25.020 --> 01:48:32.120
+But now what we've gained is we are going to be slightly less brittle
+
+01:48:32.320 --> 01:48:34.320
+with respect to the gain of these.
+
+01:48:34.520 --> 01:48:39.320
+So, for example, I can make the gain be, say, 0.2 here,
+
+01:48:39.520 --> 01:48:43.120
+which is much, much slower than what we had with the 10H.
+
+01:48:43.320 --> 01:48:44.920
+But as we'll see, the activations will actually be exactly unaffected.
+
+01:48:45.120 --> 01:48:46.520
+But as we'll see, the activations will actually be exactly unaffected.
+
+01:48:46.820 --> 01:48:49.520
+And that's because of, again, this explicit normalization.
+
+01:48:49.720 --> 01:48:51.220
+The gradients are going to look okay.
+
+01:48:51.420 --> 01:48:53.720
+The weight gradients are going to look okay.
+
+01:48:53.920 --> 01:48:56.720
+But actually, the updates will change.
+
+01:48:56.920 --> 01:49:00.620
+And so even though the forward and backward pass, to a very large extent,
+
+01:49:00.820 --> 01:49:03.520
+look okay because of the backward pass of the BatchNorm
+
+01:49:03.720 --> 01:49:05.820
+and how the scale of the incoming activations
+
+01:49:06.020 --> 01:49:10.120
+interacts in the BatchNorm and its backward pass,
+
+01:49:10.320 --> 01:49:15.820
+this is actually changing the scale of the updates on these parameters.
+
+01:49:15.820 --> 01:49:18.720
+So the gradients of these weights are affected.
+
+01:49:18.920 --> 01:49:24.220
+So we still don't get a completely free pass to pass in arbitrary weights here,
+
+01:49:24.420 --> 01:49:28.020
+but everything else is significantly more robust
+
+01:49:28.220 --> 01:49:32.620
+in terms of the forward, backward, and the weight gradients.
+
+01:49:32.820 --> 01:49:35.020
+It's just that you may have to retune your learning rate
+
+01:49:35.220 --> 01:49:39.420
+if you are changing sufficiently the scale of the activations
+
+01:49:39.620 --> 01:49:40.820
+that are coming into the BatchNorms.
+
+01:49:41.020 --> 01:49:44.720
+So here, for example, we changed the gains
+
+01:49:44.720 --> 01:49:47.020
+of these linear layers to be greater,
+
+01:49:47.220 --> 01:49:51.520
+and we're seeing that the updates are coming out lower as a result.
+
+01:49:51.720 --> 01:49:54.420
+And then finally, we can also, if we are using BatchNorms,
+
+01:49:54.620 --> 01:49:56.520
+we don't actually need to necessarily...
+
+01:49:56.720 --> 01:49:59.020
+Let me reset this to 1 so there's no gain.
+
+01:49:59.220 --> 01:50:03.320
+We don't necessarily even have to normalize by fan-in sometimes.
+
+01:50:03.520 --> 01:50:08.020
+So if I take out the fan-in, so these are just now random Gaussian,
+
+01:50:08.220 --> 01:50:11.620
+we'll see that because of BatchNorm, this will actually be relatively well-behaved.
+
+01:50:11.820 --> 01:50:13.620
+So...
+
+01:50:14.720 --> 01:50:17.320
+The statistics look, of course, in the forward pass look good.
+
+01:50:17.520 --> 01:50:19.620
+The gradients look good.
+
+01:50:19.820 --> 01:50:23.520
+The backward weight updates look okay.
+
+01:50:23.720 --> 01:50:26.420
+A little bit of fat tails on some of the layers.
+
+01:50:26.620 --> 01:50:29.020
+And this looks okay as well.
+
+01:50:29.220 --> 01:50:33.320
+But as you can see, we're significantly below negative 3,
+
+01:50:33.520 --> 01:50:36.320
+so we'd have to bump up the learning rate of this BatchNorm
+
+01:50:36.520 --> 01:50:38.820
+so that we are training more properly.
+
+01:50:39.020 --> 01:50:40.420
+And in particular, looking at this,
+
+01:50:40.620 --> 01:50:43.020
+roughly looks like we have to 10x the learning rate
+
+01:50:43.220 --> 01:50:44.620
+to get to about 1e-3.
+
+01:50:44.820 --> 01:50:50.620
+So we'd come here and we would change this to be update of 1.0.
+
+01:50:50.820 --> 01:50:52.820
+And if I re-initialize...
+
+01:50:53.020 --> 01:51:01.020
+Then we'll see that everything still, of course, looks good.
+
+01:51:01.220 --> 01:51:04.020
+And now we are roughly here.
+
+01:51:04.220 --> 01:51:06.220
+And we expect this to be an okay training run.
+
+01:51:06.420 --> 01:51:09.320
+So long story short, we are significantly more robust
+
+01:51:09.520 --> 01:51:11.320
+to the gain of these linear layers,
+
+01:51:11.520 --> 01:51:13.320
+whether or not we have to apply the fan-in.
+
+01:51:13.520 --> 01:51:14.520
+And then...
+
+01:51:14.820 --> 01:51:16.020
+We can change the gain,
+
+01:51:16.220 --> 01:51:20.320
+but we actually do have to worry a little bit about the update scales
+
+01:51:20.520 --> 01:51:23.920
+and making sure that the learning rate is properly calibrated here.
+
+01:51:24.120 --> 01:51:27.420
+But the activations of the forward-backward pass and the updates
+
+01:51:27.620 --> 01:51:30.120
+are looking significantly more well-behaved,
+
+01:51:30.320 --> 01:51:34.520
+except for the global scale that is potentially being adjusted here.
+
+01:51:34.720 --> 01:51:36.320
+Okay, so now let me summarize.
+
+01:51:36.520 --> 01:51:39.320
+There are three things I was hoping to achieve with this section.
+
+01:51:39.520 --> 01:51:42.120
+Number one, I wanted to introduce you to BatchNormalization,
+
+01:51:42.320 --> 01:51:44.520
+which is one of the first modern innovations
+
+01:51:44.520 --> 01:51:48.320
+that we're looking into that helped stabilize very deep neural networks
+
+01:51:48.520 --> 01:51:49.520
+and their training.
+
+01:51:49.720 --> 01:51:52.320
+And I hope you understand how the BatchNormalization works
+
+01:51:52.520 --> 01:51:55.920
+and how it would be used in a neural network.
+
+01:51:56.120 --> 01:51:59.120
+Number two, I was hoping to PyTorchify some of our code
+
+01:51:59.320 --> 01:52:01.720
+and wrap it up into these modules.
+
+01:52:01.920 --> 01:52:04.720
+So like Linear, BatchNorm1D, 10H, etc.
+
+01:52:04.920 --> 01:52:06.620
+These are layers or modules,
+
+01:52:06.820 --> 01:52:10.720
+and they can be stacked up into neural nets like Lego building blocks.
+
+01:52:10.920 --> 01:52:14.420
+And these layers actually exist in PyTorch,
+
+01:52:14.620 --> 01:52:16.520
+and if you import Torch NN,
+
+01:52:16.720 --> 01:52:19.120
+then you can actually, the way I've constructed it,
+
+01:52:19.320 --> 01:52:22.520
+you can simply just use PyTorch by prepending NN.
+
+01:52:22.720 --> 01:52:24.720
+to all these different layers.
+
+01:52:24.920 --> 01:52:27.520
+And actually everything will just work
+
+01:52:27.720 --> 01:52:29.720
+because the API that I've developed here
+
+01:52:29.920 --> 01:52:32.320
+is identical to the API that PyTorch uses.
+
+01:52:32.520 --> 01:52:34.720
+And the implementation also is basically,
+
+01:52:34.920 --> 01:52:37.920
+as far as I'm aware, identical to the one in PyTorch.
+
+01:52:38.120 --> 01:52:41.120
+And number three, I tried to introduce you to the diagnostic tools
+
+01:52:41.320 --> 01:52:44.320
+that you would use to understand whether your neural network
+
+01:52:44.320 --> 01:52:46.120
+is in a good state dynamically.
+
+01:52:46.320 --> 01:52:48.920
+So we are looking at the statistics and histograms
+
+01:52:49.120 --> 01:52:52.120
+and activation of the forward pass activations,
+
+01:52:52.320 --> 01:52:53.920
+the backward pass gradients,
+
+01:52:54.120 --> 01:52:56.920
+and then also we're looking at the weights that are going to be updated
+
+01:52:57.120 --> 01:52:58.920
+as part of stochastic gradient ascent,
+
+01:52:59.120 --> 01:53:01.120
+and we're looking at their means, standard deviations,
+
+01:53:01.320 --> 01:53:04.520
+and also the ratio of gradients to data,
+
+01:53:04.720 --> 01:53:07.720
+or even better, the updates to data.
+
+01:53:07.920 --> 01:53:10.320
+And we saw that typically we don't actually look at it
+
+01:53:10.520 --> 01:53:13.720
+as a single snapshot frozen in time at some particular iteration.
+
+01:53:13.720 --> 01:53:17.520
+Typically, people look at this as over time, just like I've done here.
+
+01:53:17.720 --> 01:53:19.520
+And they look at these update to data ratios
+
+01:53:19.720 --> 01:53:21.320
+and they make sure everything looks OK.
+
+01:53:21.520 --> 01:53:25.120
+And in particular, I said that one in negative three
+
+01:53:25.320 --> 01:53:27.320
+or basically negative three on the log scale
+
+01:53:27.520 --> 01:53:31.520
+is a good rough heuristic for what you want this ratio to be.
+
+01:53:31.720 --> 01:53:34.120
+And if it's way too high, then probably the learning rate
+
+01:53:34.320 --> 01:53:36.320
+or the updates are a little too big.
+
+01:53:36.520 --> 01:53:39.520
+And if it's way too small, then the learning rate is probably too small.
+
+01:53:39.720 --> 01:53:42.320
+So that's just some of the things that you may want to play with
+
+01:53:42.320 --> 01:53:46.720
+when you try to get your neural network to work very well.
+
+01:53:46.920 --> 01:53:49.120
+Now, there's a number of things I did not try to achieve.
+
+01:53:49.320 --> 01:53:51.120
+I did not try to beat our previous performance,
+
+01:53:51.320 --> 01:53:53.920
+as an example, by introducing the BatchNorm layer.
+
+01:53:54.120 --> 01:53:56.920
+Actually, I did try and I found that I used
+
+01:53:57.120 --> 01:53:59.720
+the learning rate finding mechanism that I've described before.
+
+01:53:59.920 --> 01:54:03.120
+I tried to train the BatchNorm layer, a BatchNorm neural net.
+
+01:54:03.320 --> 01:54:05.720
+And I actually ended up with results that are very,
+
+01:54:05.920 --> 01:54:08.120
+very similar to what we've obtained before.
+
+01:54:08.320 --> 01:54:11.920
+And that's because our performance now is not bottlenecked by
+
+01:54:12.320 --> 01:54:14.920
+optimization, which is what BatchNorm is helping with.
+
+01:54:15.120 --> 01:54:18.520
+The performance at this stage is bottlenecked by what I suspect is
+
+01:54:18.720 --> 01:54:21.720
+the context length of our context.
+
+01:54:21.920 --> 01:54:24.520
+So currently we are taking three characters to predict the fourth one.
+
+01:54:24.720 --> 01:54:26.120
+And I think we need to go beyond that.
+
+01:54:26.320 --> 01:54:29.520
+And we need to look at more powerful architectures like recurring neural
+
+01:54:29.720 --> 01:54:32.800
+networks and transformers in order to further push
+
+01:54:33.000 --> 01:54:36.200
+the log probabilities that we're achieving on this dataset.
+
+01:54:36.400 --> 01:54:41.920
+And I also did not try to have a full explanation of all of these activations,
+
+01:54:42.320 --> 01:54:44.920
+and the backward pass, and the statistics of all these gradients.
+
+01:54:45.120 --> 01:54:47.720
+And so you may have found some of the parts here unintuitive.
+
+01:54:47.920 --> 01:54:51.720
+And maybe you were slightly confused about, okay, if I change the gain here,
+
+01:54:51.920 --> 01:54:53.720
+how come that we need a different learning rate?
+
+01:54:53.920 --> 01:54:56.520
+And I didn't go into the full detail because you'd have to actually look
+
+01:54:56.720 --> 01:54:59.320
+at the backward pass of all these different layers and get an intuitive
+
+01:54:59.520 --> 01:55:00.920
+understanding of how that works.
+
+01:55:01.120 --> 01:55:03.520
+And I did not go into that in this lecture.
+
+01:55:03.720 --> 01:55:07.320
+The purpose really was just to introduce you to the diagnostic tools and what
+
+01:55:07.520 --> 01:55:10.720
+they look like, but there's still a lot of work remaining on the intuitive level
+
+01:55:10.920 --> 01:55:12.120
+to understand the initialization.
+
+01:55:12.320 --> 01:55:14.920
+The backward pass and how all of that interacts.
+
+01:55:15.120 --> 01:55:18.120
+But you shouldn't feel too bad because honestly,
+
+01:55:18.320 --> 01:55:22.320
+we are getting to the cutting edge of where the field is.
+
+01:55:22.520 --> 01:55:25.520
+We certainly haven't, I would say, solved initialization.
+
+01:55:25.720 --> 01:55:27.720
+And we haven't solved back propagation.
+
+01:55:27.920 --> 01:55:30.520
+And these are still very much an active area of research.
+
+01:55:30.520 --> 01:55:33.120
+People are still trying to figure out what is the best way to initialize these
+
+01:55:33.320 --> 01:55:37.320
+networks, what is the best update rule to use, and so on.
+
+01:55:37.520 --> 01:55:40.920
+So none of this is really solved, and we don't really have all the answers to all
+
+01:55:41.120 --> 01:55:42.120
+the...
+
+01:55:42.320 --> 01:55:46.320
+You know, all these cases, but at least, you know, we're making progress and at
+
+01:55:46.520 --> 01:55:49.320
+least we have some tools to tell us whether or not things are on the right
+
+01:55:49.520 --> 01:55:51.520
+track for now.
+
+01:55:51.720 --> 01:55:55.720
+So I think we've made positive progress in this lecture, and I hope you enjoyed
+
+01:55:55.720 --> 01:55:56.920
+that, and I will see you next time.
+
