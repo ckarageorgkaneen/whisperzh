@@ -1,0 +1,3028 @@
+start	end	text
+0	4200	Hi everyone. So today we are once again continuing our implementation of MakeMore.
+4980	10560	Now so far we've come up to here, multilayer perceptrons, and our neural net looked like this,
+10800	14880	and we were implementing this over the last few lectures. Now I'm sure everyone is very excited
+14880	19340	to go into recurrent neural networks and all of their variants and how they work, and the diagrams
+19340	22180	look cool and it's very exciting and interesting, and we're going to get a better result.
+22760	28400	But unfortunately I think we have to remain here for one more lecture. And the reason for that is
+28400	32300	we've already trained this multilayer perceptron, right, and we are getting pretty good loss,
+32520	35880	and I think we have a pretty decent understanding of the architecture and how it works.
+36360	42240	But the line of code here that I take an issue with is here, loss.backward. That is, we are
+42240	48080	taking PyTorch autograd and using it to calculate all of our gradients along the way. And I would
+48080	52580	like to remove the use of loss.backward, and I would like us to write our backward pass manually
+52580	57940	on the level of tensors. And I think that this is a very useful exercise for the following reasons.
+58400	64040	I actually have an entire blog post on this topic, but I'd like to call backpropagation a leaky
+64040	69240	abstraction. And what I mean by that is backpropagation doesn't just make your neural
+69240	73560	networks just work magically. It's not the case that you can just stack up arbitrary Lego blocks
+73560	77820	of differentiable functions and just cross your fingers and backpropagate and everything is great.
+78760	82660	Things don't just work automatically. It is a leaky abstraction in the sense that
+82660	88140	you can shoot yourself in the foot if you do not understand its internals. It will magically not
+88400	93380	work or not work optimally. And you will need to understand how it works under the hood if you're
+93380	99200	hoping to debug it and if you are hoping to address it in your neural net. So this blog post
+99200	103580	here from a while ago goes into some of those examples. So for example, we've already covered
+103580	109520	them, some of them already. For example, the flat tails of these functions and how you do not want
+109520	114980	to saturate them too much because your gradients will die. The case of dead neurons, which I've
+114980	118160	already covered as well. The case of exploding or
+118400	121880	exploding gradients in the case of recurring neural networks, which we are about to cover.
+122840	128780	And then also you will often come across some examples in the wild. This is a snippet that I
+128780	134240	found in a random code base on the internet where they actually have like a very subtle but pretty
+134240	139880	major bug in their implementation. And the bug points at the fact that the author of this code
+139880	143420	does not actually understand backpropagation. So what they're trying to do here is they're trying
+143420	148040	to clip the loss at a certain maximum value. But actually what they're trying to do is they're
+148400	152360	trying to clip the gradients to have a maximum value instead of trying to clip the loss at a
+152360	158240	maximum value. And indirectly, they're basically causing some of the outliers to be actually
+158240	164300	ignored. Because when you clip the loss of an outlier, you are setting its gradient to 0.
+164840	169760	And so have a look through this and read through it. But there's basically a bunch of subtle
+169760	173600	issues that you're going to avoid if you actually know what you're doing. And that's why I don't
+173600	178380	think it's the case that because PyTorch or other frameworks offer autograd, it is okay for us to do.
+178400	185480	ignore how it works. Now, we've actually already covered autograd and we wrote micrograd, but
+185480	190500	micrograd was an autograd engine only on the level of individual scalars. So the atoms were single
+190500	195000	individual numbers. And, you know, I don't think it's enough. And I'd like us to basically think
+195000	199420	about backpropagation on the level of tensors as well. And so in a summary, I think it's a good
+199420	204760	exercise. I think it is very, very valuable. You're going to become better at debugging neural
+204760	209180	networks and making sure that you understand what you're doing. It is going to make everything
+209180	213460	fully explicit. So you're not going to be nervous about what is hidden away from you. And basically
+213460	219100	in general, we're going to emerge stronger. And so let's get into it. A bit of a fun historical note
+219100	224020	here is that today writing your backward pass by hand and manually is not recommended and no one
+224020	229000	does it except for the purposes of exercise. But about 10 years ago in deep learning, this was
+229000	233740	fairly standard and in fact pervasive. So at the time, everyone used to write their backward pass
+233740	234600	by hand manually.
+234760	239940	Including myself. And it's just what you would do. So we used to write backward pass by hand. And now
+239940	246100	everyone just calls lost that backward. We've lost something. I want to give you a few examples of
+246100	253480	this. So here's a 2006 paper from Jeff Hinton and Ruslan Slakhtinov in science that was
+253480	258800	influential at the time. And this was training some architectures called restricted Boltzmann
+258800	264580	machines. And basically, it's an autoencoder trained here. And this is from roughly
+264580	264740	2000.
+264760	270100	In 2010, I had a library for training restricted Boltzmann machines. And this was at the time
+270100	274980	written in Matlab. So Python was not used for deep learning pervasively. It was all Matlab. And
+274980	281060	Matlab was this scientific computing package that everyone would use. So we would write Matlab,
+281060	286740	which is barely a programming language as well. But it had a very convenient tensor class.
+286740	290420	And it was this computing environment and you would run here. It would all run on the CPU,
+290420	294580	of course. But you would have very nice plots to go with it and a built-in debugger. And it was
+294580	301080	pretty nice. Now, the code in this package in 2010 that I wrote for fitting restricted Boltzmann
+301080	306280	machines to a large extent is recognizable. But I wanted to show you how you would... Well,
+306280	311880	I'm creating the data in the XY batches. I'm initializing the neural net. So it's got weights
+311880	316440	and biases just like we're used to. And then this is the training loop where we actually do the
+316440	321200	forward pass. And then here, at this time, they didn't even necessarily use back propagation to
+321200	324400	train neural networks. So this, in particular, implements a lot of the training that we're doing.
+324400	329920	It implements contrastive divergence, which estimates a gradient. And then here, we take
+329920	335860	that gradient and use it for a parameter update along the lines that we're used to. Yeah, here.
+335860	341200	But you can see that basically people are meddling with these gradients directly and inline and
+341200	345640	themselves. It wasn't that common to use an autograd engine. Here's one more example from a
+345640	351640	paper of mine from 2014 called Deep Fragment Embeddings. And here, what I was doing is I was
+351640	353020	aligning images and text.
+354400	379520	And here, I'm implementing the cost function. And it was standard to implement not just the cost,
+379520	384200	but also the backward pass manually. So here, I'm calculating the image embeddings,
+384200	384380	and I'm implementing the cost function. And here, I'm implementing the backward pass manually.
+384400	391260	Sentence embeddings, I calculate the scores. This is the loss function. And then once I have
+391260	395820	the loss function, I do the backward pass right here. So I backward through the loss function
+395820	401480	and through the neural net, and I append regularization. So everything was done by hand
+401480	405000	manually, and you would just write out the backward pass. And then you would use a gradient
+405000	409340	checker to make sure that your numerical estimate of the gradient agrees with the one you calculated
+409340	413820	during back propagation. So this was very standard for a long time. But today, of course, it is
+413820	419180	standard to use an autograd engine. But it was definitely useful, and I think people sort of
+419180	423180	understood how these neural networks work on a very intuitive level. And so I think it's a good
+423180	427020	exercise again, and this is where we want to be. Okay, so just as a reminder from our previous
+427020	432440	lecture, this is the Jupyter notebook that we implemented at the time. And we're going to keep
+432440	436540	everything the same. So we're still going to have a two-layer multi-layer perceptron with a batch
+436540	441260	normalization layer. So the forward pass will be basically identical to this lecture. But here,
+441260	443780	we're going to get rid of loss.backward. And instead, we're going to
+443820	448900	write the backward pass manually. Now, here's the starter code for this lecture. We are becoming
+448900	455020	a backprop ninja in this notebook. And the first few cells here are identical to what we are used
+455020	460040	to. So we are doing some imports, loading in the data set, and processing the data set. None of
+460040	465100	this changed. Now, here, I'm introducing a utility function that we're going to use later to compare
+465100	469020	the gradients. So in particular, we are going to have the gradients that we estimate manually
+469020	473780	ourselves. And we're going to have gradients that PyTorch calculates. And we're going to be
+473820	476720	checking for correctness, assuming, of course, that PyTorch is correct.
+478660	483900	Then here, we have the initialization that we are quite used to. So we have our embedding table for
+483900	488860	the characters, the first layer, second layer, and a batch normalization in between. And here's
+488860	493200	where we create all the parameters. Now, you will note that I changed the initialization a little
+493200	498600	bit to be small numbers. So normally, you would set the biases to be all zero. Here, I'm setting
+498600	503800	them to be small random numbers. And I'm doing this because if your variables are all zero,
+503820	507900	or initialized to exactly zero, sometimes what can happen is that can mask an incorrect
+507900	513200	implementation of a gradient. Because when everything is zero, it sort of like simplifies
+513200	517320	and gives you a much simpler expression of the gradient than you would otherwise get. And so by
+517320	522120	making it small numbers, I'm trying to unmask those potential errors in these calculations.
+522920	528820	You also notice that I'm using b1 in the first layer. I'm using a bias despite batch
+528820	533580	normalization right afterwards. So this would typically not be what you'd do because we talked
+533580	533800	about the bias. So I'm going to mask the bias. And I'm going to mask the bias. And I'm going to
+533820	538460	fact that you don't need a bias but i'm doing this here just for fun because we're going to
+538460	542220	have a gradient with respect to it and we can check that we are still calculating it correctly
+542220	548140	even though this bias is spurious so here i'm calculating a single batch and then here i am
+548140	553260	doing a forward pass now you'll notice that the forward pass is significantly expanded from what
+553260	559420	we are used to here the forward pass was just um here now the reason that the forward pass is
+559420	565020	longer is for two reasons number one here we just had an f dot cross entropy but here i am bringing
+565020	570940	back a explicit implementation of the loss function and number two i've broken up the
+570940	577020	implementation into manageable chunks so we have a lot a lot more intermediate tensors along the way
+577020	581420	in the forward pass and that's because we are about to go backwards and calculate the gradients
+582220	588380	in this back propagation from the bottom to the top so we're going to go upwards and just like we
+588380	589340	have for example the lockpick
+589420	593980	props tensor in a forward pass in a backward pass we're going to have a d lock props which is going
+593980	598300	to store the derivative of the loss with respect to the lock props tensor and so we're going to
+598300	603420	be prepending d to every one of these tensors and calculating it along the way of this back
+603420	609420	propagation so as an example we have a b in raw here we're going to be calculating a db in raw
+610140	616220	so here i'm telling pytorch that we want to retain the grad of all these intermediate values because
+616220	619260	here in exercise one we're going to calculate the backward pass
+619420	624860	so we're going to calculate all these d variable d variables and use the cmp function i've introduced
+624860	629900	above to check our correctness with respect to what pytorch is telling us this is going to be
+629900	635500	exercise one where we sort of back propagate through this entire graph now just to give you
+635500	638380	a very quick preview of what's going to happen in exercise two and below
+639580	645340	here we have fully broken up the loss and back propagated through it manually in all
+645340	649340	the little atomic pieces that make it up but here we're going to collapse the loss into
+649420	654300	a single cross entropy call and instead we're going to analytically derive using
+654940	660780	math and paper and pencil the gradient of the loss with respect to the logits and instead of
+660780	664780	back propagating through all of its little chunks one at a time we're just going to analytically
+664780	668780	derive what that gradient is and we're going to implement that which is much more efficient as
+668780	674060	we'll see in a bit then we're going to do the exact same thing for batch normalization so
+674060	679180	instead of breaking up bastion arm into all the little tiny components we're going to use pen and
+679420	685100	paper and mathematics and calculus to derive the gradient through the bachelor bathroom layer so
+685100	689660	we're going to calculate the backward pass through bathroom layer in a much more efficient expression
+689660	692780	instead of backward propagating through all of its little pieces independently
+693500	698780	so it's going to be exercise three and then in exercise four we're going to put it all together
+698780	703980	and this is the full code of training this two layer mlp and we're going to basically insert
+703980	709260	our manual backdrop and we're going to take out lost up backward and you will basically see
+709420	715980	that you can get all the same results using fully your own code and the only thing we're using from
+715980	722460	pytorch is the torch.tensor to make the calculations efficient but otherwise you will understand fully
+722460	726780	what it means to forward and backward the neural net and train it and i think that'll be awesome so
+726780	733100	let's get to it okay so i ran all the cells of this notebook all the way up to here and i'm going
+733100	738380	to erase this and i'm going to start implementing backward pass starting with d lock probes so we
+739420	743980	go here to calculate the gradient of the loss with respect to all the elements of the lock props
+743980	749260	tensor now i'm going to give away the answer here but i wanted to put a quick note here that
+749260	754380	i think would be most pedagogically useful for you is to actually go into the description of this
+754380	758940	video and find the link to this jupyter notebook you can find it both on github but you can also
+758940	762780	find google collab with it so you don't have to install anything you'll just go to a website on
+762780	769260	google collab and you can try to implement these derivatives or gradients yourself and then if you
+769420	775180	are not able to come to my video and see me do it and so work in tandem and try it first yourself
+775180	779660	and then see me give away the answer and i think that'll be most valuable to you and that's how i
+779660	785900	recommend you go through this lecture so we are starting here with d log props now d log props
+785900	792220	will hold the derivative of the loss with respect to all the elements of log props what is inside
+792220	799420	log blobs the shape of this is 32 by 27. so it's not going to surprise you that d log props should
+799420	804380	also be an array of size 32 by 27 because we want the derivative loss with respect to all of its
+804380	812620	elements so the sizes of those are always going to be equal now how how does log probes influence
+812620	821180	the loss okay loss is negative log probes indexed with range of n and yb and then the mean of that
+821740	827660	now just as a reminder yb is just basically an array of all the
+828780	829420	correct indexes of all the indexes of all the indexes of all the indexes of all the indexes of
+829420	835100	all the indexes so what we're doing here is we're taking the log props array of size 32 by 27
+837340	844220	right and then we are going in every single row and in each row we are plugging plucking out
+844220	848620	the index 8 and then 14 and 15 and so on so we're going down the rows
+848620	853340	that's the iterator range of n and then we are always plucking out the index and the
+853340	859020	column specified by this tensor yb so in the zeroth row we are taking the eighth column
+859580	867100	in the first row we're taking the 14th column etc and so log props at this plucks out all those
+869020	874300	log probabilities of the correct next character in a sequence so that's what that does and the
+874300	881500	shape of this or the size of it is of course 32 because our batch size is 32. so these elements
+881500	888620	get plucked out and then their mean and the negative of that becomes loss so i always like to
+889580	895740	examples to understand the numerical form of derivative what's going on here is once we've
+895740	902060	plucked out these examples um we're taking the mean and then the negative so the loss basically
+902780	906540	if i can write it this way is the negative of say a plus b plus c
+907900	911980	and the mean of those three numbers would be say negative would divide three that would be how we
+911980	918060	achieve the mean of three numbers a b c although we actually have 32 numbers here and so what is
+919420	925900	loss by say like da right well if we simplify this expression mathematically this is negative
+925900	929020	one over three of a and negative one plus negative one over three of b
+930940	936140	plus negative one over three of c and so what is d loss by d a it's just negative one over three
+937020	940620	and so you can see that if we don't just have a b and c but we have 32 numbers
+941340	948060	then d loss by d um you know every one of those numbers is going to be one over n more generally
+949420	952140	the size of the batch, 32 in this case.
+953140	959060	So DLoss by DLockProbs is negative one over N
+959060	961200	in all these places.
+961980	964620	Now, what about the other elements inside LockProbs?
+964760	966260	Because LockProbs is a large array.
+966260	969300	You see that LockProbs.shape is 32 by 27,
+969720	973640	but only 32 of them participate in the loss calculation.
+974240	976160	So what's the derivative of all the other,
+976460	979380	most of the elements that do not get blocked out here?
+980380	981880	Well, their loss intuitively is zero.
+982200	984400	Sorry, their gradient intuitively is zero.
+984780	986740	And that's because they did not participate in the loss.
+987260	989760	So most of these numbers inside this tensor
+989760	991560	does not feed into the loss.
+991940	993560	And so if we were to change these numbers,
+994020	995140	then the loss doesn't change,
+995200	997320	which is the equivalent of what I was saying,
+997820	1000440	that the derivative of the loss with respect to them is zero.
+1000740	1001640	They don't impact it.
+1003080	1006100	So here's a way to implement this derivative then.
+1006440	1009380	We start out with Torch.zeros of shape 32.
+1009580	1011420	So we're going to set it to 32 by 27,
+1011420	1015180	or let's just say instead of doing this because we don't want to hard-code numbers,
+1015180	1019180	let's do Torch.zeros like LockProbs.
+1019180	1023180	So basically this is going to create an array of zeros exactly in the shape of LockProbs.
+1024180	1029180	And then we need to set the derivative of negative one over n inside exactly these locations.
+1029180	1031180	So here's what we can do.
+1031180	1034180	The LockProbs indexed in the identical way
+1035180	1039180	will be just set to negative one over zero divide n.
+1039920	1041420	Right, just like we derived here.
+1042660	1045420	So now let me erase all of these reasoning.
+1045920	1049420	And then this is the candidate derivative for DLockProbs.
+1049660	1052420	Let's uncomment the first line and check that this is correct.
+1054180	1059180	Okay, so CMP ran, and let's go back to CMP.
+1059920	1062180	And you see that what it's doing is it's calculating if
+1062920	1066180	the calculated value by us, which is dt,
+1066420	1069180	is exactly equal to t.grad as calculated by PyTorch.
+1069420	1073420	And then this is making sure that all of the elements are exactly equal.
+1073420	1076420	And then converting this to a single Boolean value
+1076460	1079420	because we don't want a Boolean tensor, we just want a Boolean value.
+1079920	1083920	And then here we are making sure that, okay, if they're not exactly equal,
+1083920	1086920	maybe they are approximately equal because of some floating point issues.
+1086920	1088920	But they're very, very close.
+1088920	1093420	So here we are using Torch.allClose, which has a little bit of a wiggle available
+1093420	1095920	because sometimes you can get very, very close.
+1096920	1098420	But if you use a slightly different calculation,
+1098420	1098920	because of floating point, you can't get very, very close.
+1098920	1103340	because of floating point arithmetic, you can get a slightly different result.
+1103860	1106640	So this is checking if you get an approximately close result.
+1107340	1112500	And then here we are checking the maximum, basically the value that has the highest difference,
+1113080	1116740	and what is the difference, and the absolute value difference between those two.
+1117340	1121100	And so we are printing whether we have an exact equality, an approximate equality,
+1121520	1123500	and what is the largest difference.
+1125180	1128700	And so here we see that we actually have exact equality.
+1129180	1131380	And so therefore, of course, we also have an approximate equality,
+1131680	1134300	and the maximum difference is exactly zero.
+1134840	1140360	So basically, our DLOGPROPS is exactly equal to what PyTorch calculated to be
+1140360	1142980	logPROPS.grad in its backpropagation.
+1143720	1145540	So, so far, we're doing pretty well.
+1146200	1147900	Okay, so let's now continue our backpropagation.
+1148660	1151820	We have that logPROPS depends on PROPS through a log.
+1152180	1156280	So all the elements of PROPS are being element-wise applied log to.
+1157440	1158820	Now, if we want DPROPS...
+1158920	1161420	then, then remember your micrograph training.
+1162160	1163680	We have like a log node.
+1163840	1166240	It takes in PROPS and creates logPROPS.
+1166800	1171580	And DPROPS will be the local derivative of that individual operation, log,
+1172000	1176980	times the derivative loss with respect to its output, which in this case is DLOGPROPS.
+1177600	1179960	So what is the local derivative of this operation?
+1180320	1183860	Well, we are taking log element-wise, and we can come here and we can see,
+1183880	1188140	well, from alpha is your friend, that d by dx of log of x is just simply 1 over x.
+1188920	1191680	So therefore, in this case, x is PROPS.
+1191700	1195840	So we have d by dx is 1 over x, which is 1 over PROPS.
+1196220	1197680	And then this is the local derivative.
+1197700	1199540	And then times, we want to chain it.
+1200120	1201040	So this is chain rule.
+1201620	1202720	Times DLOGPROPS.
+1203520	1207120	Then let me uncomment this and let me run the cell in place.
+1207220	1211820	And we see that the derivative of PROPS as we calculated here is exactly correct.
+1212920	1214520	And so notice here how this works.
+1214800	1216400	PROPS that are...
+1216600	1218740	PROPS is going to be inverted and then element-wise,
+1218740	1220240	and then element-wise, multiplied here.
+1220840	1223440	So if your PROPS is very, very close to 1,
+1223540	1226740	that means your network is currently predicting the character correctly,
+1227240	1230840	then this will become 1 over 1, and DLOGPROPS just gets passed through.
+1231740	1233940	But if your probabilities are incorrectly assigned,
+1234040	1238140	so if the correct character here is getting a very low probability,
+1238640	1245040	then 1.0 dividing by it will boost this and then multiply by DLOGPROPS.
+1245340	1248140	So basically, what this line is doing intuitively is it's taking
+1248140	1248440	the...
+1248440	1251740	the examples that have a very low probability currently assigned,
+1251940	1253340	and it's boosting their gradient.
+1254140	1255440	You can look at it that way.
+1256140	1258240	Next up is COUNTSUMINV.
+1259340	1261740	So we want the derivative of this.
+1262240	1266540	Now, let me just pause here and kind of introduce what's happening here in general,
+1266640	1267940	because I know it's a little bit confusing.
+1268440	1270240	We have the logits that come out of the neural net.
+1270840	1274040	Here, what I'm doing is I'm finding the maximum in each row,
+1274540	1277340	and I'm subtracting it for the purpose of numerical stability.
+1277540	1278240	And we talked about how...
+1278440	1279640	if you do not do this,
+1280040	1283540	you run into numerical issues if some of the logits take on two large values
+1283840	1285640	because we end up exponentiating them.
+1286440	1289240	So this is done just for safety, numerically.
+1289840	1294640	Then here's the exponentiation of all the sort of logits to create our counts.
+1295140	1298740	And then we want to take the sum of these counts and normalize
+1298840	1301040	so that all of the probes sum to 1.
+1301740	1303840	Now here, instead of using 1 over COUNTSUM,
+1303940	1306440	I use raised to the power of negative 1.
+1306640	1308040	Mathematically, they are identical.
+1308040	1310840	I just found that there's something wrong with the PyTorch implementation
+1310940	1315540	of the backward pass of division, and it gives like a weird result,
+1315640	1318240	but that doesn't happen for star star negative 1,
+1318340	1319940	so I'm using this formula instead.
+1320040	1323940	But basically, all that's happening here is we got the logits,
+1324040	1325340	we want to exponentiate all of them,
+1325440	1328540	and we want to normalize the counts to create our probabilities.
+1328640	1331240	It's just that it's happening across multiple lines.
+1331340	1335540	So now, here,
+1335640	1337440	we want to normalize the counts to create our probabilities.
+1338040	1340440	We want to first take the derivative,
+1340540	1344540	we want to backpropagate into COUNTSUM and then into COUNTS as well.
+1344640	1348140	So what should be the COUNTSUM?
+1348240	1349640	Now, we actually have to be careful here
+1349740	1353340	because we have to scrutinize and be careful with the shapes.
+1353440	1360740	So COUNTS.shape and then COUNTSUM.inv.shape are different.
+1360840	1363140	So in particular, COUNTS is 32 by 27,
+1363240	1365940	but this COUNTSUM.inv is 32 by 1.
+1366040	1367840	And so in this multiplication here,
+1368040	1372140	we also have an implicit broadcasting that PyTorch will do
+1372240	1374540	because it needs to take this column tensor of 32 numbers
+1374640	1378640	and replicate it horizontally 27 times to align these two tensors
+1378740	1381440	so it can do an element-wise multiply.
+1381540	1383640	So really what this looks like is the following,
+1383740	1386140	using a toy example again.
+1386240	1389240	What we really have here is just props is COUNTS times COUNTSUM.inv.
+1389340	1391640	So it's C equals A times B.
+1391740	1396340	But A is 3 by 3, and B is just 3 by 1, a column tensor.
+1396440	1397640	And so PyTorch internally
+1397640	1399940	replicated these elements of B,
+1400040	1402240	and it did that across all the columns.
+1402340	1405140	So for example, B1, which is the first element of B,
+1405240	1409240	would be replicated here across all the columns in this multiplication.
+1409340	1414040	And now we're trying to backpropagate through this operation to COUNTSUM.inv.
+1414140	1417240	So when we are calculating this derivative,
+1417340	1421240	it's important to realize that this looks like a single operation,
+1421340	1425040	but actually is two operations applied sequentially.
+1425140	1427340	The first operation that PyTorch did is it took
+1427340	1433140	this column tensor and replicated it across all the columns,
+1433240	1434740	basically 27 times.
+1434840	1436940	So that's the first operation, it's a replication.
+1437040	1439440	And then the second operation is the multiplication.
+1439540	1442740	So let's first backprop through the multiplication.
+1442840	1445840	If these two arrays were of the same size,
+1445940	1449440	and we just have A and B, both of them 3 by 3,
+1449540	1453240	then how do we backpropagate through a multiplication?
+1453340	1455640	So if we just have scalars and not tensors,
+1455740	1457140	then if you have C equals A times B,
+1457340	1461240	then what is the derivative of C with respect to B?
+1461340	1462640	Well, it's just A.
+1462740	1464640	And so that's the local derivative.
+1464740	1467740	So here in our case, undoing the multiplication
+1467840	1470740	and backpropagating through just the multiplication itself,
+1470840	1473840	which is element-wise, is going to be the local derivative,
+1473940	1477640	which in this case is simply COUNTS,
+1477740	1480240	because COUNTS is the A.
+1480340	1482340	So this is the local derivative, and then times,
+1482440	1486140	because of the chain rule, dprops.
+1486240	1487140	So this here is the dprops.
+1487340	1490240	So this is the local derivative, or the gradient,
+1490340	1493240	but with respect to replicated B.
+1493340	1495240	But we don't have a replicated B,
+1495340	1497240	we just have a single B column.
+1497340	1500240	So how do we now backpropagate through the replication?
+1500340	1504240	And intuitively, this B1 is the same variable,
+1504340	1506240	and it's just reused multiple times.
+1506340	1509240	And so you can look at it as being equivalent
+1509340	1512240	to a case we've encountered in micrograd.
+1512340	1514240	And so here I'm just pulling out a random graph
+1514340	1515240	we used in micrograd.
+1515340	1517240	We had an example where a single node,
+1517440	1519240	has its output feeding into two branches
+1519340	1523240	of basically the graph until the last function.
+1523340	1525240	And we're talking about how the correct thing to do
+1525340	1528240	in the backward pass is we need to sum all the gradients
+1528340	1530240	that arrive at any one node.
+1530340	1532240	So across these different branches,
+1532340	1534240	the gradients would sum.
+1534340	1536240	So if a node is used multiple times,
+1536340	1541240	the gradients for all of its uses sum during backpropagation.
+1541340	1544240	So here, B1 is used multiple times in all these columns,
+1544340	1547240	and therefore the right thing to do here is to sum
+1547340	1550240	horizontally across all the rows.
+1550340	1554240	So we want to sum in dimension 1,
+1554340	1556240	but we want to retain this dimension
+1556340	1559240	so that the countSumInv and its gradient
+1559340	1561240	are going to be exactly the same shape.
+1561340	1564240	So we want to make sure that we keep them as true
+1564340	1566240	so we don't lose this dimension.
+1566340	1568240	And this will make the countSumInv
+1568340	1571240	be exactly shaped 32 by 1.
+1571340	1575240	So revealing this comparison as well and running this,
+1575340	1577240	we see that we get an exact match.
+1577340	1580240	So this derivative is exactly correct.
+1580340	1584240	And let me erase this.
+1584340	1587240	Now let's also backpropagate into counts,
+1587340	1590240	which is the other variable here to create props.
+1590340	1592240	So from props to countSumInv,
+1592340	1593240	we just did that.
+1593340	1595240	Let's go into counts as well.
+1595340	1600240	So dCounts is our A.
+1600340	1603240	So dC by dA is just B.
+1603340	1606240	So therefore it's countSumInv.
+1606240	1610140	And then times, chain rule, dProps.
+1610240	1613140	Now countSumInv is 32 by 1.
+1613240	1617140	dProps is 32 by 27.
+1617240	1621140	So those will broadcast fine
+1621240	1623140	and will give us dCounts.
+1623240	1626140	There's no additional summation required here.
+1626240	1628140	There will be a broadcasting
+1628240	1630140	that happens in this multiply here
+1630240	1633140	because countSumInv needs to be replicated again
+1633240	1635140	to correctly multiply dProps.
+1635140	1638040	But that's going to give the correct result.
+1638140	1641040	So as far as this single operation is concerned.
+1641140	1644040	So we've backpropagated from props to counts,
+1644140	1648040	but we can't actually check the derivative of counts.
+1648140	1650040	I have it much later on.
+1650140	1652040	And the reason for that is because
+1652140	1654040	countSumInv depends on counts.
+1654140	1656040	And so there's a second branch here
+1656140	1657040	that we have to finish.
+1657140	1660040	Because countSumInv backpropagates into countSum,
+1660140	1662040	and countSum will backpropagate into counts.
+1662140	1665040	And so counts is a node that is being used twice.
+1665040	1666940	It's used right here in two props,
+1667040	1668940	and it goes through this other branch
+1669040	1670940	through countSumInv.
+1671040	1672940	So even though we've calculated
+1673040	1674940	the first contribution of it,
+1675040	1676940	we still have to calculate the second contribution of it later.
+1677040	1678940	Okay, so we're continuing with this branch.
+1679040	1680940	We have the derivative for countSumInv.
+1681040	1682940	Now we want the derivative for countSum.
+1683040	1684940	So dCountSum equals
+1685040	1686940	what is the local derivative of this operation?
+1687040	1688940	So this is basically an element-wise
+1689040	1690940	1 over countsSum.
+1691040	1693940	So countSum raised to the power of negative 1
+1693940	1695840	is the same as 1 over countsSum.
+1695940	1697840	If we go to wall from alpha,
+1697940	1699840	we see that x to the negative 1,
+1699940	1701840	d by dx of it,
+1701940	1703840	is basically negative x to the negative 2.
+1703940	1705840	Negative 1 over s squared
+1705940	1707840	is the same as negative x to the negative 2.
+1707940	1711840	So dCountSum here will be
+1711940	1713840	local derivative is going to be
+1713940	1718840	negative countsSum to the negative 2,
+1718940	1720840	that's the local derivative,
+1720940	1723840	times chain rule, which is
+1723840	1725740	countSumInv.
+1725840	1727740	So that's dCountSum.
+1727840	1729740	Let's uncomment this
+1729840	1731740	and check that I am correct.
+1731840	1733740	Okay, so we have perfect equality.
+1733840	1737740	And there's no sketchiness going on here
+1737840	1739740	with any shapes because these are of the same shape.
+1739840	1741740	Okay, next up we want to
+1741840	1743740	backpropagate through this line.
+1743840	1745740	We have that countSum is counts.sum
+1745840	1747740	along the rows.
+1747840	1749740	So I wrote out some help here.
+1749840	1751740	We have to keep in mind that
+1751840	1753740	counts, of course, is 32 by 27.
+1753840	1755740	And countsSum is 32 by 1.
+1755840	1757740	So in this backpropagation,
+1757840	1761740	we need to take this column of derivatives
+1761840	1764740	and transform it into an array of derivatives,
+1764840	1766740	two-dimensional array.
+1766840	1768740	So what is this operation doing?
+1768840	1770740	We're taking some kind of an input,
+1770840	1772740	like, say, a 3x3 matrix A,
+1772840	1774740	and we are summing up the rows
+1774840	1776740	into a column tensor B.
+1776840	1779740	B1, B2, B3, that is basically this.
+1779840	1781740	So now we have the derivatives
+1781840	1783740	of the loss with respect to B.
+1783740	1785640	And now we have the elements of B.
+1785740	1787640	And now we want the derivative of the loss
+1787740	1789640	with respect to all these little a's.
+1789740	1791640	So how do the b's depend on the a's,
+1791740	1793640	is basically what we're after.
+1793740	1795640	What is the local derivative of this operation?
+1795740	1797640	Well, we can see here that B1
+1797740	1799640	only depends on these elements here.
+1799740	1801640	The derivative of B1
+1801740	1803640	with respect to all of these elements down here
+1803740	1805640	is 0.
+1805740	1807640	But for these elements here,
+1807740	1809640	like A11, A12, etc.,
+1809740	1811640	the local derivative is 1, right?
+1811640	1815540	So dB1 by dA11, for example, is 1.
+1815640	1817540	So it's 1, 1, and 1.
+1817640	1819540	So when we have the derivative of the loss
+1819640	1821540	with respect to B1,
+1821640	1823540	the local derivative of B1
+1823640	1825540	with respect to these inputs is 0 here,
+1825640	1827540	but it's 1 on these guys.
+1827640	1829540	So in the chain rule,
+1829640	1831540	we have the local derivative
+1831640	1834540	times the derivative of B1.
+1834640	1836540	And so because the local derivative
+1836640	1838540	is 1 on these three elements,
+1838640	1840540	the local derivative of multiplying
+1840540	1842440	the derivative of B1
+1842540	1844440	will just be the derivative of B1.
+1844540	1846440	And so you can look at it as a router.
+1846540	1848440	Basically, an addition
+1848540	1850440	is a router of gradient.
+1850540	1852440	Whatever gradient comes from above,
+1852540	1854440	it just gets routed equally
+1854540	1856440	to all the elements that participate
+1856540	1858440	in that addition.
+1858540	1860440	So in this case, the derivative of B1
+1860540	1862440	will just flow equally to the derivative
+1862540	1864440	of A11, A12, and A13.
+1864540	1866440	So if we have a derivative
+1866540	1868440	of all the elements of B
+1868540	1870440	in this column tensor,
+1870440	1872340	which we calculated just now,
+1872440	1874340	we basically see that what that amounts to
+1874440	1876340	is all of these are now flowing
+1876440	1878340	to all these elements of A,
+1878440	1880340	and they're doing that horizontally.
+1880440	1882340	So basically what we want
+1882440	1884340	is we want to take the decount sum
+1884440	1886340	of size 32 by 1,
+1886440	1888340	and we just want to replicate it
+1888440	1890340	27 times horizontally
+1890440	1892340	to create 32 by 27 array.
+1892440	1894340	So there's many ways to implement this operation.
+1894440	1896340	You could, of course, just replicate the tensor,
+1896440	1898340	but I think maybe one clean one
+1898440	1900340	is that decounts is simply
+1900340	1902240	torch.once-like,
+1902340	1904240	so just two-dimensional arrays
+1904340	1906240	of once in the shape of counts,
+1906340	1908240	so 32 by 27,
+1908340	1910240	times decounts sum.
+1910340	1912240	So this way we're letting
+1912340	1914240	the broadcasting here
+1914340	1916240	basically implement the replication.
+1916340	1918240	You can look at it that way.
+1918340	1920240	But then we have to also be careful
+1920340	1922240	because decounts
+1922340	1924240	was all already calculated.
+1924340	1926240	We calculated earlier here,
+1926340	1928240	and that was just the first branch,
+1928340	1930240	and we're now finishing the second branch.
+1930240	1932140	So we need to make sure that these gradients add,
+1932240	1934140	so plus equals.
+1934240	1936140	And then here,
+1936240	1938140	let's comment out
+1938240	1940140	the comparison,
+1940240	1942140	and let's make sure, crossing fingers,
+1942240	1944140	that we have the correct result.
+1944240	1946140	So PyTorch agrees with us
+1946240	1948140	on this gradient as well.
+1948240	1950140	Okay, hopefully we're getting a hang of this now.
+1950240	1952140	Counts is an element-wise exp
+1952240	1954140	of norm logits.
+1954240	1956140	So now we want dNormLogits,
+1956240	1958140	and because it's an element-wise operation,
+1958240	1960140	everything is very simple.
+1960140	1962040	It's the local derivative of e to the x.
+1962140	1964040	It's famously just e to the x.
+1964140	1966040	So this is the local derivative.
+1968140	1970040	That is the local derivative.
+1970140	1972040	Now we already calculated it,
+1972140	1974040	and it's inside counts.
+1974140	1976040	So we may as well potentially just reuse counts.
+1976140	1978040	That is the local derivative.
+1978140	1980040	Times dCounts.
+1982140	1984040	Funny as that looks.
+1984140	1986040	Counts times dCounts is dNormLogits.
+1986140	1988040	And now let's erase this,
+1988140	1990040	and let's verify,
+1990040	1991940	and let's go.
+1992040	1993940	So that's dNormLogits.
+1994040	1995940	Okay, so we are here
+1996040	1997940	on this line now, dNormLogits.
+1998040	1999940	We have that,
+2000040	2001940	and we're trying to calculate dLogits
+2002040	2003940	and dLogitMaxes.
+2004040	2005940	So back-propagating through this line.
+2006040	2007940	Now we have to be careful here,
+2008040	2009940	because the shapes, again, are not the same,
+2010040	2011940	and so there's an implicit broadcasting happening here.
+2012040	2013940	So dNormLogits has the shape 32x27.
+2014040	2015940	dLogits does as well,
+2016040	2017940	but dLogitMaxes is only 32x1.
+2018040	2019940	So there's a broadcast
+2019940	2021840	here in the minus.
+2021940	2023840	Now here I tried to
+2023940	2025840	sort of write out a toy example again.
+2025940	2027840	We basically have that
+2027940	2029840	this is our c equals a minus b,
+2029940	2031840	and we see that because of the shape,
+2031940	2033840	these are 3x3, but this one is just a column.
+2033940	2035840	And so for example,
+2035940	2037840	every element of c,
+2037940	2039840	we have to look at how it came to be.
+2039940	2041840	And every element of c is just
+2041940	2043840	the corresponding element of a minus
+2043940	2045840	basically that associated b.
+2047940	2049840	So it's very clear now
+2049840	2051740	that the derivatives of
+2051840	2053740	every one of these c's with respect to their inputs
+2053840	2055740	are 1
+2055840	2057740	for the corresponding a,
+2057840	2059740	and it's a negative 1
+2059840	2061740	for the corresponding b.
+2061840	2063740	And so therefore,
+2063840	2065740	the derivatives
+2065840	2067740	on the c will flow
+2067840	2069740	equally to the corresponding a's,
+2069840	2071740	and then also to the corresponding b's.
+2071840	2073740	But then in addition to that,
+2073840	2075740	the b's are broadcast,
+2075840	2077740	so we'll have to do the additional sum
+2077840	2079740	just like we did before.
+2079740	2081640	And of course, the derivatives for b's
+2081740	2083640	will undergo a minus,
+2083740	2085640	because the local derivative here
+2085740	2087640	is negative 1.
+2087740	2089640	So dc32 by db3 is negative 1.
+2089740	2091640	So let's just implement that.
+2091740	2093640	Basically, dlogits will be
+2093740	2095640	exactly copying
+2095740	2097640	the derivative on normlogits.
+2097740	2099640	So
+2099740	2101640	dlogits equals
+2101740	2103640	dnormlogits, and I'll do a .clone
+2103740	2105640	for safety, so we're just making a copy.
+2105740	2107640	And then we have that
+2107740	2109640	dlogitmaxis,
+2109640	2111540	will be the negative
+2111640	2113540	of dnormlogits,
+2113640	2115540	because of the negative sign.
+2115640	2117540	And then we have to be careful because
+2117640	2119540	dlogitmaxis is
+2119640	2121540	a column, and so
+2121640	2123540	just like we saw before,
+2123640	2125540	because we keep replicating the same
+2125640	2127540	elements across all the
+2127640	2129540	columns, then in the
+2129640	2131540	backward pass, because we keep reusing
+2131640	2133540	this, these are all just like separate
+2133640	2135540	branches of use of that one variable.
+2135640	2137540	And so therefore, we have to do a
+2137640	2139540	sum along 1, we'd keep
+2139540	2141440	them equals true, so that we don't
+2141540	2143440	destroy this dimension.
+2143540	2145440	And then dlogitmaxis will be the same
+2145540	2147440	shape. Now we have to be careful because
+2147540	2149440	this dlogits is not the final dlogits,
+2149540	2151440	and that's because
+2151540	2153440	not only do we get gradient signal
+2153540	2155440	into logits through here, but
+2155540	2157440	logitmaxis is a function of logits,
+2157540	2159440	and that's a second branch into
+2159540	2161440	logits. So this is not yet our final
+2161540	2163440	derivative for logits, we will come back
+2163540	2165440	later for the second branch.
+2165540	2167440	For now, dlogitmaxis is the final derivative,
+2167540	2169440	so let me uncomment this
+2169440	2171340	cmp here, and let's just run this.
+2171440	2173340	And logitmaxis,
+2173440	2175340	if pytorch, agrees
+2175440	2177340	with us. So that was the derivative
+2177440	2179340	into, through
+2179440	2181340	this line. Now before
+2181440	2183340	we move on, I want to pause here briefly,
+2183440	2185340	and I want to look at these logitmaxis, and
+2185440	2187340	especially their gradients. We've
+2187440	2189340	talked previously in the previous lecture
+2189440	2191340	that the only reason we're doing this is
+2191440	2193340	for the numerical stability of the softmax
+2193440	2195340	that we are implementing here.
+2195440	2197340	And we talked about how if you take
+2197440	2199340	these logits for any one of these examples,
+2199440	2201340	so one row of this logits tensor,
+2201440	2203340	if you add or subtract
+2203440	2205340	any value equally to all the elements,
+2205440	2207340	then the value
+2207440	2209340	of the probes will be unchanged.
+2209440	2211340	You're not changing the softmax. The only thing
+2211440	2213340	that this is doing is it's making sure that
+2213440	2215340	exp doesn't overflow. And the
+2215440	2217340	reason we're using a max is because then we
+2217440	2219340	are guaranteed that each row of logits,
+2219440	2221340	the highest number, is zero.
+2221440	2223340	And so this will be safe.
+2223440	2225340	And so
+2225440	2227340	basically
+2227440	2229340	that has repercussions.
+2229440	2231340	If it is the case that changing
+2231440	2233340	logitmaxis does not change the
+2233440	2235340	probes, and therefore does not change the loss,
+2235440	2237340	then the gradient on logitmaxis
+2237440	2239340	should be zero.
+2239440	2241340	Because saying those two things is the same.
+2241440	2243340	So indeed we hope that this is
+2243440	2245340	very, very small numbers. Indeed we hope this is zero.
+2245440	2247340	Now because of floating
+2247440	2249340	point sort of wonkiness,
+2249440	2251340	this doesn't come out exactly zero.
+2251440	2253340	Only in some of the rows it does.
+2253440	2255340	But we get extremely small values, like
+2255440	2257340	1e-9 or 10.
+2257440	2259340	And so this is telling us that the values of
+2259340	2261240	logitmaxis are not impacting the loss
+2261340	2263240	as they shouldn't.
+2263340	2265240	It feels kind of weird to backpropagate through this branch,
+2265340	2267240	honestly, because
+2267340	2269240	if you have any
+2269340	2271240	implementation of f.crossentropy and
+2271340	2273240	pytorch, and you block together
+2273340	2275240	all of these elements, and you're not doing backpropagation
+2275340	2277240	piece by piece, then you would
+2277340	2279240	probably assume that the derivative
+2279340	2281240	through here is exactly zero.
+2281340	2283240	So you would be sort of
+2283340	2285240	skipping
+2285340	2287240	this branch. Because
+2287340	2289240	it's only done for numerical stability.
+2289340	2291240	But it's interesting to see that even if you break up
+2291340	2293240	everything into the full atoms, and you
+2293340	2295240	still do the computation as you'd like
+2295340	2297240	with respect to numerical stability, the correct thing
+2297340	2299240	happens. And you still get
+2299340	2301240	very, very small gradients here.
+2301340	2303240	Basically reflecting the fact that
+2303340	2305240	the values of these do not matter
+2305340	2307240	with respect to the final loss.
+2307340	2309240	Okay, so let's now continue backpropagation
+2309340	2311240	through this line here.
+2311340	2313240	We've just calculated the logitmaxis, and now
+2313340	2315240	we want to backprop into logits through this
+2315340	2317240	second branch. Now here of course
+2317340	2319240	we took logits, and we took the max
+2319240	2321140	along all the rows, and then
+2321240	2323140	we looked at its values here.
+2323240	2325140	Now the way this works is that in pytorch,
+2327240	2329140	this thing here,
+2329240	2331140	the max returns both the values,
+2331240	2333140	and it returns the indices at which those
+2333240	2335140	values to count the maximum value.
+2335240	2337140	Now in the forward pass, we only
+2337240	2339140	used values, because that's all we needed.
+2339240	2341140	But in the backward pass, it's extremely
+2341240	2343140	useful to know about where those
+2343240	2345140	maximum values occurred.
+2345240	2347140	And we have the indices at which they occurred.
+2347240	2349140	And this will of course help us do
+2349240	2351140	the backpropagation.
+2351240	2353140	Because what should the backward pass be
+2353240	2355140	here in this case? We have the logit tensor,
+2355240	2357140	which is 32 by 27, and
+2357240	2359140	in each row we find the maximum value,
+2359240	2361140	and then that value gets plucked out into
+2361240	2363140	logitmaxis. And so intuitively,
+2363240	2365140	basically
+2365240	2367140	the derivative
+2367240	2369140	flowing through here then
+2369240	2371140	should be 1
+2371240	2373140	times the local derivative
+2373240	2375140	is 1 for the appropriate entry that was
+2375240	2377140	plucked out, and
+2377240	2379140	then times the global derivative,
+2379140	2381040	of the logitmaxis.
+2381140	2383040	So really what we're doing here, if you think through it,
+2383140	2385040	is we need to take the delogitmaxis,
+2385140	2387040	and we need to scatter it to
+2387140	2389040	the correct positions
+2389140	2391040	in these logits,
+2391140	2393040	from where the maximum values came.
+2393140	2395040	And so,
+2395140	2397040	I came up with
+2397140	2399040	one line of code that does that.
+2399140	2401040	Let me just erase a bunch of stuff here.
+2401140	2403040	You could do it kind of very similar
+2403140	2405040	to what we've done here, where we create
+2405140	2407040	a zeros, and then we populate
+2407140	2409040	the correct elements.
+2409140	2411040	So we use the indices here, and we would
+2411140	2413040	set them to be 1. But you can
+2413140	2415040	also use one hot.
+2415140	2417040	So f dot one hot,
+2417140	2419040	and then I'm taking the logits of max
+2419140	2421040	over the first dimension
+2421140	2423040	dot indices, and I'm telling
+2423140	2425040	PyTorch that
+2425140	2427040	the dimension of
+2427140	2429040	every one of these tensors should be
+2429140	2431040	27.
+2431140	2433040	And so what this is going to do
+2433140	2435040	is...
+2435140	2437040	Okay, I apologize, this is crazy.
+2437140	2439040	PLT dot imchev of this.
+2439140	2441040	It's really just an array
+2441140	2443040	of where the maxes came from
+2443140	2445040	in each row, and that element is 1,
+2445140	2447040	and all the other elements are 0.
+2447140	2449040	So it's one hot vector in each row,
+2449140	2451040	and these indices are now populating
+2451140	2453040	a single 1 in the proper
+2453140	2455040	place. And then what I'm doing
+2455140	2457040	here is I'm multiplying by the logit
+2457140	2459040	maxes. And keep in mind that
+2459140	2461040	this is a column
+2461140	2463040	of 32 by 1.
+2463140	2465040	And so when I'm doing this
+2465140	2467040	times the logit maxes,
+2467140	2469040	the logit maxes will broadcast
+2469040	2470940	and that column will get replicated,
+2471040	2472940	and then element-wise multiply
+2473040	2474940	will ensure that each of these
+2475040	2476940	just gets routed to whichever
+2477040	2478940	one of these bits is turned on.
+2479040	2480940	And so that's another way to implement
+2481040	2482940	this kind of
+2483040	2484940	operation, and
+2485040	2486940	both of these can be used. I just
+2487040	2488940	thought I would show an equivalent way to do it.
+2489040	2490940	And I'm using plus equals because
+2491040	2492940	we already calculated the logits here,
+2493040	2494940	and this is now the second branch.
+2495040	2496940	So let's
+2497040	2498940	look at logits and make sure that
+2498940	2500840	this is correct.
+2500940	2502840	And we see that we have exactly the correct answer.
+2502940	2504840	Next up,
+2504940	2506840	we want to continue with logits here.
+2506940	2508840	That is an outcome of a matrix
+2508940	2510840	multiplication and a bias offset
+2510940	2512840	in this linear layer.
+2512940	2514840	So I've
+2514940	2516840	printed out the shapes of all these intermediate
+2516940	2518840	tensors. We see that logits
+2518940	2520840	is of course 32 by 27, as we've just
+2520940	2522840	seen. Then the
+2522940	2524840	h here is 32 by 64.
+2524940	2526840	So these are 64-dimensional hidden states.
+2526940	2528840	And then this w
+2528840	2530740	matrix projects those 64-dimensional
+2530840	2532740	vectors into 27 dimensions.
+2532840	2534740	And then there's a 27-dimensional
+2534840	2536740	offset, which is a
+2536840	2538740	one-dimensional vector. Now we
+2538840	2540740	should note that this plus here actually
+2540840	2542740	broadcasts, because h multiplied
+2542840	2544740	by w2
+2544840	2546740	will give us a 32 by 27.
+2546840	2548740	And so then this plus
+2548840	2550740	b2 is a 27-dimensional
+2550840	2552740	vector here. Now in the
+2552840	2554740	rules of broadcasting, what's going to happen with this bias
+2554840	2556740	vector is that this one-dimensional
+2556840	2558740	vector of 27 will get a lot
+2558840	2560740	aligned with an padded dimension
+2560840	2562740	of 1 on the left.
+2562840	2564740	And it will basically become a row vector,
+2564840	2566740	and then it will get replicated
+2566840	2568740	vertically 32 times to make it
+2568840	2570740	32 by 27, and then there's an element-wise
+2570840	2572740	multiply.
+2572840	2574740	Now the question
+2574840	2576740	is how do we backpropagate from
+2576840	2578740	logits to the hidden states,
+2578840	2580740	the weight matrix w2, and the bias
+2580840	2582740	b2? And you might
+2582840	2584740	think that we need to go to some
+2584840	2586740	matrix calculus,
+2586740	2588640	and then we have to look up the derivative
+2588740	2590640	for matrix multiplication,
+2590740	2592640	but actually you don't have to do any of that, and you can go
+2592740	2594640	back to first principles and derive this yourself
+2594740	2596640	on a piece of paper.
+2596740	2598640	And specifically what I like to do, and what
+2598740	2600640	I find works well for me, is you find
+2600740	2602640	a specific small example
+2602740	2604640	that you then fully write out, and then
+2604740	2606640	in the process of analyzing how that individual
+2606740	2608640	small example works, you will understand
+2608740	2610640	the broader pattern, and you'll be able to generalize
+2610740	2612640	and write out the full
+2612740	2614640	general formula for
+2614640	2616540	how these derivatives flow in an expression
+2616640	2618540	like this. So let's try that out.
+2618640	2620540	So pardon the low-budget production
+2620640	2622540	here, but what I've done here
+2622640	2624540	is I'm writing it out on a piece of paper.
+2624640	2626540	Really what we are interested in is we have
+2626640	2628540	a multiply b plus c,
+2628640	2630540	and that creates a d.
+2630640	2632540	And we have the derivative
+2632640	2634540	of the loss with respect to d, and we'd like to
+2634640	2636540	know what the derivative of the loss is with respect to a, b,
+2636640	2638540	and c. Now these
+2638640	2640540	here are little two-dimensional examples
+2640640	2642540	of matrix multiplication.
+2642640	2644540	2 by 2 times a 2 by 2,
+2644540	2646440	plus a 2,
+2646540	2648440	a vector of just two elements, c1 and c2,
+2648540	2650440	gives me a 2 by 2.
+2650540	2652440	Now notice here that
+2652540	2654440	I have a bias vector
+2654540	2656440	here called c, and the
+2656540	2658440	bias vector is c1 and c2, but
+2658540	2660440	as I described over here, that bias
+2660540	2662440	vector will become a row vector in the broadcasting,
+2662540	2664440	and will replicate vertically.
+2664540	2666440	So that's what's happening here as well. c1, c2
+2666540	2668440	is replicated vertically,
+2668540	2670440	and we see how we have two rows of c1,
+2670540	2672440	c2 as a result.
+2672540	2674440	So now when I say write it out,
+2674540	2676440	I just mean like this.
+2676540	2678440	Basically break up this matrix multiplication
+2678540	2680440	into the actual thing that's
+2680540	2682440	going on under the hood.
+2682540	2684440	So as a result of matrix multiplication
+2684540	2686440	and how it works, d11
+2686540	2688440	is the result of a dot product between the
+2688540	2690440	first row of a and the first column
+2690540	2692440	of b. So a11, b11,
+2692540	2694440	plus a12, b21,
+2694540	2696440	plus c1.
+2696540	2698440	And so on
+2698540	2700440	and so forth for all the other elements of d.
+2700540	2702440	And once you actually write
+2702540	2704440	it out, it becomes obvious that it's just a bunch of
+2704440	2706340	multiplies and adds.
+2706440	2708340	And we know from micrograd
+2708440	2710340	how to differentiate multiplies and adds.
+2710440	2712340	And so this is not scary anymore.
+2712440	2714340	It's not just matrix multiplication.
+2714440	2716340	It's just tedious, unfortunately.
+2716440	2718340	But this is completely tractable.
+2718440	2720340	We have dl by d for all of these,
+2720440	2722340	and we want dl by
+2722440	2724340	all these little other variables.
+2724440	2726340	So how do we achieve that, and how do we
+2726440	2728340	actually get the gradients?
+2728440	2730340	Okay, so the low-budget production continues here.
+2730440	2732340	So let's, for example, derive
+2732440	2734340	the derivative of the loss with respect to
+2734340	2736240	a11.
+2736340	2738240	We see here that a11 occurs twice
+2738340	2740240	in our simple expression, right here, right here,
+2740340	2742240	and influences d11 and d12.
+2742340	2744240	So this is, so what
+2744340	2746240	is dl by d a11?
+2746340	2748240	Well, it's dl by d11
+2748340	2750240	times
+2750340	2752240	the local derivative of d11,
+2752340	2754240	which in this case is just b11,
+2754340	2756240	because that's what's multiplying
+2756340	2758240	a11 here.
+2758340	2760240	And likewise here, the local
+2760340	2762240	derivative of d12 with respect to a11
+2762340	2764240	is just b12.
+2764240	2766140	And so b12 will, in the chain rule, therefore,
+2766240	2768140	multiply dl by d12.
+2768240	2770140	And then, because a11
+2770240	2772140	is used both to produce
+2772240	2774140	d11 and d12, we need
+2774240	2776140	to add up the contributions
+2776240	2778140	of both of those sort of
+2778240	2780140	chains that are running in parallel.
+2780240	2782140	And that's why we get a plus, just
+2782240	2784140	adding up those two,
+2784240	2786140	those two contributions. And that gives
+2786240	2788140	us dl by d a11.
+2788240	2790140	We can do the exact same analysis for
+2790240	2792140	the other one, for all the other
+2792240	2794140	elements of a. And when you
+2794140	2796040	simply write it out, it's just super
+2796140	2798040	simple taking of
+2798140	2800040	gradients on, you know,
+2800140	2802040	expressions like this.
+2802140	2804040	You find that
+2804140	2806040	this matrix, dl by d a,
+2806140	2808040	that we're after, right, if we
+2808140	2810040	just arrange all of them in the
+2810140	2812040	same shape as a takes, so
+2812140	2814040	a is just a 2x2 matrix, so
+2814140	2816040	dl by d a here will be
+2816140	2818040	also just the same
+2818140	2820040	shape
+2820140	2822040	tensor with the derivatives
+2822140	2824040	now. So dl by d a11
+2824040	2825940	etc. And we see that actually
+2826040	2827940	we can express what we've written out here
+2828040	2829940	as a matrix multiply.
+2830040	2831940	And so it just so
+2832040	2833940	happens that dl by, that all
+2834040	2835940	of these formulas that we've derived here
+2836040	2837940	by taking gradients can actually
+2838040	2839940	be expressed as a matrix multiplication.
+2840040	2841940	And in particular, we see that it is the matrix
+2842040	2843940	multiplication of these two
+2844040	2845940	matrices. So it
+2846040	2847940	is the dl
+2848040	2849940	by d and then matrix
+2850040	2851940	multiplying b, but b
+2852040	2853840	transpose, actually. So you see that
+2853840	2855740	b21 and b12
+2855840	2857740	have changed place,
+2857840	2859740	whereas before we had, of course,
+2859840	2861740	b11, b12, b21,
+2861840	2863740	b22. So you see that
+2863840	2865740	this other matrix, b,
+2865840	2867740	is transposed. And so
+2867840	2869740	basically what we have, long story short, just by
+2869840	2871740	doing very simple reasoning here,
+2871840	2873740	by breaking up the expression in the case of
+2873840	2875740	a very simple example, is that
+2875840	2877740	dl by d a is
+2877840	2879740	which is this, is simply
+2879840	2881740	equal to dl by dd matrix
+2881840	2883740	multiplied with b transpose.
+2883840	2885740	So that
+2885840	2887740	is what we have so far.
+2887840	2889740	Now, we also want the derivative with respect to
+2889840	2891740	b and c.
+2891840	2893740	Now, for
+2893840	2895740	b, I'm not actually doing the full derivation
+2895840	2897740	because, honestly, it's
+2897840	2899740	not deep. It's just
+2899840	2901740	annoying. It's exhausting. You can
+2901840	2903740	actually do this analysis yourself. You'll
+2903840	2905740	also find that if you take these expressions
+2905840	2907740	and you differentiate with respect to b
+2907840	2909740	instead of a, you will find that
+2909840	2911740	dl by db is also a matrix
+2911840	2913740	multiplication. In this case, you have to take
+2913740	2915640	the matrix a and transpose
+2915740	2917640	it and matrix multiply that with
+2917740	2919640	dl by dd.
+2919740	2921640	And that's what gives you dl by db.
+2921740	2923640	And then here for
+2923740	2925640	the offsets, c1 and
+2925740	2927640	c2, if you again just differentiate
+2927740	2929640	with respect to c1, you will find
+2929740	2931640	an expression like this.
+2931740	2933640	And c2, an expression
+2933740	2935640	like this. And basically
+2935740	2937640	you'll find that dl by dc is
+2937740	2939640	simply, because they're just offsetting
+2939740	2941640	these expressions, you just have to take
+2941740	2943640	the dl by dd matrix
+2943640	2945540	of the derivatives of d
+2945640	2947540	and you just have to
+2947640	2949540	sum across the columns.
+2949640	2951540	And that gives you the derivatives
+2951640	2953540	for c.
+2953640	2955540	So, long story short,
+2955640	2957540	the backward pass of a matrix
+2957640	2959540	multiply is a matrix multiply.
+2959640	2961540	And instead of, just like we had
+2961640	2963540	d equals a times b plus c,
+2963640	2965540	in a scalar case,
+2965640	2967540	we sort of arrive at something very, very similar
+2967640	2969540	but now with a matrix multiplication
+2969640	2971540	instead of a scalar multiplication.
+2971640	2973540	So, the derivative
+2973540	2975440	of d with respect
+2975540	2977440	to a is
+2977540	2979440	dl by dd
+2979540	2981440	matrix multiply b transpose
+2981540	2983440	and here it's a transpose
+2983540	2985440	multiply dl by dd. But in both
+2985540	2987440	cases it's a matrix multiplication with
+2987540	2989440	the derivative and
+2989540	2991440	the other term in the
+2991540	2993440	multiplication. And
+2993540	2995440	for c it is a sum.
+2995540	2997440	Now, I'll tell you a secret.
+2997540	2999440	I can never remember the formulas
+2999540	3001440	that we just derived for backpropagating
+3001440	3003340	a matrix multiplication and I can backpropagate
+3003440	3005340	through these expressions just fine.
+3005440	3007340	And the reason this works is because
+3007440	3009340	the dimensions have to work out.
+3009440	3011340	So, let me give you an example.
+3011440	3013340	Say I want to create dh.
+3013440	3015340	Then what should dh be?
+3015440	3017340	Number one, I have to know that
+3017440	3019340	the shape of dh must be the same
+3019440	3021340	as the shape of h.
+3021440	3023340	And the shape of h is 32 by 64.
+3023440	3025340	And then the other piece of information I know
+3025440	3027340	is that dh
+3027440	3029340	must be some kind of matrix multiplication
+3029340	3031240	of dlogits with w2.
+3031340	3033240	And dlogits
+3033340	3035240	is 32 by 27
+3035340	3037240	and w2 is
+3037340	3039240	64 by 27. There is only
+3039340	3041240	a single way to make the shape work out
+3041340	3043240	in this case
+3043340	3045240	and it is indeed the correct result.
+3045340	3047240	In particular here, h
+3047340	3049240	needs to be 32 by 64. The only
+3049340	3051240	way to achieve that is to take dlogits
+3051340	3053240	and matrix
+3053340	3055240	multiply it with
+3055340	3057240	you see how I have to take w2 but I have to
+3057340	3059240	transpose it to make the dimensions work out.
+3059340	3061240	So w2 transpose.
+3061340	3063240	And it is the only way to make these
+3063340	3065240	to matrix multiply those two pieces
+3065340	3067240	to make the shapes work out. And that turns out
+3067340	3069240	to be the correct formula. So if we come
+3069340	3071240	here, we want
+3071340	3073240	dh which is da and we see
+3073340	3075240	that da is dl by
+3075340	3077240	dd matrix multiply b transpose.
+3077340	3079240	So that is dlogits multiply
+3079340	3081240	and b is w2.
+3081340	3083240	So w2 transpose which is exactly
+3083340	3085240	what we have here. So
+3085340	3087240	there is no need to remember these formulas.
+3087340	3089240	Similarly, now if I
+3089240	3091140	want dw2
+3091240	3093140	well I know that it must be a matrix
+3093240	3095140	multiplication of
+3095240	3097140	dlogits and h
+3097240	3099140	and maybe there is a few transpose
+3099240	3101140	like there is one transpose in there as well.
+3101240	3103140	And I don't know which way it is so I have to come to w2
+3103240	3105140	and I see that its shape is
+3105240	3107140	64 by 27
+3107240	3109140	and that has to come from some matrix
+3109240	3111140	multiplication of these two.
+3111240	3113140	And so to get a 64 by 27
+3113240	3115140	I need to take
+3115240	3117140	h
+3117240	3119140	I need to transpose it
+3119240	3121140	and then I need to matrix multiply it
+3121240	3123140	so that will become 64 by 32
+3123240	3125140	and then I need to matrix multiply it with
+3125240	3127140	32 by 27 and that's going to give me
+3127240	3129140	a 64 by 27. So I need
+3129240	3131140	to matrix multiply this with dlogits.shape
+3131240	3133140	just like that. That's the only way
+3133240	3135140	to make the dimensions work out and
+3135240	3137140	just use matrix multiplication.
+3137240	3139140	And if we come here, we see that
+3139240	3141140	that's exactly what's here. So a transpose
+3141240	3143140	a for us is h
+3143240	3145140	multiplied with dlogits.
+3145240	3147140	So that's w2
+3147240	3149140	and then db2
+3149140	3151040	is just
+3151140	3153040	the
+3153140	3155040	vertical sum and actually
+3155140	3157040	in the same way, there's only one way to make
+3157140	3159040	the shapes work out. I don't have to remember that
+3159140	3161040	it's a vertical sum along the 0th axis
+3161140	3163040	because that's the only way that this makes sense.
+3163140	3165040	Because b2's shape is 27
+3165140	3167040	so in order to get
+3167140	3169040	a dlogits
+3169140	3171040	here
+3171140	3173040	it's 32 by 27 so
+3173140	3175040	knowing that it's just sum over dlogits
+3175140	3177040	in some direction
+3177040	3180940	that direction must be 0
+3181040	3182940	because I need to eliminate this dimension.
+3183040	3184940	So it's this.
+3185040	3186940	So this is
+3187040	3188940	kind of like the hacky way.
+3189040	3190940	Let me copy paste and delete that
+3191040	3192940	and let me swing over here
+3193040	3194940	and this is our backward pass for the linear layer.
+3195040	3196940	Hopefully.
+3197040	3198940	So now let's uncomment
+3199040	3200940	these three and we're checking that
+3201040	3202940	we got all the three
+3203040	3204940	derivatives correct and
+3205040	3206940	run
+3206940	3208840	and we see that h,
+3208940	3210840	w2 and b2 are all exactly correct.
+3210940	3212840	So we backpropagate it through
+3212940	3214840	a linear layer.
+3214940	3216840	Now next up
+3216940	3218840	we have derivative for the h
+3218940	3220840	already and we need to backpropagate
+3220940	3222840	through tanh into h preact.
+3222940	3224840	So we want to derive
+3224940	3226840	dh preact
+3226940	3228840	and here we have to backpropagate through a tanh
+3228940	3230840	and we've already done this in micrograd
+3230940	3232840	and we remember that tanh is a very simple
+3232940	3234840	backward formula. Now unfortunately
+3234940	3236840	if I just put in d by dx of f
+3236940	3238840	tanh of x into volt from alpha
+3238940	3240840	it lets us down. It tells us that it's a
+3240940	3242840	hyperbolic secant function squared
+3242940	3244840	of x. It's not exactly helpful
+3244940	3246840	but luckily google image
+3246940	3248840	search does not let us down and it gives
+3248940	3250840	us the simpler formula. In particular
+3250940	3252840	if you have that a is equal to tanh
+3252940	3254840	of z then da by
+3254940	3256840	dz backpropagating through tanh
+3256940	3258840	is just 1 minus a square
+3258940	3260840	and take note that 1
+3260940	3262840	minus a square a here is the
+3262940	3264840	output of the tanh not the input to
+3264940	3266840	the tanh z. So
+3266840	3268740	the da by dz is here
+3268840	3270740	formulated in terms of the output of that tanh
+3270840	3272740	and here also
+3272840	3274740	in google image search we have the full derivation
+3274840	3276740	if you want to actually take the
+3276840	3278740	actual definition of tanh and work
+3278840	3280740	through the math to figure out 1 minus
+3280840	3282740	tanh square of z. So
+3282840	3284740	1 minus a square is
+3284840	3286740	the local derivative. In our case
+3286840	3288740	that is 1 minus
+3288840	3290740	the output of tanh
+3290840	3292740	square which here is h
+3292840	3294740	so it's h square
+3294840	3296740	and that is the local derivative
+3296840	3298740	and then times the chain rule
+3298840	3300740	dh. So
+3300840	3302740	that is going to be our candidate implementation
+3302840	3304740	so if we come here
+3304840	3306740	and then uncomment
+3306840	3308740	this let's hope for the best
+3308840	3310740	and we have
+3310840	3312740	the right answer. Okay next
+3312840	3314740	up we have dh preact and
+3314840	3316740	we want to backpropagate into the gain
+3316840	3318740	the b in raw and the b in bias.
+3318840	3320740	So here this is the bash norm
+3320840	3322740	parameters b in gain and bias inside
+3322840	3324740	the bash norm that take the b in raw
+3324840	3326740	that is exact unit Gaussian
+3326740	3328640	and they scale it and shift it
+3328740	3330640	and these are the parameters of the
+3330740	3332640	bash norm. Now here
+3332740	3334640	we have a multiplication but
+3334740	3336640	it's worth noting that this multiply is very very
+3336740	3338640	different from this matrix multiply here
+3338740	3340640	matrix multiply are dot products
+3340740	3342640	between rows and columns of these
+3342740	3344640	matrices involved. This is an
+3344740	3346640	element wise multiply so things are quite a bit
+3346740	3348640	simpler. Now we do have to
+3348740	3350640	be careful with some of the broadcasting happening
+3350740	3352640	in this line of code though. So you
+3352740	3354640	see how b in gain and b in bias
+3354740	3356640	are 1 by 64
+3356740	3358640	but h preact and
+3358740	3360640	b in raw are 32 by 64.
+3360740	3362640	So
+3362740	3364640	we have to be careful with that and make sure that all the shapes
+3364740	3366640	work out fine and that the broadcasting is
+3366740	3368640	correctly backpropagated. So
+3368740	3370640	in particular let's start with db in gain
+3370740	3372640	so db in gain
+3372740	3374640	should be
+3374740	3376640	and here this is again element wise
+3376740	3378640	multiply and whenever we have a times
+3378740	3380640	b equals c we saw that
+3380740	3382640	the local derivative here is just if this
+3382740	3384640	is a the local derivative is just the
+3384740	3386640	b the other one. So this
+3386740	3388640	local derivative is just b in raw
+3388740	3390640	and then times chain rule
+3390740	3392640	so dh preact.
+3392740	3394640	So
+3394740	3396640	this is the candidate
+3396740	3398640	gradient. Now again
+3398740	3400640	we have to be careful because b in gain
+3400740	3402640	is of size 1 by 64
+3402740	3404640	but this here
+3404740	3406640	would be 32 by 64
+3406740	3408640	and so
+3408740	3410640	the correct thing to do
+3410740	3412640	in this case of course is that b in gain
+3412740	3414640	here is a rule vector of 64 numbers
+3414740	3416640	it gets replicated vertically
+3416640	3418540	in this operation
+3418640	3420540	and so therefore the correct thing to do
+3420640	3422540	is to sum because it's being replicated
+3422640	3424540	and therefore
+3424640	3426540	all the gradients in each of the rows
+3426640	3428540	that are now flowing backwards
+3428640	3430540	need to sum up to that same
+3430640	3432540	tensor db in gain.
+3432640	3434540	So we have to sum across all the zero
+3434640	3436540	all the examples
+3436640	3438540	basically which is the direction
+3438640	3440540	in which this gets replicated
+3440640	3442540	and now we have to be also careful because
+3442640	3444540	b in gain is of shape
+3444640	3446540	1 by 64. So in fact
+3446640	3448540	I need to keep them as true
+3448640	3450540	otherwise I would just get 64.
+3450640	3452540	Now I don't actually
+3452640	3454540	really remember why
+3454640	3456540	the b in gain and the b in bias
+3456640	3458540	I made them be 1 by 64
+3458640	3460540	but the biases
+3460640	3462540	b1 and b2
+3462640	3464540	I just made them be one-dimensional vectors
+3464640	3466540	they're not two-dimensional tensors
+3466640	3468540	so I can't recall exactly why
+3468640	3470540	I left the gain
+3470640	3472540	and the bias as two-dimensional
+3472640	3474540	but it doesn't really matter as long as you are consistent
+3474640	3476540	and you're keeping it the same.
+3476640	3478540	So in this case we want to keep the dimension
+3478640	3480540	so that the tensor shapes work.
+3480640	3482540	Next up we have
+3482640	3484540	b in raw
+3484640	3486540	so db in raw will be
+3486640	3488540	b in gain
+3488640	3490540	multiplying
+3490640	3492540	dh preact
+3492640	3494540	that's our chain rule.
+3494640	3496540	Now what about the
+3496640	3498540	dimensions of this?
+3498640	3500540	We have to be careful, right?
+3500640	3502540	So dh preact is
+3502640	3504540	32 by 64
+3504640	3506540	b in gain is 1 by 64
+3506540	3508440	so it will just get replicated
+3508540	3510440	to create this multiplication
+3510540	3512440	which is the correct thing
+3512540	3514440	because in a forward pass it also gets replicated
+3514540	3516440	in just the same way.
+3516540	3518440	So in fact we don't need the brackets here, we're done.
+3518540	3520440	And the shapes are already correct.
+3520540	3522440	And finally for the bias
+3522540	3524440	very similar
+3524540	3526440	this bias here is very very similar
+3526540	3528440	to the bias we saw in the linear layer
+3528540	3530440	and we see that the gradients
+3530540	3532440	from h preact will simply flow
+3532540	3534440	into the biases and add up
+3534540	3536440	because these are just offsets.
+3536540	3538440	And so basically we want this to be
+3538540	3540440	dh preact but it needs
+3540540	3542440	to sum along the right dimension
+3542540	3544440	and in this case similar to the gain
+3544540	3546440	we need to sum across the 0th
+3546540	3548440	dimension, the examples
+3548540	3550440	because of the way that the bias gets replicated
+3550540	3552440	vertically and we also
+3552540	3554440	want to have keep them as true.
+3554540	3556440	And so this will basically take
+3556540	3558440	this and sum it up and give us
+3558540	3560440	a 1 by 64.
+3560540	3562440	So this is the candidate implementation
+3562540	3564440	it makes all the shapes work
+3564440	3566340	let me bring it up
+3566440	3568340	down here
+3568440	3570340	and then let me uncomment these 3 lines
+3570440	3572340	to check that
+3572440	3574340	we are getting the correct result
+3574440	3576340	for all the 3 tensors
+3576440	3578340	and indeed we see that all of that
+3578440	3580340	got backpropagated correctly.
+3580440	3582340	So now we get to the batchnorm layer
+3582440	3584340	we see how here bngain and bmbias
+3584440	3586340	are the primers so the backpropagation ends
+3586440	3588340	but bnraw now
+3588440	3590340	is the output of the standardization
+3590440	3592340	so here what I'm doing
+3592440	3594340	of course is I'm breaking up the batchnorm
+3594340	3596240	into manageable pieces so we can backpropagate
+3596340	3598240	through each line individually
+3598340	3600240	but basically what's happening is
+3600340	3602240	bnmeani is the sum
+3602340	3604240	so this is the
+3604340	3606240	bnmeani
+3606340	3608240	I apologize for the variable naming
+3608340	3610240	bndiff is x minus mu
+3610340	3612240	bndiff2
+3612340	3614240	is x minus mu squared
+3614340	3616240	here inside the variance
+3616340	3618240	bnvar is the variance
+3618340	3620240	so sigma square
+3620340	3622240	this is bnvar
+3622340	3624240	and it's basically the sum of squares
+3624340	3626240	so this is the x minus mu
+3626340	3628240	squared
+3628340	3630240	and then the sum
+3630340	3632240	now you'll notice one departure here
+3632340	3634240	here it is normalized as 1 over m
+3634340	3636240	which is the number of examples
+3636340	3638240	here I'm normalizing
+3638340	3640240	as 1 over n minus 1 instead of m
+3640340	3642240	and this is deliberate and I'll come back to that
+3642340	3644240	in a bit when we are at this line
+3644340	3646240	it is something called the Bessel's correction
+3646340	3648240	but this is how I want it
+3648340	3650240	in our case
+3650340	3652240	bnvar inv
+3652340	3654240	then becomes basically bnvar
+3654340	3656240	plus epsilon
+3656340	3658240	epsilon is 1 negative 5
+3658340	3660240	and then it's 1 over square root
+3660340	3662240	is the same as raising to the power of
+3662340	3664240	negative 0.5
+3664340	3666240	because 0.5 is square root
+3666340	3668240	and then negative makes it 1 over square root
+3668340	3670240	so bnvar inv
+3670340	3672240	is 1 over this denominator here
+3672340	3674240	and then we can see that
+3674340	3676240	bnraw which is the x hat here
+3676340	3678240	is equal to the
+3678340	3680240	bndiff the numerator
+3680340	3682240	multiplied by the
+3682340	3684240	bnvar inv
+3684240	3686140	and this line here
+3686240	3688140	that creates hpreact was the last piece
+3688240	3690140	we've already backpropagated through it
+3690240	3692140	so now what we want to do
+3692240	3694140	is we are here
+3694240	3696140	and we have bnraw
+3696240	3698140	and we have to first backpropagate
+3698240	3700140	into bndiff and bnvar inv
+3700240	3702140	so now we are here
+3702240	3704140	and we have dbnraw
+3704240	3706140	and we need to backpropagate through this line
+3706240	3708140	now I've written out the shapes here
+3708240	3710140	and indeed
+3710240	3712140	bnvar inv is a shape 1 by 64
+3712240	3714140	so there is a
+3714140	3716040	little bit of broadcasting happening here
+3716140	3718040	that we have to be careful with
+3718140	3720040	but it is just an elementwise simple multiplication
+3720140	3722040	by now we should be pretty comfortable with that
+3722140	3724040	to get dbndiff
+3724140	3726040	we know that this is just
+3726140	3728040	bnvar inv multiplied with
+3728140	3730040	dbnraw
+3730140	3732040	and conversely
+3732140	3734040	to get dbnvar inv
+3734140	3736040	we need to take
+3736140	3738040	bndiff
+3738140	3740040	and multiply that by dbnraw
+3742140	3744040	so this is the candidate
+3744040	3745940	but of course
+3746040	3747940	we need to make sure that broadcasting is obeyed
+3748040	3749940	so in particular
+3750040	3751940	bnvar inv multiplying with dbnraw
+3752040	3753940	will be okay
+3754040	3755940	and give us 32 by 64 as we expect
+3756040	3757940	but dbnvar inv
+3758040	3759940	would be taking
+3760040	3761940	a 32 by 64
+3762040	3763940	multiplying it by
+3764040	3765940	32 by 64
+3766040	3767940	so this is a 32 by 64
+3768040	3769940	but of course this bnvar inv
+3770040	3771940	is only 1 by 64
+3772040	3773940	so this second line here
+3773940	3775840	needs a sum across the examples
+3775940	3777840	and because there's this
+3777940	3779840	dimension here we need to make sure that
+3779940	3781840	keep them is true
+3781940	3783840	so this is the candidate
+3783940	3785840	let's erase this
+3785940	3787840	and let's swing down here
+3787940	3789840	and implement it
+3789940	3791840	and then let's comment out
+3791940	3793840	dbnvar inv
+3793940	3795840	and dbndiff
+3795940	3797840	now we'll actually notice
+3797940	3799840	that dbndiff by the way
+3799940	3801840	is going to be incorrect
+3801940	3803840	so when I run this
+3803840	3805740	bnvar inv is correct
+3805840	3807740	bndiff is not correct
+3807840	3809740	and this is actually expected
+3809840	3811740	because we're not done
+3811840	3813740	with bndiff
+3813840	3815740	so in particular when we slide here
+3815840	3817740	we see here that bnraw is a function of bndiff
+3817840	3819740	but actually bnvar inv
+3819840	3821740	is a function of bnvar
+3821840	3823740	which is a function of bndiff too
+3823840	3825740	which is a function of bndiff
+3825840	3827740	so it comes here
+3827840	3829740	so bdndiff
+3829840	3831740	these variable names are crazy I'm sorry
+3831840	3833740	it branches out into two branches
+3833740	3835640	we've only done one branch of it
+3835740	3837640	we have to continue our backpropagation
+3837740	3839640	and eventually come back to bndiff
+3839740	3841640	and then we'll be able to do a plus equals
+3841740	3843640	and get the actual correct gradient
+3843740	3845640	for now it is good to verify that cmp also works
+3845740	3847640	it doesn't just lie to us
+3847740	3849640	and tell us that everything is always correct
+3849740	3851640	it can in fact detect when your
+3851740	3853640	gradient is not correct
+3853740	3855640	so that's good to see as well
+3855740	3857640	okay so now we have the derivative here
+3857740	3859640	and we're trying to backpropagate through this line
+3859740	3861640	and because we're raising to a power of negative 0.5
+3861740	3863640	I brought up the power rule
+3863640	3865540	and we see that basically we have that
+3865640	3867540	the bnvar will now be
+3867640	3869540	we bring down the exponent
+3869640	3871540	so negative 0.5 times x
+3871640	3873540	which is this
+3873640	3875540	and now raised to the power of
+3875640	3877540	negative 0.5 minus 1
+3877640	3879540	which is negative 1.5
+3879640	3881540	now we would have to also apply
+3881640	3883540	a small chain rule here in our head
+3883640	3885540	because we need to take further
+3885640	3887540	the derivative of bnvar
+3887640	3889540	with respect to this expression here
+3889640	3891540	inside the bracket
+3891640	3893540	but because this is an element-wise operation
+3893540	3895440	everything is fairly simple
+3895540	3897440	that's just one
+3897540	3899440	and so there's nothing to do there
+3899540	3901440	so this is the local derivative
+3901540	3903440	and then times the global derivative
+3903540	3905440	to create the chain rule
+3905540	3907440	this is just times the bnvar
+3907540	3909440	so this is our candidate
+3909540	3911440	let me bring this down
+3911540	3913440	and uncomment the check
+3913540	3915440	and we see that
+3915540	3917440	we have the correct result
+3917540	3919440	now before we backpropagate through the next line
+3919540	3921440	I want to briefly talk about the node here
+3921540	3923440	where I'm using the Bessel's correction
+3923440	3925340	which is 1 over n minus 1
+3925440	3927340	instead of dividing by n
+3927440	3929340	when I normalize here
+3929440	3931340	the sum of squares
+3931440	3933340	now you'll notice that this is a departure from the paper
+3933440	3935340	which uses 1 over n instead
+3935440	3937340	not 1 over n minus 1
+3937440	3939340	there m is rn
+3939440	3941340	so it turns out that there are two ways
+3941440	3943340	of estimating variance of an array
+3943440	3945340	one is the biased estimate
+3945440	3947340	which is 1 over n
+3947440	3949340	and the other one is the unbiased estimate
+3949440	3951340	which is 1 over n minus 1
+3951440	3953340	now confusingly in the paper
+3953340	3955240	it's not very clearly described
+3955340	3957240	and also it's a detail that kind of matters
+3957340	3959240	I think
+3959340	3961240	we are using the biased version at training time
+3961340	3963240	but later when they are talking about the inference
+3963340	3965240	they are mentioning that
+3965340	3967240	when they do the inference
+3967340	3969240	they are using the unbiased estimate
+3969340	3971240	which is the n minus 1 version
+3971340	3973240	in basically
+3973340	3975240	for inference
+3975340	3977240	and to calibrate the running mean
+3977340	3979240	and the running variance basically
+3979340	3981240	and so they actually introduce
+3981340	3983240	a train test mismatch
+3983340	3985240	where in training they use the biased version
+3985340	3987240	and in test time they use the unbiased version
+3987340	3989240	I find this extremely confusing
+3989340	3991240	you can read more about
+3991340	3993240	the Bessel's correction
+3993340	3995240	and why dividing by n minus 1
+3995340	3997240	gives you a better estimate of the variance
+3997340	3999240	in the case where you have population sizes
+3999340	4001240	or samples from a population
+4001340	4003240	that are very small
+4003340	4005240	and that is indeed the case for us
+4005340	4007240	because we are dealing with mini-matches
+4007340	4009240	and these mini-matches are a small sample
+4009340	4011240	of a larger population
+4011340	4013240	which is the entire training set
+4013240	4015140	and it turns out that
+4015240	4017140	if you just estimate it using 1 over n
+4017240	4019140	that actually almost always
+4019240	4021140	underestimates the variance
+4021240	4023140	and it is a biased estimator
+4023240	4025140	and it is advised that you use the unbiased version
+4025240	4027140	and divide by n minus 1
+4027240	4029140	and you can go through this article here
+4029240	4031140	that I liked that actually describes
+4031240	4033140	the fall of reasoning
+4033240	4035140	and I'll link it in the video description
+4035240	4037140	now when you calculate the torshta variance
+4037240	4039140	you'll notice that they take the unbiased flag
+4039240	4041140	whether or not you want to divide by n
+4041240	4043140	or n minus 1
+4043140	4045040	so the default is for unbiased
+4045140	4047040	but I believe unbiased by default
+4047140	4049040	is true
+4049140	4051040	I'm not sure why the docs here don't cite that
+4051140	4053040	now in the batch norm
+4053140	4055040	1 , the documentation again
+4055140	4057040	is kind of wrong and confusing
+4057140	4059040	it says that the standard deviation is calculated
+4059140	4061040	via the biased estimator
+4061140	4063040	but this is actually not exactly right
+4063140	4065040	and people have pointed out that it is not right
+4065140	4067040	in a number of issues since then
+4067140	4069040	because actually the rabbit hole is deeper
+4069140	4071040	and they follow the paper exactly
+4071140	4073040	and they use the biased
+4073040	4074940	version for training
+4075040	4076940	but when they're estimating the running standard deviation
+4077040	4078940	they are using the unbiased version
+4079040	4080940	so again there's the train test mismatch
+4081040	4082940	so long story short
+4083040	4084940	I'm not a fan of train test discrepancies
+4085040	4086940	I basically kind of consider
+4087040	4088940	the fact that we use the biased version
+4089040	4090940	the training time
+4091040	4092940	and the unbiased test time
+4093040	4094940	I basically consider this to be a bug
+4095040	4096940	and I don't think that there's a good reason for that
+4097040	4098940	it's not really
+4099040	4100940	they don't really go into the detail
+4101040	4102940	of the reasoning behind it in this paper
+4102940	4104840	I basically prefer to use the Bessel's correction
+4104940	4106840	in my own work
+4106940	4108840	unfortunately BatchNorm does not take
+4108940	4110840	a keyword argument that tells you whether or not
+4110940	4112840	you want to use the unbiased version
+4112940	4114840	or the biased version in both train and test
+4114940	4116840	and so therefore anyone using BatchNormalization
+4116940	4118840	basically in my view
+4118940	4120840	has a bit of a bug in the code
+4120940	4122840	and this turns out to be much less of a problem
+4122940	4124840	if your batch
+4124940	4126840	many batch sizes are a bit larger
+4126940	4128840	but still I just find it kind of
+4128940	4130840	unpalatable
+4130940	4132840	so maybe someone can explain why this is okay
+4132840	4134740	but for now I prefer to use the unbiased version
+4134840	4136740	consistently both during training
+4136840	4138740	and at test time
+4138840	4140740	and that's why I'm using 1 over n minus 1 here
+4140840	4142740	okay so let's now actually backpropagate
+4142840	4144740	through this line
+4144840	4146740	so
+4146840	4148740	the first thing that I always like to do
+4148840	4150740	is I like to scrutinize the shapes first
+4150840	4152740	so in particular here looking at the shapes
+4152840	4154740	of what's involved
+4154840	4156740	I see that bnvar shape is 1 by 64
+4156840	4158740	so it's a row vector
+4158840	4160740	and bndiff2.shape is 32 by 64
+4160840	4162740	so I can see that
+4162840	4164740	so clearly here we're doing a sum
+4164840	4166740	over the 0th axis
+4166840	4168740	to squash the first dimension
+4168840	4170740	of the shapes here
+4170840	4172740	using a sum
+4172840	4174740	so that right away actually hints to me
+4174840	4176740	that there will be some kind of a replication
+4176840	4178740	or broadcasting in the backward pass
+4178840	4180740	and maybe you're noticing the pattern here
+4180840	4182740	but basically any time you have a sum
+4182840	4184740	in the forward pass
+4184840	4186740	that turns into a replication
+4186840	4188740	or broadcasting in the backward pass
+4188840	4190740	along the same dimension
+4190840	4192740	and conversely when we have a replication
+4192740	4194640	or a broadcasting in the forward pass
+4194740	4196640	that indicates a variable reuse
+4196740	4198640	and so in the backward pass
+4198740	4200640	that turns into a sum
+4200740	4202640	over the exact same dimension
+4202740	4204640	and so hopefully you're noticing that duality
+4204740	4206640	that those two are kind of like the opposites
+4206740	4208640	of each other in the forward and backward pass
+4208740	4210640	now once we understand the shapes
+4210740	4212640	the next thing I like to do always
+4212740	4214640	is I like to look at a toy example in my head
+4214740	4216640	to sort of just like understand roughly how
+4216740	4218640	the variable dependencies go
+4218740	4220640	in the mathematical formula
+4220740	4222640	so here we have
+4222640	4224540	a two-dimensional array
+4224640	4226540	b and div 2 which we are scaling
+4226640	4228540	by a constant and then we are summing
+4228640	4230540	vertically over the columns
+4230640	4232540	so if we have a 2x2 matrix a
+4232640	4234540	and then we sum over the columns
+4234640	4236540	and scale we would get a
+4236640	4238540	row vector b1 b2 and
+4238640	4240540	b1 depends on a in this way
+4240640	4242540	where it's just sum that is scaled
+4242640	4244540	of a and b2
+4244640	4246540	in this way where it's the second column
+4246640	4248540	summed and scaled
+4248640	4250540	and so looking at this basically
+4250640	4252540	what we want to do is
+4252540	4254440	we have the derivatives on b1 and b2
+4254540	4256440	and we want to back propagate them into a's
+4256540	4258440	and so it's clear that just
+4258540	4260440	differentiating in your head
+4260540	4262440	the local derivative here is 1 over n-1
+4262540	4264440	times 1
+4264540	4266440	for each one of these a's
+4266540	4268440	and
+4268540	4270440	basically the derivative of b1
+4270540	4272440	has to flow through the columns of a
+4272540	4274440	scaled by 1 over n-1
+4274540	4276440	and that's roughly
+4276540	4278440	what's happening here
+4278540	4280440	so intuitively the derivative flow
+4280540	4282440	tells us that
+4282440	4284340	db and df2
+4284440	4286340	will be
+4286440	4288340	the local derivative of this operation
+4288440	4290340	and there are many ways to do this by the way
+4290440	4292340	but I like to do something like this
+4292440	4294340	torch dot ones like
+4294440	4296340	of b and df2
+4296440	4298340	so I'll create a large array
+4298440	4300340	two dimensional of ones
+4300440	4302340	and then I will scale it
+4302440	4304340	so 1.0 divided by n-1
+4304440	4306340	so this is an array of
+4306440	4308340	1 over n-1
+4308440	4310340	and that's sort of like the local derivative
+4310440	4312340	and now for the chain rule
+4312340	4314240	I will simply just multiply it by
+4314340	4316240	db and var
+4318340	4320240	and notice here what's going to happen
+4320340	4322240	this is 32 by 64
+4322340	4324240	and this is just 1 by 64
+4324340	4326240	so I'm letting the broadcasting
+4326340	4328240	do the replication
+4328340	4330240	because internally in pytorch
+4330340	4332240	basically db and var
+4332340	4334240	which is 1 by 64 row vector
+4334340	4336240	will in this multiplication get
+4336340	4338240	copied vertically
+4338340	4340240	until the two are of the same shape
+4340340	4342240	and then there will be an elementwise multiply
+4342240	4344140	so the broadcasting is basically doing the replication
+4344240	4346140	and I will end up
+4346240	4348140	with the derivatives of db and df2
+4348240	4350140	here
+4350240	4352140	so this is the candidate solution
+4352240	4354140	let's bring it down here
+4354240	4356140	let's uncomment this line
+4356240	4358140	where we check it
+4358240	4360140	and let's hope for the best
+4360240	4362140	and indeed we see that this is the correct formula
+4362240	4364140	next up let's differentiate here
+4364240	4366140	into b and df
+4366240	4368140	so here we have that b and df
+4368240	4370140	is elementwise squared to create b and df2
+4370240	4372140	so this is a
+4372140	4374040	relatively simple derivative
+4374140	4376040	because it's a simple elementwise operation
+4376140	4378040	so it's kind of like the scalar case
+4378140	4380040	and we have that db and df
+4380140	4382040	should be
+4382140	4384040	if this is x squared
+4384140	4386040	then the derivative of this is 2x
+4386140	4388040	so it's simply 2 times b and df
+4388140	4390040	that's the local derivative
+4390140	4392040	and then times chain rule
+4392140	4394040	and the shape of these is the same
+4394140	4396040	they are of the same shape
+4396140	4398040	so times this
+4398140	4400040	so that's the backward pass for this variable
+4400140	4402040	let me bring it down here
+4402040	4403940	I've already calculated db and df
+4404040	4405940	so this is just the end of the other
+4406040	4407940	branch coming back to b and df
+4408040	4409940	because b and df
+4410040	4411940	were already back propagated to
+4412040	4413940	way over here
+4414040	4415940	from b and raw
+4416040	4417940	so we now completed the second branch
+4418040	4419940	and so that's why I have to do plus equals
+4420040	4421940	and if you recall
+4422040	4423940	we had an incorrect derivative for b and df before
+4424040	4425940	and I'm hoping that once we append
+4426040	4427940	this last missing piece
+4428040	4429940	we have the exact correctness
+4430040	4431940	so let's run
+4432040	4433940	and b and df now actually shows
+4434040	4435940	the exact correct derivative
+4436040	4437940	so that's comforting
+4438040	4439940	okay so let's now back propagate
+4440040	4441940	through this line here
+4442040	4443940	the first thing we do of course
+4444040	4445940	is we check the shapes
+4446040	4447940	and I wrote them out here
+4448040	4449940	and basically the shape of this
+4450040	4451940	is 32 by 64
+4452040	4453940	h pre bn is the same shape
+4454040	4455940	but b and mean i is a row vector
+4456040	4457940	1 by 64
+4458040	4459940	so this minus here will actually do broadcasting
+4460040	4461940	and so we have to be careful with that
+4461940	4463840	again because of the duality
+4463940	4465840	a broadcasting in the forward pass
+4465940	4467840	means a variable reuse
+4467940	4469840	and therefore there will be a sum
+4469940	4471840	in the backward pass
+4471940	4473840	so let's write out the backward pass here now
+4473940	4475840	back propagate into the h pre bn
+4475940	4477840	because these are the same shape
+4477940	4479840	then the local derivative
+4479940	4481840	for each one of the elements here
+4481940	4483840	is just 1 for the corresponding element
+4483940	4485840	in here
+4485940	4487840	so basically what this means is that
+4487940	4489840	the gradient just simply copies
+4489940	4491840	it's just a variable assignment
+4491840	4493740	so I'm just going to clone this tensor
+4493840	4495740	just for safety to create an exact copy
+4495840	4497740	of db and diff
+4497840	4499740	and then here
+4499840	4501740	to back propagate into this one
+4501840	4503740	what I'm inclined to do here
+4503840	4505740	is
+4505840	4507740	d bn mean i
+4507840	4509740	will basically be
+4509840	4511740	what is the local derivative
+4511840	4513740	well it's negative torch.once like
+4513840	4515740	of the shape of
+4515840	4517740	b and diff
+4517840	4519740	right
+4519840	4521740	so
+4522240	4523740	and then times
+4523840	4525740	the
+4525840	4527740	derivative here
+4527840	4529740	db and diff
+4529840	4531740	and this here
+4531840	4533740	is the back propagation
+4533840	4535740	for the replicated
+4535840	4537740	b and mean i
+4537840	4539740	so I still have to back propagate
+4539840	4541740	through the replication
+4541840	4543740	in the broadcasting
+4543840	4545740	and I do that by doing a sum
+4545840	4547740	so I'm going to take this whole thing
+4547840	4549740	and I'm going to do a sum
+4549740	4551640	and I'm going to do a replication
+4551740	4553640	so if you scrutinize this by the way
+4553740	4555640	you'll notice that
+4555740	4557640	this is the same shape as that
+4557740	4559640	and so what I'm doing
+4559740	4561640	what I'm doing here doesn't actually make that much sense
+4561740	4563640	because it's just a
+4563740	4565640	array of ones multiplying db and diff
+4565740	4567640	so in fact I can just do
+4567740	4569640	this
+4569740	4571640	and that is equivalent
+4571740	4573640	so this is the candidate
+4573740	4575640	backward pass
+4575740	4577640	let me copy it here
+4577640	4579540	let me comment out this one
+4579640	4581540	and this one
+4581640	4583540	enter
+4583640	4585540	and it's wrong
+4585640	4587540	damn
+4587640	4589540	actually sorry
+4589640	4591540	this is supposed to be wrong
+4591640	4593540	and it's supposed to be wrong because
+4593640	4595540	we are back propagating
+4595640	4597540	from b and diff into h pre bn
+4597640	4599540	but we're not done
+4599640	4601540	because b and mean i depends
+4601640	4603540	on h pre bn and there will be
+4603640	4605540	a second portion of that derivative coming from
+4605640	4607540	this second branch
+4607540	4609440	but we're not done yet and we expect it to be incorrect
+4609540	4611440	so there you go
+4611540	4613440	so let's now back propagate from b and mean i
+4613540	4615440	into h pre bn
+4617540	4619440	and so here again we have to be careful
+4619540	4621440	because there's a broadcasting along
+4621540	4623440	or there's a sum along the 0th dimension
+4623540	4625440	so this will turn into broadcasting
+4625540	4627440	in the backward pass now
+4627540	4629440	and I'm going to go a little bit faster on this line
+4629540	4631440	because it is very similar to the line
+4631540	4633440	that we had before
+4633540	4635440	multiple lines in the past in fact
+4635540	4637440	so d h pre bn
+4637540	4639440	will be
+4639540	4641440	the gradient will be scaled
+4641540	4643440	by 1 over n and then
+4643540	4645440	basically this gradient here on d bn
+4645540	4647440	mean i
+4647540	4649440	is going to be scaled by 1 over n
+4649540	4651440	and then it's going to flow across
+4651540	4653440	all the columns and deposit itself
+4653540	4655440	into d h pre bn
+4655540	4657440	so what we want is this thing
+4657540	4659440	scaled by 1 over n
+4659540	4661440	let me put the constant up front here
+4665540	4667440	so scale down the gradient
+4667440	4669340	and we need to replicate it
+4669440	4671340	across all the
+4671440	4673340	across all the rows here
+4673440	4675340	so I like to do that
+4675440	4677340	by torch dot once like
+4677440	4679340	of basically
+4679440	4681340	h pre bn
+4683440	4685340	and I will let broadcasting
+4685440	4687340	do the work of
+4687440	4689340	replication
+4689440	4691340	so
+4691340	4695340	A
+4695340	4697240	like that
+4697340	4699240	so this is
+4699340	4701240	d h pre bn
+4701340	4703240	and hopefully
+4703340	4705240	we can plus equals that
+4709340	4711240	so this here is broadcasting
+4711340	4713240	and then this is the scaling
+4713340	4715240	so this should be correct
+4715340	4717240	okay
+4717340	4719240	so that completes the backpropagation
+4719240	4721140	let's backpropagate through the linear layer 1
+4721240	4723140	here now because
+4723240	4725140	everything is getting a little vertically crazy
+4725240	4727140	I copy pasted the line here
+4727240	4729140	and let's just backpropagate through this one line
+4729240	4731140	so first of course
+4731240	4733140	we inspect the shapes and we see that
+4733240	4735140	this is 32 by 64
+4735240	4737140	mcat is 32
+4737240	4739140	by 30
+4739240	4741140	w1 is 30 by 64
+4741240	4743140	and b1 is just 64
+4743240	4745140	so as I mentioned
+4745240	4747140	backpropagating through linear layers
+4747240	4749140	is fairly easy just by matching the shapes
+4749240	4751140	so let's do that
+4751240	4753140	we have that d mcat
+4753240	4755140	should be
+4755240	4757140	some matrix multiplication
+4757240	4759140	of d h pre bn with
+4759240	4761140	w1 and 1 transpose
+4761240	4763140	thrown in there
+4763240	4765140	so to make mcat
+4765240	4767140	be 32 by 30
+4767240	4769140	I need to take
+4769240	4771140	d h pre bn
+4771240	4773140	32 by 64
+4773240	4775140	and multiply it by
+4775240	4777140	w1 dot transpose
+4777240	4779140	...
+4779240	4781140	to get d w1
+4781240	4783140	I need to end up with
+4783240	4785140	30 by 64
+4785240	4787140	so to get that I need to take
+4787240	4789140	mcat transpose
+4789240	4791140	...
+4791240	4793140	and multiply that by
+4793240	4795140	d h pre bn
+4795240	4797140	...
+4797240	4799140	and finally to get
+4799240	4801140	d b1
+4801240	4803140	this is an addition
+4803240	4805140	and we saw that basically
+4805240	4807140	I need to just sum the elements
+4807240	4809140	in d h pre bn along some dimensions
+4809240	4811140	and to make the dimensions work out
+4811240	4813140	I need to sum along the 0th axis
+4813240	4815140	here to eliminate
+4815240	4817140	this dimension
+4817240	4819140	and we do not keep dims
+4819240	4821140	so that we want to just get a single
+4821240	4823140	one-dimensional vector of 64
+4823240	4825140	so these are the claimed derivatives
+4825240	4827140	let me put that here
+4827240	4829140	and let me
+4829240	4831140	uncomment three lines
+4831240	4833140	and cross our fingers
+4833240	4835140	everything is great
+4835240	4837140	okay so we now continue almost there
+4837240	4839140	we have the derivative of mcat
+4839140	4841040	and we want to backpropagate
+4841140	4843040	into mb
+4843140	4845040	so I again copied this line over here
+4845140	4847040	so this is the forward pass
+4847140	4849040	and then this is the shapes
+4849140	4851040	so remember that the shape here
+4851140	4853040	was 32 by 30
+4853140	4855040	and the original shape of mb
+4855140	4857040	was 32 by 3 by 10
+4857140	4859040	so this layer in the forward pass
+4859140	4861040	as you recall did the concatenation
+4861140	4863040	of these three 10-dimensional
+4863140	4865040	character vectors
+4865140	4867040	and so now we just want to undo that
+4867140	4869040	so this is actually a relatively
+4869040	4870940	simple iteration because
+4871040	4872940	the backward pass of the
+4873040	4874940	what is the view? view is just a
+4875040	4876940	representation of the array
+4877040	4878940	it's just a logical form of how
+4879040	4880940	you interpret the array
+4881040	4882940	so let's just reinterpret it
+4883040	4884940	to be what it was before
+4885040	4886940	so in other words dmb is not 32 by 30
+4887040	4888940	it is basically dmpcat
+4889040	4890940	but if you view it
+4891040	4892940	as the original shape
+4893040	4894940	so just m.shape
+4897040	4898940	you can pass and tuple
+4898940	4900840	into view
+4900940	4902840	and so this should just be
+4902940	4904840	okay
+4904940	4906840	we just re-represent that view
+4906940	4908840	and then we uncomment this line here
+4908940	4910840	and hopefully
+4910940	4912840	yeah, so the derivative of m
+4912940	4914840	is correct
+4914940	4916840	so in this case we just have to re-represent
+4916940	4918840	the shape of those derivatives
+4918940	4920840	into the original view
+4920940	4922840	so now we are at the final line
+4922940	4924840	and the only thing that's left to backpropagate through
+4924940	4926840	is this indexing operation here
+4926940	4928840	m is c at xb
+4928840	4930740	or I copy pasted this line here
+4930840	4932740	and let's look at the shapes of everything that's involved
+4932840	4934740	and remind ourselves how this worked
+4934840	4936740	so m.shape
+4936840	4938740	was 32 by 3 by 10
+4938840	4940740	so it's 32 examples
+4940840	4942740	and then we have 3 characters
+4942840	4944740	each one of them has a 10 dimensional
+4944840	4946740	embedding
+4946840	4948740	and this was achieved by taking the
+4948840	4950740	lookup table c which have 27
+4950840	4952740	possible characters
+4952840	4954740	each of them 10 dimensional
+4954840	4956740	and we looked up at the rows
+4956840	4958740	that were specified
+4958740	4960640	inside this tensor xb
+4960740	4962640	so xb is 32 by 3
+4962740	4964640	and it's basically giving us for each example
+4964740	4966640	the identity or the index
+4966740	4968640	of which character
+4968740	4970640	is part of that example
+4970740	4972640	and so here I'm showing the first 5 rows
+4972740	4976640	of this tensor xb
+4976740	4978640	and so we can see that for example here
+4978740	4980640	it was the first example in this batch
+4980740	4982640	is that the first character
+4982740	4984640	and the first character and the fourth character
+4984740	4986640	comes into the neural net
+4986740	4988640	and then we want to predict the next character
+4988640	4990540	in the sequence after the character is 114
+4990640	4992540	so basically
+4992640	4994540	what's happening here is
+4994640	4996540	there are integers inside xb
+4996640	4998540	and each one of these integers
+4998640	5000540	is specifying which row of c
+5000640	5002540	we want to pluck out
+5002640	5004540	right and then we arrange
+5004640	5006540	those rows that we've plucked out
+5006640	5008540	into 32 by 3 by 10 tensor
+5008640	5010540	and we just package them in
+5010640	5012540	we just package them into this tensor
+5012640	5014540	and now what's happening
+5014640	5016540	is that we have dimp
+5016640	5018540	so for every one of these
+5018540	5020440	basically plucked out rows
+5020540	5022440	we have their gradients now
+5022540	5026440	but they're arranged inside this 32 by 3 by 10 tensor
+5026540	5028440	so all we have to do now
+5028540	5030440	is we just need to route this gradient
+5030540	5032440	backwards through this assignment
+5032540	5034440	so we need to find which row of c
+5034540	5036440	that every one of these
+5036540	5038440	10 dimensional embeddings come from
+5038540	5040440	and then we need to deposit them
+5040540	5042440	into dc
+5042540	5044440	so we just need to undo the indexing
+5044540	5046440	and of course
+5046540	5048440	if any of these rows of c
+5048440	5050340	were used multiple times
+5050440	5052340	which almost certainly is the case
+5052440	5054340	like the row 1 and 1 was used multiple times
+5054440	5056340	then we have to remember that the gradients
+5056440	5058340	that arrive there have to add
+5058440	5060340	so for each occurrence
+5060440	5062340	we have to have an addition
+5062440	5064340	so let's now write this out
+5064440	5066340	and I don't actually know of like
+5066440	5068340	a much better way to do this
+5068440	5070340	than a for loop unfortunately in python
+5070440	5072340	so maybe someone can come up with
+5072440	5074340	a vectorized efficient operation
+5074440	5076340	but for now let's just use for loops
+5076440	5078340	so let me create torch.zeros like c
+5078340	5080240	and I'm going to utilize just
+5080340	5082240	a 27 by 10 tensor of all zeros
+5082340	5084240	and then honestly
+5084340	5086240	for k in range xb.shape at 0
+5086340	5088240	maybe someone has a better way to do this
+5088340	5090240	but for j in range xb.shape at 1
+5090340	5092240	this is going to iterate over
+5092340	5094240	all the elements of xb
+5094340	5096240	all these integers
+5096340	5098240	and then let's get the index
+5098340	5100240	at this position
+5100340	5102240	so the index is basically
+5102340	5104240	the value of xb
+5104340	5106240	and then let's get the index
+5106340	5108240	at this position
+5108240	5110140	which is basically xb at kj
+5110240	5112140	so an example of that
+5112240	5114140	is 11 or 14 and so on
+5114240	5116140	and now in a forward pass
+5116240	5118140	we took
+5118240	5120140	we basically took
+5120240	5122140	um
+5122240	5124140	the row of c at index
+5124240	5126140	and we deposited it
+5126240	5128140	into emb at k at j
+5128240	5130140	that's what happened
+5130240	5132140	that's where they are packaged
+5132240	5134140	so now we need to go backwards
+5134240	5136140	and we just need to route
+5136240	5138140	deemb at the position
+5138140	5140040	kj
+5140140	5142040	we now have these derivatives
+5142140	5144040	for each position
+5144140	5146040	and it's 10 dimensional
+5146140	5148040	and you just need to go into the correct
+5148140	5150040	row of c
+5150140	5152040	so dc rather
+5152140	5154040	at ix is this
+5154140	5156040	but plus equals
+5156140	5158040	because there could be multiple occurrences
+5158140	5160040	like the same row could have been used
+5160140	5162040	many many times
+5162140	5164040	and so all those derivatives will
+5164140	5166040	just go backwards through the indexing
+5166140	5168040	and they will add
+5168040	5169940	so this is my candidate
+5170040	5171940	solution
+5172040	5173940	let's copy it here
+5176040	5177940	let's uncomment this
+5178040	5179940	and cross our fingers
+5180040	5181940	yay
+5182040	5183940	so that's it
+5184040	5185940	we've backpropagated through
+5186040	5187940	this entire beast
+5188040	5189940	so there we go
+5190040	5191940	totally makes sense
+5192040	5193940	so now we come to exercise 2
+5194040	5195940	it basically turns out that in this first exercise
+5196040	5197940	we were doing way too much work
+5197940	5199840	we were backpropagating way too much
+5199940	5201840	and it was all good practice and so on
+5201940	5203840	but it's not what you would do in practice
+5203940	5205840	and the reason for that is for example
+5205940	5207840	here I separated out this loss calculation
+5207940	5209840	over multiple lines
+5209940	5211840	and I broke it up all to like
+5211940	5213840	its smallest atomic pieces
+5213940	5215840	and we backpropagated through all of those individually
+5215940	5217840	but it turns out that if you just look at
+5217940	5219840	the mathematical expression for the loss
+5219940	5221840	then actually you can do
+5221940	5223840	the differentiation on pen and paper
+5223940	5225840	and a lot of terms cancel and simplify
+5225940	5227840	and the mathematical expression you end up with
+5227940	5229740	is significantly shorter
+5229840	5231740	and easier to implement
+5231840	5233740	than backpropagating through all the little pieces
+5233840	5235740	of everything you've done
+5235840	5237740	so before we had this complicated forward pass
+5237840	5239740	going from logits to the loss
+5239840	5241740	but in pytorch everything can just be
+5241840	5243740	glued together into a single call
+5243840	5245740	at that cross entropy
+5245840	5247740	you just pass in logits and the labels
+5247840	5249740	and you get the exact same loss
+5249840	5251740	as I verify here
+5251840	5253740	so our previous loss and the fast loss
+5253840	5255740	coming from the chunk of operations
+5255840	5257740	as a single mathematical expression
+5257840	5259640	is much faster than the backward pass
+5259740	5261640	it's also much much faster in backward pass
+5261740	5263640	and the reason for that is if you just look at
+5263740	5265640	the mathematical form of this and differentiate again
+5265740	5267640	you will end up with a very small and short expression
+5267740	5269640	so that's what we want to do here
+5269740	5271640	we want to in a single operation
+5271740	5273640	or in a single go or like very quickly
+5273740	5275640	go directly into dlogits
+5275740	5277640	and we need to implement dlogits
+5277740	5279640	as a function of logits
+5279740	5281640	and yb's
+5281740	5283640	but it will be significantly shorter
+5283740	5285640	than whatever we did here
+5285740	5287640	where to get to dlogits
+5287640	5289540	we need to go all the way here
+5289640	5291540	so all of this work can be skipped
+5291640	5293540	in a much much simpler mathematical expression
+5293640	5295540	that you can implement here
+5295640	5297540	so you can
+5297640	5299540	give it a shot yourself
+5299640	5301540	basically look at what exactly
+5301640	5303540	is the mathematical expression of loss
+5303640	5305540	and differentiate with respect to the logits
+5305640	5307540	so let me show you
+5307640	5309540	a hint
+5309640	5311540	you can of course try it fully yourself
+5311640	5313540	but if not I can give you some hint
+5313640	5315540	of how to get started mathematically
+5315640	5317540	so basically what's happening here
+5317640	5319540	is we have logits
+5319640	5321540	then there's the softmax
+5321640	5323540	that takes the logits and gives you probabilities
+5323640	5325540	then we are using the identity
+5325640	5327540	of the correct next character
+5327640	5329540	to pluck out a row of probabilities
+5329640	5331540	take the negative log of it
+5331640	5333540	to get our negative log probability
+5333640	5335540	and then we average up
+5335640	5337540	all the log probabilities
+5337640	5339540	or negative log probabilities
+5339640	5341540	to get our loss
+5341640	5343540	so basically what we have
+5343640	5345540	is for a single individual example
+5345640	5347540	we have that loss is equal to
+5347540	5349440	where p here is kind of like
+5349540	5351440	thought of as a vector
+5351540	5353440	of all the probabilities
+5353540	5355440	so at the yth position
+5355540	5357440	where y is the label
+5357540	5359440	and we have that p here of course
+5359540	5361440	is the softmax
+5361540	5363440	so the ith component of p
+5363540	5365440	of this probability vector
+5365540	5367440	is just the softmax function
+5367540	5369440	so raising all the logits
+5369540	5371440	basically to the power of e
+5371540	5373440	and normalizing
+5373540	5375440	so everything sums to one
+5375540	5377440	now if you write out
+5377440	5379340	this expression here
+5379440	5381340	you can just write out the softmax
+5381440	5383340	and then basically what we're interested in
+5383440	5385340	is we're interested in the derivative of the loss
+5385440	5387340	with respect to the ith logit
+5387440	5389340	and so basically it's a d by dLi
+5389440	5391340	of this expression here
+5391440	5393340	where we have l indexed
+5393440	5395340	with the specific label y
+5395440	5397340	and on the bottom we have a sum over j
+5397440	5399340	of e to the lj
+5399440	5401340	and the negative log of all that
+5401440	5403340	so potentially give it a shot
+5403440	5405340	pen and paper and see if you can actually
+5405440	5407340	derive the expression for the loss by dLi
+5407340	5409240	and to implement it here
+5409340	5411240	okay so I'm going to give away the result here
+5411340	5413240	so this is some of the math I did
+5413340	5415240	to derive the gradients
+5415340	5417240	analytically
+5417340	5419240	and so we see here that I'm just applying
+5419340	5421240	the rules of calculus from your first or second year
+5421340	5423240	of bachelor's degree if you took it
+5423340	5425240	and we see that the expressions
+5425340	5427240	actually simplify quite a bit
+5427340	5429240	you have to separate out the analysis
+5429340	5431240	in the case where the ith index
+5431340	5433240	that you're interested in inside logits
+5433340	5435240	is either equal to the label
+5435340	5437240	or it's not equal to the label
+5437240	5439140	in a slightly different way
+5439240	5441140	and what we end up with is something
+5441240	5443140	very very simple
+5443240	5445140	we either end up with basically p at i
+5445240	5447140	where p is again this vector of
+5447240	5449140	probabilities after a softmax
+5449240	5451140	or p at i minus one
+5451240	5453140	where we just simply subtract a one
+5453240	5455140	but in any case we just need to calculate
+5455240	5457140	the softmax p
+5457240	5459140	and then in the correct dimension
+5459240	5461140	we need to subtract a one
+5461240	5463140	and that's the gradient
+5463240	5465140	the form that it takes analytically
+5465240	5467140	so let's implement this basically
+5467140	5469040	but here we are working with batches of examples
+5469140	5471040	so we have to be careful of that
+5471140	5473040	and then the loss for a batch
+5473140	5475040	is the average loss over all the examples
+5475140	5477040	so in other words
+5477140	5479040	is the example for all the individual examples
+5479140	5481040	is the loss for each individual example
+5481140	5483040	summed up and then divided by n
+5483140	5485040	and we have to backpropagate through that
+5485140	5487040	as well and be careful with it
+5487140	5489040	so dlogits
+5489140	5491040	is going to be f dot softmax
+5491140	5493040	pytorch has a softmax function
+5493140	5495040	that you can call
+5495140	5497040	and we want to apply the softmax
+5497040	5498940	on the logits and we want to go
+5499040	5500940	in the dimension
+5501040	5502940	that is one
+5503040	5504940	so basically we want to do the softmax
+5505040	5506940	along the rows of these logits
+5507040	5508940	then at the correct positions
+5509040	5510940	we need to subtract a one
+5511040	5512940	so dlogits at iterating over all the rows
+5513040	5514940	and indexing
+5515040	5516940	into the columns
+5517040	5518940	provided by the correct labels
+5519040	5520940	inside yb
+5521040	5522940	we need to subtract one
+5523040	5524940	and then finally it's the average loss
+5525040	5526940	that is the loss
+5526940	5528840	so in average there's a one over n
+5528940	5530840	of all the losses added up
+5530940	5532840	and so we need to also backpropagate
+5532940	5534840	through that division
+5534940	5536840	so the gradient has to be scaled down
+5536940	5538840	by n as well
+5538940	5540840	because of the mean
+5540940	5542840	but this otherwise should be the result
+5542940	5544840	so now if we verify this
+5544940	5546840	we see that we don't get an exact match
+5546940	5548840	but at the same time
+5548940	5550840	the maximum difference from
+5550940	5552840	logits from pytorch
+5552940	5554840	and rdlogits here
+5554840	5556740	is on the order of 5e-9
+5556840	5558740	so it's a tiny tiny number
+5558840	5560740	so because of floating point wonkiness
+5560840	5562740	we don't get the exact bitwise result
+5562840	5564740	but we basically get
+5564840	5566740	the correct answer
+5566840	5568740	approximately
+5568840	5570740	now I'd like to pause here briefly
+5570840	5572740	before we move on to the next exercise
+5572840	5574740	because I'd like us to get an intuitive sense
+5574840	5576740	of what dlogits is
+5576840	5578740	because it has a beautiful and very simple
+5578840	5580740	explanation honestly
+5580840	5582740	so here I'm taking dlogits
+5582840	5584740	and I'm visualizing it
+5584740	5586640	and I see that we have a batch of 32 examples
+5586740	5588640	of 27 characters
+5588740	5590640	and what is dlogits intuitively?
+5590740	5592640	dlogits is the probabilities
+5592740	5594640	that the probabilities matrix
+5594740	5596640	in the forward pass
+5596740	5598640	but then here these black squares
+5598740	5600640	are the positions of the correct indices
+5600740	5602640	where we subtracted a 1
+5602740	5604640	and so what is this doing?
+5604740	5606640	these are the derivatives on dlogits
+5606740	5608640	and so let's look at
+5608740	5610640	just the first row here
+5610740	5612640	so that's what I'm doing here
+5612740	5614640	I'm calculating the probabilities
+5614640	5616540	and then I'm taking just the first row
+5616640	5618540	and this is the probability row
+5618640	5620540	and then dlogits of the first row
+5620640	5622540	and multiplying by n
+5622640	5624540	just for us so that
+5624640	5626540	we don't have the scaling by n in here
+5626640	5628540	and everything is more interpretable
+5628640	5630540	we see that it's exactly equal to the probability
+5630640	5632540	of course but then the position
+5632640	5634540	of the correct index has a minus equals 1
+5634640	5636540	so minus 1 on that position
+5636640	5638540	and so notice that
+5638640	5640540	if you take dlogits at 0
+5640640	5642540	and you sum it
+5642640	5644540	it actually sums to 0
+5644640	5646540	and so you should think of these
+5646640	5648540	gradients here
+5648640	5650540	at each cell
+5650640	5652540	as like a force
+5652640	5654540	we are going to be basically
+5654640	5656540	pulling down on the probabilities
+5656640	5658540	of the incorrect characters
+5658640	5660540	and we're going to be pulling up
+5660640	5662540	on the probability
+5662640	5664540	at the correct index
+5664640	5666540	and that's what's basically happening
+5666640	5668540	in each row
+5668640	5670540	and the amount of push and pull
+5670640	5672540	is exactly equalized
+5672640	5674540	because the sum is 0
+5674540	5676440	and the amount to which we pull down
+5676540	5678440	on the probabilities
+5678540	5680440	and the amount that we push up
+5680540	5682440	on the probability of the correct character
+5682540	5684440	is equal
+5684540	5686440	so the repulsion and the attraction are equal
+5686540	5688440	and think of the neural net now
+5688540	5690440	as a massive pulley system
+5690540	5692440	or something like that
+5692540	5694440	we're up here on top of dlogits
+5694540	5696440	and we're pulling up
+5696540	5698440	we're pulling down the probabilities of incorrect
+5698540	5700440	and pulling up the probability of the correct
+5700540	5702440	and in this complicated pulley system
+5702440	5704340	we think of it as sort of like
+5704440	5706340	this tension translating to this
+5706440	5708340	complicating pulley mechanism
+5708440	5710340	and then eventually we get a tug
+5710440	5712340	on the weights and the biases
+5712440	5714340	and basically in each update
+5714440	5716340	we just kind of like tug in the direction
+5716440	5718340	that we'd like for each of these elements
+5718440	5720340	and the parameters are slowly given in
+5720440	5722340	to the tug and that's what training in neural net
+5722440	5724340	kind of like looks like on a high level
+5724440	5726340	and so I think the forces of push and pull
+5726440	5728340	in these gradients are actually
+5728440	5730340	very intuitive here
+5730440	5732340	we're pushing and pulling on the correct answer
+5732340	5734240	and the amount of force that we're applying
+5734340	5736240	is actually proportional to
+5736340	5738240	the probabilities that came out
+5738340	5740240	in the forward pass
+5740340	5742240	and so for example if our probabilities came out
+5742340	5744240	exactly correct so they would have had
+5744340	5746240	zero everywhere except for one
+5746340	5748240	at the correct position
+5748340	5750240	then the dlogits would be all
+5750340	5752240	a row of zeros for that example
+5752340	5754240	there would be no push and pull
+5754340	5756240	so the amount to which your prediction is incorrect
+5756340	5758240	is exactly the amount
+5758340	5760240	by which you're going to get a pull
+5760340	5762240	or a push in that dimension
+5762240	5764140	so if you have for example
+5764240	5766140	a very confidently mispredicted element here
+5766240	5768140	then what's going to happen is
+5768240	5770140	that element is going to be pulled down
+5770240	5772140	very heavily and the correct answer
+5772240	5774140	is going to be pulled up to the same amount
+5774240	5776140	and the other characters
+5776240	5778140	are not going to be influenced too much
+5778240	5780140	so the amount to which
+5780240	5782140	you mispredict is then proportional
+5782240	5784140	to the strength of the pull
+5784240	5786140	and that's happening independently
+5786240	5788140	in all the dimensions of this tensor
+5788240	5790140	and it's sort of very intuitive
+5790240	5792140	and very easy to think through
+5792140	5794040	and that's basically the magic of the cross entropy loss
+5794140	5796040	and what it's doing dynamically
+5796140	5798040	in the backward pass of the neural net
+5798140	5800040	so now we get to exercise number three
+5800140	5802040	which is a very fun exercise
+5802140	5804040	depending on your definition of fun
+5804140	5806040	and we are going to do for batch normalization
+5806140	5808040	exactly what we did for cross entropy loss
+5808140	5810040	in exercise number two
+5810140	5812040	that is we are going to consider it as a glued
+5812140	5814040	single mathematical expression
+5814140	5816040	and back propagate through it in a very efficient manner
+5816140	5818040	because we are going to derive a much simpler formula
+5818140	5820040	for the backward pass of batch normalization
+5820140	5822040	and we're going to do that
+5822040	5823940	using pen and paper
+5824040	5825940	so previously we've broken up batch normalization
+5826040	5827940	into all of the little intermediate pieces
+5828040	5829940	and all the atomic operations inside it
+5830040	5831940	and then we back propagated through it
+5832040	5833940	one by one
+5834040	5835940	now we just have a single sort of forward pass
+5836040	5837940	of a batch form
+5838040	5839940	and it's all glued together
+5840040	5841940	and we see that we get the exact same result as before
+5842040	5843940	now for the backward pass
+5844040	5845940	we'd like to also implement
+5846040	5847940	a single formula basically
+5848040	5849940	for back propagating through this entire operation
+5850040	5851940	that is the batch normalization
+5852040	5853940	so in the forward pass previously
+5854040	5855940	we took h pre bn
+5856040	5857940	the hidden states of the pre batch normalization
+5858040	5859940	and created h preact
+5860040	5861940	which is the hidden states
+5862040	5863940	just before the activation
+5864040	5865940	in the batch normalization paper
+5866040	5867940	h pre bn is x
+5868040	5869940	and h preact is y
+5870040	5871940	so in the backward pass what we'd like to do now
+5872040	5873940	is we have dh preact
+5874040	5875940	and we'd like to produce dh pre bn
+5876040	5877940	and we'd like to do that in a very efficient manner
+5878040	5879940	so that's the name of the game
+5880040	5881940	calculate dh pre bn
+5882040	5883940	given dh preact
+5884040	5885940	and for the purposes of this exercise
+5886040	5887940	we're going to ignore gamma and beta
+5888040	5889940	and their derivatives
+5890040	5891940	because they take on a very simple form
+5892040	5893940	in a very similar way to what we did up above
+5894040	5895940	so let's calculate this
+5896040	5897940	given that right here
+5898040	5899940	so to help you a little bit
+5900040	5901940	like I did before
+5902040	5903940	I started off the implementation here
+5904040	5905940	on pen and paper
+5906040	5907940	and I took two sheets of paper
+5908040	5909940	to derive the mathematical formulas
+5910040	5911940	for the backward pass
+5911940	5913840	so to solve the problem
+5913940	5915840	just write out the mu sigma square variance
+5915940	5917840	xi hat and yi
+5917940	5919840	exactly as in the paper
+5919940	5921840	except for the Bessel correction
+5921940	5923840	and then in the backward pass
+5923940	5925840	we have the derivative of the laws
+5925940	5927840	with respect to all the elements of y
+5927940	5929840	and remember that y is a vector
+5929940	5931840	there's multiple numbers here
+5931940	5933840	so we have all the derivatives
+5933940	5935840	with respect to all the y's
+5935940	5937840	and then there's a gamma and a beta
+5937940	5939840	and this is kind of like the compute graph
+5939940	5941840	the gamma and the beta
+5941840	5943740	there's the x hat
+5943840	5945740	and then the mu and the sigma square
+5945840	5947740	and the x
+5947840	5949740	so we have dl by dyi
+5949840	5951740	and we want dl by dxi
+5951840	5953740	for all the i's in these vectors
+5953840	5955740	so
+5955840	5957740	this is the compute graph
+5957840	5959740	and you have to be careful because
+5959840	5961740	I'm trying to note here that
+5961840	5963740	these are vectors
+5963840	5965740	there's many nodes here inside x
+5965840	5967740	x hat and y
+5967840	5969740	but mu and sigma
+5969840	5971740	sorry sigma square
+5971840	5973740	so you have to be careful with that
+5973840	5975740	you have to imagine there's multiple nodes here
+5975840	5977740	or you're going to get your math wrong
+5977840	5979740	so as an example
+5979840	5981740	I would suggest that you go in the following order
+5981840	5983740	one, two, three, four
+5983840	5985740	in terms of the back propagation
+5985840	5987740	so back propagate into x hat
+5987840	5989740	then into sigma square
+5989840	5991740	then into mu and then into x
+5991840	5993740	just like in a topological sort
+5993840	5995740	in micrograd we would go from right to left
+5995840	5997740	you're doing the exact same thing
+5997840	5999740	except you're doing it with symbols
+5999840	6001740	and on a piece of paper
+6001740	6003640	so for number one
+6003740	6005640	I'm not giving away too much
+6005740	6007640	if you want dl of
+6007740	6009640	dxi hat
+6009740	6011640	then we just take dl by dyi
+6011740	6013640	and multiply it by gamma
+6013740	6015640	because of this expression here
+6015740	6017640	where any individual yi is just gamma
+6017740	6019640	times xi hat plus beta
+6019740	6021640	so it didn't help you
+6021740	6023640	too much there
+6023740	6025640	but this gives you basically the derivatives
+6025740	6027640	for all the x hats
+6027740	6029640	and so now try to go through this computational graph
+6029740	6031640	and derive
+6031640	6033540	what is dl by d sigma square
+6033640	6035540	and then what is dl by d mu
+6035640	6037540	and then what is dl by dx
+6037640	6039540	eventually
+6039640	6041540	so give it a go
+6041640	6043540	and I'm going to be revealing the answer
+6043640	6045540	one piece at a time
+6045640	6047540	okay, so to get dl by d sigma square
+6047640	6049540	we have to remember again, like I mentioned
+6049640	6051540	that there are many x hats here
+6051640	6053540	and remember that sigma square
+6053640	6055540	is just a single individual number here
+6055640	6057540	so when we look at the expression
+6057640	6059540	for dl by d sigma square
+6059540	6061440	for dl by d sigma square
+6061540	6063440	we have that we have to actually
+6063540	6065440	consider all the possible paths
+6065540	6067440	that
+6067540	6069440	we basically have that
+6069540	6071440	there's many x hats
+6071540	6073440	and they all feed off from
+6073540	6075440	they all depend on sigma square
+6075540	6077440	so sigma square has a large fan out
+6077540	6079440	there's lots of arrows coming out from sigma square
+6079540	6081440	into all the x hats
+6081540	6083440	and then there's a back-replicating signal
+6083540	6085440	from each x hat into sigma square
+6085540	6087440	and that's why we actually need to sum over
+6087540	6089440	all those i's
+6089440	6091340	into 1 to m
+6091440	6093340	of the dl by dx hat
+6093440	6095340	which is the global gradient
+6095440	6097340	times
+6097440	6099340	the xi hat by d sigma square
+6099440	6101340	which is the local gradient
+6101440	6103340	of this operation here
+6103440	6105340	and then mathematically
+6105440	6107340	I'm just working it out here
+6107440	6109340	and I'm simplifying and you get a certain expression
+6109440	6111340	for dl by d sigma square
+6111440	6113340	and we're going to be using this expression
+6113440	6115340	when we back-propagate into mu
+6115440	6117340	and then eventually into x
+6117440	6119340	so now let's continue our back-propagation into mu
+6119340	6121240	which is dl by d mu
+6121340	6123240	now again be careful
+6123340	6125240	that mu influences x hat
+6125340	6127240	and x hat is actually lots of values
+6127340	6129240	so for example if our mini-batch size is 32
+6129340	6131240	as it is in our example that we were working on
+6131340	6133240	then this is 32 numbers
+6133340	6135240	and 32 arrows going back to mu
+6135340	6137240	and then mu going to sigma square
+6137340	6139240	is just a single arrow
+6139340	6141240	because sigma square is a scalar
+6141340	6143240	so in total there are 33 arrows
+6143340	6145240	emanating from mu
+6145340	6147240	and then all of them have gradients coming into mu
+6147340	6149240	and they all need to be summed up
+6149340	6151240	and so that's why
+6151340	6153240	when we look at the expression for dl by d mu
+6153340	6155240	I'm summing up over all the gradients
+6155340	6157240	of dl by dx i hat
+6157340	6159240	times dx i hat by d mu
+6159340	6161240	so that's this arrow
+6161340	6163240	and that's 32 arrows here
+6163340	6165240	and then plus the one arrow from here
+6165340	6167240	which is dl by d sigma square
+6167340	6169240	times d sigma square by d mu
+6169340	6171240	so now we have to work out
+6171340	6173240	that expression
+6173340	6175240	and let me just reveal the rest of it
+6175340	6177240	simplifying here is not complicated
+6177340	6179240	the first term
+6179240	6181140	and you just get an expression here
+6181240	6183140	for the second term though
+6183240	6185140	there's something really interesting that happens
+6185240	6187140	when we look at d sigma square by d mu
+6187240	6189140	and we simplify
+6189240	6191140	at one point if we assume
+6191240	6193140	that in a special case where mu is actually
+6193240	6195140	the average of xi's
+6195240	6197140	as it is in this case
+6197240	6199140	then if we plug that in
+6199240	6201140	then actually the gradient vanishes
+6201240	6203140	and becomes exactly zero
+6203240	6205140	and that makes the entire second term cancel
+6205240	6207140	and so
+6207240	6209140	these
+6209140	6211040	if you have a mathematical expression like this
+6211140	6213040	and you look at d sigma square by d mu
+6213140	6215040	you would get some mathematical formula
+6215140	6217040	for how mu impacts sigma square
+6217140	6219040	but if it is the special case
+6219140	6221040	that mu is actually equal to the average
+6221140	6223040	as it is in the case of batch normalization
+6223140	6225040	that gradient will actually vanish
+6225140	6227040	and become zero
+6227140	6229040	so the whole term cancels
+6229140	6231040	and we just get a fairly straightforward expression here
+6231140	6233040	for dl by d mu
+6233140	6235040	okay and now we get to the craziest part
+6235140	6237040	which is deriving dl by d xi
+6237140	6239040	which is ultimately what we're after
+6239140	6241040	now let's count
+6241140	6243040	first of all how many numbers are there inside x
+6243140	6245040	as I mentioned there are 32 numbers
+6245140	6247040	there are 32 little xi's
+6247140	6249040	and let's count the number of arrows
+6249140	6251040	emanating from each xi
+6251140	6253040	there's an arrow going to mu
+6253140	6255040	an arrow going to sigma square
+6255140	6257040	and then there's an arrow going to x hat
+6257140	6259040	but this arrow here
+6259140	6261040	let's scrutinize that a little bit
+6261140	6263040	each xi hat is just a function of xi
+6263140	6265040	and all the other scalars
+6265140	6267040	so xi hat
+6267140	6269040	only depends on xi
+6269040	6270940	and all the other x's
+6271040	6272940	and so therefore
+6273040	6274940	there are actually in this single arrow
+6275040	6276940	there are 32 arrows
+6277040	6278940	but those 32 arrows are going exactly parallel
+6279040	6280940	they don't interfere
+6281040	6282940	they're just going parallel between x and x hat
+6283040	6284940	you can look at it that way
+6285040	6286940	and so how many arrows are emanating from each xi
+6287040	6288940	there are three arrows
+6289040	6290940	mu sigma square
+6291040	6292940	and the associated x hat
+6293040	6294940	and so in back propagation
+6295040	6296940	we now need to apply the chain rule
+6297040	6298940	and we need to add up those three contributions
+6298940	6300840	like if I just write that out
+6300940	6302840	we have
+6302940	6304840	we're going through
+6304940	6306840	we're chaining through mu sigma square
+6306940	6308840	and through x hat
+6308940	6310840	and those three terms are just here
+6310940	6312840	now we already have three of these
+6312940	6314840	we have dl by d xi hat
+6314940	6316840	we have dl by d mu
+6316940	6318840	which we derived here
+6318940	6320840	and we have dl by d sigma square
+6320940	6322840	which we derived here
+6322940	6324840	but we need three other terms here
+6324940	6326840	this one, this one, and this one
+6326940	6328840	so I invite you to try to derive them
+6328840	6330740	if you find it complicated
+6330840	6332740	you're just looking at these expressions here
+6332840	6334740	and differentiating with respect to xi
+6334840	6336740	so give it a shot
+6336840	6338740	but here's the result
+6338840	6340740	or at least what I got
+6340840	6342740	I'm just differentiating with respect to xi
+6342840	6344740	for all of these expressions
+6344840	6346740	and honestly I don't think there's anything too tricky here
+6346840	6348740	it's basic calculus
+6348840	6350740	now what gets a little bit more tricky
+6350840	6352740	is we are now going to plug everything together
+6352840	6354740	so all of these terms
+6354840	6356740	multiplied with all of these terms
+6356840	6358740	and added up according to this formula
+6358740	6360640	and that gets a little bit hairy
+6360740	6362640	so what ends up happening is
+6364740	6366640	you get a large expression
+6366740	6368640	and the thing to be very careful with here
+6368740	6370640	of course is
+6370740	6372640	we are working with a dl by d xi
+6372740	6374640	for a specific i here
+6374740	6376640	but when we are plugging in some of these terms
+6376740	6378640	like say
+6378740	6380640	this term here
+6380740	6382640	dl by d sigma squared
+6382740	6384640	you see how dl by d sigma squared
+6384740	6386640	I end up with an expression
+6386740	6388640	and I'm iterating over little i's here
+6388740	6390640	but I can't use i as the variable
+6390740	6392640	when I plug in here
+6392740	6394640	because this is a different i from this i
+6394740	6396640	this i here is just a placeholder
+6396740	6398640	like a local variable for a for loop
+6398740	6400640	in here
+6400740	6402640	so here when I plug that in
+6402740	6404640	you notice that I rename the i to a j
+6404740	6406640	because I need to make sure that this j
+6406740	6408640	is not this i
+6408740	6410640	this j is like a little local iterator
+6410740	6412640	over 32 terms
+6412740	6414640	and so you have to be careful with that
+6414740	6416640	when you are plugging in the expressions from here to here
+6416740	6418640	you may have to rename i's into j's
+6418640	6420540	but you have to be very careful
+6420640	6422540	what is actually an i
+6422640	6424540	with respect to dl by d xi
+6424640	6426540	so some of these are j's
+6426640	6428540	some of these are i's
+6428640	6430540	and then we simplify this expression
+6430640	6432540	and I guess like
+6432640	6434540	the big thing to notice here is
+6434640	6436540	a bunch of terms are just going to come out to the front
+6436640	6438540	and you can refactor them
+6438640	6440540	there is a sigma squared plus epsilon
+6440640	6442540	raised to the power of negative 3 over 2
+6442640	6444540	this sigma squared plus epsilon
+6444640	6446540	can be actually separated out into 3 terms
+6446640	6448540	each of them are sigma squared plus epsilon
+6448540	6450440	raised to the power of negative 1 over 2
+6450540	6452440	so the 3 of them multiplied
+6452540	6454440	is equal to this
+6454540	6456440	and then those 3 terms can go different places
+6456540	6458440	because of the multiplication
+6458540	6460440	so one of them actually comes out to the front
+6460540	6462440	and will end up here outside
+6462540	6464440	one of them joins up with this term
+6464540	6466440	and one of them joins up with this other term
+6466540	6468440	and then when you simplify the expression
+6468540	6470440	you will notice that
+6470540	6472440	some of these terms that are coming out
+6472540	6474440	are just the xi hats
+6474540	6476440	so you can simplify just by rewriting that
+6476540	6478440	and what we end up with at the end
+6478440	6480340	is a fairly simple mathematical expression
+6480440	6482340	over here that I cannot simplify further
+6482440	6484340	but basically you'll notice that
+6484440	6486340	it only uses the stuff we have
+6486440	6488340	and it derives the thing we need
+6488440	6490340	so we have dl by dy
+6490440	6492340	for all the i's
+6492440	6494340	and those are used plenty of times here
+6494440	6496340	and also in addition what we're using
+6496440	6498340	is these xi hats and xj hats
+6498440	6500340	and they just come from the forward pass
+6500440	6502340	and otherwise this is a
+6502440	6504340	simple expression and it gives us
+6504440	6506340	dl by d xi for all the i's
+6506440	6508340	and that's ultimately what we're interested in
+6508440	6510340	so that's the end of
+6510440	6512340	batch norm
+6512440	6514340	backward pass analytically
+6514440	6516340	let's now implement this final result
+6516440	6518340	okay so I implemented the expression
+6518440	6520340	into a single line of code here
+6520440	6522340	and you can see that the max diff
+6522440	6524340	is tiny so this is the correct implementation
+6524440	6526340	of this formula
+6526440	6528340	now I'll just
+6528440	6530340	basically tell you that getting this
+6530440	6532340	formula here from this mathematical expression
+6532440	6534340	was not trivial and there's a lot
+6534440	6536340	going on packed into this one formula
+6536440	6538340	and this is a whole exercise by itself
+6538440	6540340	because you have to consider
+6540440	6542340	the fact that this formula here
+6542440	6544340	is just for a single neuron
+6544440	6546340	and a batch of 32 examples
+6546440	6548340	but what I'm doing here is I'm actually
+6548440	6550340	we actually have 64 neurons
+6550440	6552340	and so this expression has to in parallel
+6552440	6554340	evaluate the batch norm backward pass
+6554440	6556340	for all of those 64 neurons
+6556440	6558340	in parallel and independently
+6558440	6560340	so this has to happen basically in every single
+6560440	6562340	column of
+6562440	6564340	the inputs here
+6564440	6566340	and in addition to that
+6566440	6568340	you see how there are a bunch of sums here
+6568340	6570240	and I want to make sure that when I do those sums
+6570340	6572240	that they broadcast correctly onto everything else
+6572340	6574240	that's here and so getting this expression
+6574340	6576240	is just like highly non-trivial
+6576340	6578240	and I invite you to basically look through it
+6578340	6580240	and step through it and it's a whole exercise
+6580340	6582240	to make sure that this checks out
+6582340	6584240	but once all the shapes agree
+6584340	6586240	and once you convince yourself that it's correct
+6586340	6588240	you can also verify that PyTorch
+6588340	6590240	gets the exact same answer as well
+6590340	6592240	and so that gives you a lot of peace of mind
+6592340	6594240	that this mathematical formula is correctly
+6594340	6596240	implemented here and broadcasted correctly
+6596340	6598240	and replicated in parallel
+6598240	6600140	for all of the 64 neurons
+6600240	6602140	inside this batch norm layer
+6602240	6604140	okay and finally exercise number 4
+6604240	6606140	asks you to put it all together
+6606240	6608140	and here we have a redefinition
+6608240	6610140	of the entire problem
+6610240	6612140	so you see that we re-initialized the neural net from scratch
+6612240	6614140	and everything and then here
+6614240	6616140	instead of calling loss that backward
+6616240	6618140	we want to have the manual back propagation
+6618240	6620140	here as we derived it up above
+6620240	6622140	so go up copy paste
+6622240	6624140	all the chunks of code that we've already derived
+6624240	6626140	put them here and derive your own gradients
+6626240	6628140	and then optimize this model
+6628140	6630040	using this neural net
+6630140	6632040	basically using your own gradients
+6632140	6634040	all the way to the calibration of the batch norm
+6634140	6636040	and the evaluation of the loss
+6636140	6638040	and I was able to achieve quite a good loss
+6638140	6640040	basically the same loss you would achieve before
+6640140	6642040	and that shouldn't be surprising
+6642140	6644040	because all we've done is we've
+6644140	6646040	really got into loss that backward
+6646140	6648040	and we've pulled out all the code
+6648140	6650040	and inserted it here
+6650140	6652040	but those gradients are identical
+6652140	6654040	and everything is identical
+6654140	6656040	and the results are identical
+6656140	6658040	it's just that we have full visibility
+6658040	6659940	in this specific case
+6660040	6661940	okay and this is all of our code
+6662040	6663940	this is the full backward pass
+6664040	6665940	using basically the simplified backward pass
+6666040	6667940	for the cross entropy loss
+6668040	6669940	and the batch normalization
+6670040	6671940	so back propagating through cross entropy
+6672040	6673940	the second layer
+6674040	6675940	the 10H null linearity
+6676040	6677940	the batch normalization
+6678040	6679940	through the first layer
+6680040	6681940	and through the embedding
+6682040	6683940	and so you see that this is only maybe
+6684040	6685940	what is this 20 lines of code or something like that
+6686040	6687940	and that's what gives us gradients
+6687940	6689840	in this case loss that backward
+6689940	6691840	so the way I have the code set up is
+6691940	6693840	you should be able to run this entire cell
+6693940	6695840	once you fill this in
+6695940	6697840	and this will run for only 100 iterations
+6697940	6699840	and then break
+6699940	6701840	and it breaks because it gives you an opportunity
+6701940	6703840	to check your gradients against PyTorch
+6703940	6705840	so here our gradients we see
+6705940	6707840	are not exactly equal
+6707940	6709840	they are approximately equal
+6709940	6711840	and the differences are tiny
+6711940	6713840	one in negative nine or so
+6713940	6715840	and I don't exactly know where they're coming from
+6715940	6717840	to be honest
+6717840	6719740	but if I'm basically correct
+6719840	6721740	we can take out the gradient checking
+6721840	6725740	we can disable this breaking statement
+6725840	6727740	and then we can
+6727840	6729740	basically disable loss that backward
+6729840	6731740	we don't need it anymore
+6731840	6733740	feels amazing to say that
+6733840	6735740	and then here
+6735840	6737740	when we are doing the update
+6737840	6739740	we're not going to use p.grad
+6739840	6741740	this is the old way of PyTorch
+6741840	6743740	we don't have that anymore
+6743840	6745740	because we're not doing backward
+6745840	6747740	we are going to use this update
+6747740	6749640	I'm grading over
+6749740	6751640	I've arranged the grads to be in the same order
+6751740	6753640	as the parameters
+6753740	6755640	and I'm zipping them up
+6755740	6757640	the gradients and the parameters
+6757740	6759640	into p and grad
+6759740	6761640	and then here I'm going to step with
+6761740	6763640	just the grad that we derived manually
+6763740	6765640	so the last piece
+6765740	6767640	is that none of this now requires
+6767740	6769640	gradients from PyTorch
+6769740	6771640	and so one thing you can do here
+6771740	6773640	is you can do
+6773740	6775640	with torch.nograd
+6775740	6777640	and offset this whole code block
+6777740	6779640	and really what you're saying is
+6779740	6781640	you're telling PyTorch that hey
+6781740	6783640	I'm not going to call backward on any of this
+6783740	6785640	and this allows PyTorch to be
+6785740	6787640	a bit more efficient with all of it
+6787740	6789640	and then we should be able to just run this
+6789740	6791640	and
+6791740	6793640	it's running
+6793740	6795640	and you see that
+6795740	6797640	loss that backward is commented out
+6797740	6799640	and we're optimizing
+6799740	6801640	so we're going to leave this run
+6801740	6803640	and hopefully
+6803740	6805640	we get a good result
+6805740	6807640	okay so I allowed the neural net
+6807640	6809540	optimization then here
+6809640	6811540	I calibrate the BatchNorm parameters
+6811640	6813540	because I did not keep track of the running
+6813640	6815540	mean and variance
+6815640	6817540	in the training loop
+6817640	6819540	then here I ran the loss
+6819640	6821540	and you see that we actually obtained a pretty good loss
+6821640	6823540	very similar to what we've achieved before
+6823640	6825540	and then here I'm sampling from the model
+6825640	6827540	and we see some of the name-like gibberish
+6827640	6829540	that we're sort of used to
+6829640	6831540	so basically the model worked and samples
+6831640	6833540	pretty decent results
+6833640	6835540	compared to what we were used to
+6835640	6837540	so everything is the same but of course
+6837540	6839440	the big deal is that we did not use lots of backward
+6839540	6841440	we did not use PyTorch AutoGrad
+6841540	6843440	and we estimated our gradients ourselves
+6843540	6845440	by hand
+6845540	6847440	and so hopefully you're looking at this
+6847540	6849440	the backward pass of this neural net
+6849540	6851440	and you're thinking to yourself
+6851540	6853440	actually that's not too complicated
+6853540	6855440	each one of these layers is like three lines of code
+6855540	6857440	or something like that
+6857540	6859440	and most of it is fairly straightforward
+6859540	6861440	potentially with the notable exception
+6861540	6863440	of the BatchNormalization backward pass
+6863540	6865440	otherwise it's pretty good
+6865540	6867440	okay and that's everything I wanted to cover
+6867540	6869440	so hopefully you found this interesting
+6869540	6871440	and what I liked about it honestly is that
+6871540	6873440	it gave us a very nice diversity of layers
+6873540	6875440	to backpropagate through
+6875540	6877440	and I think it gives a pretty nice
+6877540	6879440	and comprehensive sense of how these
+6879540	6881440	backward passes are implemented
+6881540	6883440	and how they work
+6883540	6885440	and you'd be able to derive them yourself
+6885540	6887440	but of course in practice you probably don't want to
+6887540	6889440	and you want to use the PyTorch AutoGrad
+6889540	6891440	but hopefully you have some intuition about
+6891540	6893440	how gradients flow backwards through the neural net
+6893540	6895440	starting at the loss
+6895540	6897440	and how they flow through all the variables
+6897540	6899440	and if you understood a good chunk of it
+6899540	6901440	and if you have a sense of that
+6901540	6903440	then you can count yourself as one of these
+6903540	6905440	buff dojis on the left
+6905540	6907440	instead of the dojis on the right here
+6907540	6909440	now in the next lecture
+6909540	6911440	we're actually going to go to recurrent neural nets
+6911540	6913440	LSTMs and all the other variants
+6913540	6915440	of RNNs
+6915540	6917440	and we're going to start to complexify the architecture
+6917540	6919440	and start to achieve better log likelihoods
+6919540	6921440	and so I'm really looking forward to that
+6921540	6923440	and I'll see you then
