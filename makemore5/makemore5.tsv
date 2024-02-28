@@ -1,0 +1,1162 @@
+start	end	text
+0	4400	Hi everyone. Today we are continuing our implementation of MakeMore, our favorite
+4400	9000	character-level language model. Now, you'll notice that the background behind me is different. That's
+9000	14380	because I am in Kyoto, and it is awesome. So I'm in a hotel room here. Now, over the last few
+14380	19620	lectures, we've built up to this architecture that is a multi-layer perceptron character-level
+19620	23700	language model. So we see that it receives three previous characters and tries to predict the
+23700	28360	fourth character in a sequence using a very simple multi-layer perceptron using one hidden
+28360	33460	layer of neurons with tenational neuralities. So what we'd like to do now in this lecture is I'd
+33460	37400	like to complexify this architecture. In particular, we would like to take more characters
+37400	42660	in a sequence as an input, not just three. And in addition to that, we don't just want to feed
+42660	47020	them all into a single hidden layer because that squashes too much information too quickly.
+47680	52760	Instead, we would like to make a deeper model that progressively fuses this information to make
+52760	57960	its guess about the next character in a sequence. And so we'll see that as we make this architecture
+57960	58340	more complex, we'll be able to make a more complex model that progressively fuses this
+58340	61440	information to make it more complex. We're actually going to arrive at something that looks
+61440	66520	very much like a WaveNet. So WaveNet is this paper published by DeepMind in 2016.
+67480	73500	And it is also a language model, basically, but it tries to predict audio sequences instead of
+73500	79280	character-level sequences or word-level sequences. But fundamentally, the modeling setup is
+79280	84280	identical. It is an autoregressive model, and it tries to predict the next character in a sequence.
+84280	87940	And the architecture actually takes this interesting hierarchical
+87940	93920	sort of approach to predicting the next character in a sequence with this tree-like structure.
+94760	98720	And this is the architecture, and we're going to implement it in the course of this video.
+99040	104260	So let's get started. So the starter code for part five is very similar to where we ended up in
+104260	109180	in part three. Recall that part four was the manual dot propagation exercise. That is kind
+109180	114120	of an aside. So we are coming back to part three, copy-pasting chunks out of it. And that is our
+114120	116920	starter code for part five. I've changed very few things otherwise.
+117940	122400	However, both should look familiar to if you've gone through part three. So in particular, very
+122400	128880	briefly, we are doing imports. We are reading our data set of words. And we are processing the
+128880	134040	dataset of words into individual examples. And none of this data generation code has changed.
+134040	140060	And basically we have lots and lots of examples. In particular, we have 182,000 examples
+140060	146200	of three characters try to predict the fourth one. And we've broken up every one of these words into
+146200	147060	little problems.
+147060	150660	given three characters predict the fourth one so this is our data set and this is what we're
+150660	157220	trying to get the neural net to do now in part three we started to develop our code around these
+157220	163220	layer modules that are for example a class linear and we're doing this because we want to think of
+163220	168980	these modules as building blocks and like a lego building block bricks that we can sort of like
+168980	174260	stack up into neural networks and we can feed data between these layers and stack them up into
+174260	181700	sort of graphs now we also developed these layers to have apis and signatures very similar to those
+181700	186740	that are found in pytorch so we have torch.nn and it's got all these layer building blocks that you
+186740	191940	would use in practice and we were developing all these to mimic the apis of these so for example
+191940	197780	we have linear so there will also be a torch.nn.linear and its signature will be very
+197780	202580	similar to our signature and the functionality will be also quite identical as far as i'm aware
+202580	203620	so we have the linear layer
+204260	210740	with the batchnorm1d layer and the 10h layer that we developed previously and linear just does a
+210740	216500	matrix multiply in the forward pass of this module batchnorm of course is this crazy layer that we
+216500	221300	developed in the previous lecture and what's crazy about it is well there's many things
+222020	227220	number one it has these running mean and variances that are trained outside of back propagation they
+227220	233540	are trained using exponential moving average inside this layer when we call the forward pass
+234420	239460	uh in addition to that there's this training flag because the behavior of bastion is different
+239460	243380	during train time and evaluation time and so suddenly we have to be very careful that
+243380	247860	bastion is in its correct state that it's in the evaluation state or training state so that's
+247860	252740	something to now keep track of something that sometimes introduces bugs because you forget to
+252740	258020	put it into the right mode and finally we saw that bastion couples the statistics or the the
+258020	264020	activations across the examples in the batch so normally we thought of the batch as just an efficiency thing
+264820	270900	but now we are coupling the computation across batch elements and it's done for the purposes of
+270900	276340	controlling the activation statistics as we saw in the previous video so it's a very weird layer
+276340	281300	at least a lot of bugs um partly for example because you have to modulate the training and
+281300	288740	eval phase and so on um in addition for example you have to wait for uh the mean and the variance
+288740	293780	to settle and to actually reach a steady state and so um you have to make sure that you
+294260	301540	if you write the problem invalid you can more simply to you know drag and drop um
+302260	322900	to get whatever range you want uh and i want to show you the behavior of bastion
+324260	325940	And then we have a list of layers.
+325940	329840	And it's a linear, feeds to BatchNorm, feeds to 10H,
+329840	331780	and then a linear output layer.
+331780	333200	And its weights are scaled down,
+333200	336720	so we are not confidently wrong at initialization.
+336720	339260	We see that this is about 12,000 parameters.
+339260	342860	We're telling PyTorch that the parameters require gradients.
+342860	345700	The optimization is, as far as I'm aware, identical,
+345700	347940	and should look very, very familiar.
+347940	348980	Nothing changed here.
+350000	352580	Loss function looks very crazy.
+352580	354020	We should probably fix this.
+354020	357280	And that's because 32 batch elements are too few.
+357280	359880	And so you can get very lucky or unlucky
+359880	361200	in any one of these batches,
+361200	364240	and it creates a very thick loss function.
+364240	366440	So we're gonna fix that soon.
+366440	369240	Now, once we want to evaluate the trained neural network,
+369240	371400	we need to remember, because of the BatchNorm layers,
+371400	374360	to set all the layers to be training equals false.
+374360	377240	This only matters for the BatchNorm layer so far.
+377240	378860	And then we evaluate.
+380340	383740	We see that currently we have validation loss of 2.10,
+383740	387200	which is fairly good, but there's still a ways to go.
+387200	390500	But even at 2.10, we see that when we sample from the model,
+390500	393380	we actually get relatively name-like results
+393380	395100	that do not exist in a training set.
+395100	400100	So for example, Yvonne, Kilo, Pros, Alaya, et cetera.
+401600	406200	So certainly not reasonable, not unreasonable, I would say,
+406200	407320	but not amazing.
+407320	409760	And we can still push this validation loss even lower
+409760	412860	and get much better samples that are even more name-like.
+413740	416640	So let's improve this model now.
+416640	418200	Okay, first, let's fix this graph,
+418200	419700	because it is daggers in my eyes,
+419700	422000	and I just can't take it anymore.
+422000	426900	So lossI, if you recall, is a Python list of floats.
+426900	430020	So for example, the first 10 elements look like this.
+431060	432340	Now, what we'd like to do, basically,
+432340	435180	is we need to average up some of these values
+435180	439780	to get a more sort of representative value along the way.
+439780	441860	So one way to do this is the following.
+441860	443040	In PyTorch, if I create, for example, this,
+443040	443680	I'm gonna do this.
+443680	447480	If I create, for example, a tensor of the first 10 numbers,
+447480	449920	then this is currently a one-dimensional array.
+449920	452840	But recall that I can view this array as two-dimensional.
+452840	455800	So for example, I can view it as a two-by-five array,
+455800	459140	and this is a 2D tensor now, two-by-five.
+459140	461460	And you see what PyTorch has done is that the first row
+461460	463800	of this tensor is the first five elements,
+463800	466840	and the second row is the second five elements.
+466840	470180	I can also view it as a five-by-two as an example.
+470180	473680	And then recall that I can also use negative one
+473680	475920	in place of one of these numbers.
+475920	478640	And PyTorch will calculate what that number must be
+478640	481080	in order to make the number of elements work out.
+481080	484720	So this can be this, or like that.
+484720	485520	Both will work.
+485520	486720	Of course, this would not work.
+489220	492680	OK, so this allows it to spread out some of the consecutive values
+492680	493720	into rows.
+493720	495720	So that's very helpful, because what we can do now
+495720	499600	is, first of all, we're going to create a Torch.tensor out
+499600	502480	of the list of floats.
+502480	503520	And then we're going to view it.
+503520	506520	As whatever it is, but we're going
+506520	510640	to stretch it out into rows of 1,000 consecutive elements.
+510640	514560	So the shape of this now becomes 200 by 1,000.
+514560	519520	And each row is 1,000 consecutive elements in this list.
+519520	521020	So that's very helpful, because now we
+521020	524040	can do a mean along the rows.
+524040	527240	And the shape of this will just be 200.
+527240	529840	And so we've taken basically the mean on every row.
+529840	533060	So plt.plot of that should be something nicer.
+533060	535180	Much better.
+535180	537740	So we see that we've basically made a lot of progress.
+537740	540900	And then here, this is the learning rate decay.
+540900	543180	So here we see that the learning rate decay subtracted
+543180	544900	a ton of energy out of the system,
+544900	547820	and allowed us to settle into the local minimum
+547820	549500	in this optimization.
+549500	551420	So this is a much nicer plot.
+551420	554680	Let me come up and delete the monster.
+554680	556700	And we're going to be using this going forward.
+556700	558240	Now, next up, what I'm bothered by
+558240	561180	is that you see our forward pass is a little bit gnarly, and takes a lot of time.
+561180	561940	So we're going to go ahead and do that.
+561940	562060	And we're going to go ahead and do that.
+562060	563060	And we're going to go ahead and do that.
+563060	564740	And we're going to explain too many lines of code.
+564740	567380	So in particular, we see that we've organized some of the layers
+567380	571900	inside the layers list, but not all of them for no reason.
+571900	574780	So in particular, we see that we still have the embedding table special
+574780	577020	cased outside of the layers.
+577020	579780	And in addition to that, the viewing operation here
+579780	581680	is also outside of our layers.
+581680	583640	Let's create layers for these, and then we
+583640	586600	can add those layers to just our list.
+586600	589540	So in particular, the two things that we need is here,
+589540	592580	we have this embedding table, and we are indexing
+592580	598700	at the integers inside the batch xb, inside the tensor xb.
+598700	602580	So that's an embedding table lookup just done with indexing.
+602580	604700	And then here, we see that we have this view operation,
+604700	606620	which if you recall from the previous video,
+606620	611000	simply rearranges the character embeddings
+611000	613080	and stretches them out into a row.
+613080	616420	And effectively, what that does is the concatenation operation,
+616420	619100	basically, except it's free because viewing
+619100	621180	is very cheap in PyTorch.
+621180	623420	And no memory is being copied.
+623420	626040	We're just re-representing how we view that tensor.
+626040	630780	So let's create modules for both of these operations,
+630780	634060	the embedding operation and the flattening operation.
+634060	638860	So I actually wrote the code just to save some time.
+638860	641860	So we have a module embedding and a module flatten.
+641860	644880	And both of them simply do the indexing operation
+644880	649620	in a forward pass and the flattening operation here.
+649620	651060	And this.
+651180	656880	C now will just become a self.weight inside an embedding module.
+656880	659760	And I'm calling these layers specifically embedding and flatten
+659760	663080	because it turns out that both of them actually exist in PyTorch.
+663080	665820	So in PyTorch, we have n and dot embedding.
+665820	667260	And it also takes the number of embeddings
+667260	670960	and the dimensionality of the embedding, just like we have here.
+670960	673340	But in addition, PyTorch takes in a lot of other keyword arguments
+673340	678080	that we are not using for our purposes yet.
+678080	680720	And for flatten, that also exists in PyTorch.
+680720	683840	But it also takes additional keyword arguments that we are not using.
+683840	686860	So we have a very simple flatten.
+686860	687860	But both of them exist in PyTorch.
+687860	690180	They're just a bit more simpler.
+690180	698500	And now that we have these, we can simply take out some of these special cased things.
+698500	705820	So instead of C, we're just going to have an embedding and vocab size and n embed.
+705820	709120	And then after the embedding, we are going to flatten.
+709120	710620	So let's construct those modules.
+710720	713300	And now I can take out this C.
+713300	715600	And here, I don't have to special case it anymore.
+715600	719180	Because now, C is the embedding's weight.
+719180	722060	And it's inside layers.
+722060	724340	So this should just work.
+724340	727960	And then here, our forward pass simplifies substantially.
+727960	733460	Because we don't need to do these now outside of these layers, outside and explicitly.
+733460	735360	They're now inside layers.
+735360	737320	So we can delete those.
+737320	740600	But now to kick things off, we want this little x,
+740600	743100	which in the beginning is just xb,
+743100	747920	the tensor of integers specifying the identities of these characters at the input.
+747920	751100	And so these characters can now directly feed into the first layer.
+751100	752740	And this should just work.
+752740	755480	So let me come here and insert a break.
+755480	757980	Because I just want to make sure that the first iteration of this runs,
+757980	759840	and that there's no mistake.
+759840	761720	So that ran properly.
+761720	764840	And basically, we've substantially simplified the forward pass here.
+764840	766740	Okay, I'm sorry, I changed my microphone.
+766740	769720	So hopefully, the audio is a little bit better.
+769720	770480	Now, one last thing.
+770480	774100	One more thing that I would like to do in order to PyTorchify our code even further,
+774100	778440	is that right now we are maintaining all of our modules in a naked list of layers.
+778440	784180	And we can also simplify this, because we can introduce the concept of PyTorch containers.
+784180	787480	So in torch.nn, which we are basically rebuilding from scratch here,
+787480	789340	there's a concept of containers.
+789340	794860	And these containers are basically a way of organizing layers into lists or dicts and
+794860	795860	so on.
+795860	800480	So in particular, there's a sequential, which maintains a list of layers, and there's a
+800480	802760	module class in PyTorch.
+802760	806940	And it basically just passes a given input through all the layers sequentially, exactly
+806940	808980	as we are doing here.
+808980	811200	So let's write our own sequential.
+811200	812840	I've written a code here.
+812840	816000	And basically, the code for sequential is quite straightforward.
+816000	819140	We pass in a list of layers, which we keep here.
+819140	823180	And then given any input in a forward pass, we just call all the layers sequentially and
+823180	824180	return the result.
+824180	828400	And in terms of the parameters, it's just all the parameters of the child modules.
+828400	829600	So we can run this.
+829600	830100	Okay.
+830480	834520	And again, simplify this substantially, because we don't maintain this naked list of layers.
+834520	841000	We now have a notion of a model, which is a module, and in particular, is a sequential
+841000	845040	of all these layers.
+845040	849700	And now parameters are simply just model.parameters.
+849700	854100	And so that list comprehension now lives here.
+854100	858100	And then here we are doing all the things we used to do.
+858100	859600	Now here, the code again simplifies substantially.
+859600	865320	Because we don't have to do this forwarding here, instead we just call the model on the
+865320	866320	input data.
+866320	869600	And the input data here are the integers inside xb.
+869600	873900	So we can simply do logits, which are the outputs of our model, are simply the model
+873900	877040	called on xb.
+877040	881520	And then the cross entropy here takes the logits and the targets.
+881520	884120	So this simplifies substantially.
+884120	885840	And then this looks good.
+885840	887440	So let's just make sure this runs.
+887440	888440	That looks good.
+888440	889440	Okay.
+889440	893760	Now here, we actually have some work to do still here, but I'm going to come back later.
+893760	895160	For now, there's no more layers.
+895160	897040	There's a model that layers.
+897040	900900	But it's naughty to access attributes of these classes directly.
+900900	903320	So we'll come back and fix this later.
+903320	907620	And then here, of course, this simplifies substantially as well, because logits are
+907620	910840	the model called on x.
+910840	914260	And then these logits come here.
+914260	918120	So we can evaluate the train and validation loss, which currently is terrible, because
+918120	919280	we just initialized it in neural net.
+919280	921800	And then we can also sample from the model.
+921800	927100	And this simplifies dramatically as well, because we just want to call the model onto
+927100	930520	the context and outcome logits.
+930520	934600	And then these logits go into softmax and get the probabilities, et cetera.
+934600	938400	So we can sample from this model.
+938400	939400	What did I screw up?
+939400	940400	Okay.
+940400	947160	So I fixed the issue and we now get the result that we expect, which is gibberish, because
+947160	948440	the model is not trained.
+948440	949160	Okay.
+949160	950800	So we initialize it from scratch.
+950800	955080	The problem was that when I fixed this cell to be modeled out layers instead of just layers,
+955080	957420	I did not actually run the cell.
+957420	960460	And so our neural net was in a training mode.
+960460	964000	And what caused the issue here is the batch norm layer, as batch norm layer often likes
+964000	967280	to do, because batch norm was in the training mode.
+967280	971520	And here we are passing in an input, which is a batch of just a single example made up
+971520	973220	of the context.
+973220	976840	And so if you are trying to pass in a single example into a batch norm that is in the training
+976840	977840	mode.
+977840	978960	You're going to end up estimating the variance.
+978960	984600	Using the input and the variance of a single number is not a number because it is a measure
+984600	985900	of a spread.
+985900	990780	So for example, the variance of just a single number five, you can see is not a number.
+990780	992980	And so that's what happened.
+992980	995020	And batch norm basically caused an issue.
+995020	998160	And then that polluted all of the further processing.
+998160	1001360	So all that we had to do was make sure that this runs.
+1001360	1006660	And we basically made the issue of, again, we didn't actually see the issue with the
+1006660	1007660	loss.
+1007660	1008660	We could have evaluated the loss.
+1008960	1013460	We got the wrong result because batch norm was in the training mode.
+1013460	1014460	And so we still get a result.
+1014460	1019540	It's just the wrong result because it's using the sample statistics of the batch.
+1019540	1023180	Whereas we want to use the running mean and running variance inside the batch norm.
+1023180	1029620	And so again, an example of introducing a bug in line because we did not properly maintain
+1029620	1031400	the state of what is training or not.
+1031400	1032400	Okay.
+1032400	1033480	So I rerun everything.
+1033480	1034520	And here's where we are.
+1034520	1037800	As a reminder, we have the training loss of 2.05 and validation of 2.10.
+1037800	1038800	Now, let's go back.
+1038800	1042700	Now, because these losses are very similar to each other, we have a sense that we are
+1042700	1045240	not overfitting too much on this task.
+1045240	1048880	And we can make additional progress in our performance by scaling up the size of the
+1048880	1051980	neural network and making everything bigger and deeper.
+1051980	1056600	Now, currently, we are using this architecture here, where we are taking in some number of
+1056600	1060040	characters, going into a single hidden layer, and then going to the prediction of the next
+1060040	1061420	character.
+1061420	1066400	The problem here is we don't have a naive way of making this bigger in a productive
+1066400	1067400	way.
+1067400	1068600	We could, of course, use our neural network.
+1068600	1072780	We could use our layers, sort of building blocks and materials to introduce additional
+1072780	1075280	layers here and make the network deeper.
+1075280	1079420	But it is still the case that we are crushing all of the characters into a single layer
+1079420	1081260	all the way at the beginning.
+1081260	1084980	And even if we make this a bigger layer and add neurons, it's still kind of like silly
+1084980	1090040	to squash all that information so fast in a single step.
+1090040	1093580	So what we'd like to do instead is we'd like our network to look a lot more like this in
+1093580	1094960	the WaveNet case.
+1094960	1098220	So you see in the WaveNet, when we are trying to make the prediction for the next character
+1098220	1104940	in a sequence, it is a function of the previous characters that feed in, but not all of these
+1104940	1110000	different characters are not just crushed to a single layer and then you have a sandwich.
+1110000	1112280	They are crushed slowly.
+1112280	1117800	So in particular, we take two characters and we fuse them into sort of like a bigram representation.
+1117800	1120480	And we do that for all these characters consecutively.
+1120480	1127000	And then we take the bigrams and we fuse those into four character level chunks.
+1127000	1128100	And then we fuse that again.
+1128220	1132060	And so we do that in this tree-like hierarchical manner.
+1132060	1137220	So we fuse the information from the previous context slowly into the network as it gets
+1137220	1138220	deeper.
+1138220	1141000	And so this is the kind of architecture that we want to implement.
+1141000	1146740	Now in the WaveNet's case, this is a visualization of a stack of dilated causal convolution layers.
+1146740	1150180	And this makes it sound very scary, but actually the idea is very simple.
+1150180	1154340	And the fact that it's a dilated causal convolution layer is really just an implementation detail
+1154340	1155660	to make everything fast.
+1155660	1157220	We're going to see that later.
+1157220	1158220	But for now, let's just keep going.
+1158220	1161780	We're going to keep the basic idea of it, which is this progressive fusion.
+1161780	1166220	So we want to make the network deeper, and at each level, we want to fuse only two consecutive
+1166220	1167260	elements.
+1167260	1171820	Two characters, then two bigrams, then two fourgrams, and so on.
+1171820	1172820	So let's implement this.
+1172820	1176100	Okay, so first up, let me scroll to where we built the dataset, and let's change the
+1176100	1178520	block size from three to eight.
+1178520	1183360	So we're going to be taking eight characters of context to predict the ninth character.
+1183360	1185260	So the dataset now looks like this.
+1185260	1188220	We have a lot more context feeding in to predict any next character.
+1188220	1189220	So we're going to have a sequence.
+1189220	1193660	And these eight characters are going to be processed in this tree-like structure.
+1193660	1197660	Now if we scroll here, everything here should just be able to work.
+1197660	1199960	So we should be able to redefine the network.
+1199960	1204460	You see that the number of parameters has increased by 10,000, and that's because the
+1204460	1205720	block size has grown.
+1205720	1208140	So this first linear layer is much, much bigger.
+1208140	1212740	Our linear layer now takes eight characters into this middle layer.
+1212740	1214500	So there's a lot more parameters there.
+1214500	1216260	But this should just run.
+1216260	1218140	Let me just break right after this.
+1218140	1219140	This is the very first iteration.
+1219140	1221500	So you see that this runs just fine.
+1221500	1223580	It's just that this network doesn't make too much sense.
+1223580	1227140	We're crushing way too much information way too fast.
+1227140	1232120	So let's now come in and see how we could try to implement the hierarchical scheme.
+1232120	1235800	Now before we dive into the detail of the re-implementation here, I was just curious
+1235800	1239640	to actually run it and see where we are in terms of the baseline performance of just
+1239640	1242500	lazily scaling up the context length.
+1242500	1243500	So I let it run.
+1243500	1245000	We get a nice loss curve.
+1245000	1248040	And then evaluating the loss, we actually see quite a bit of improvement.
+1248140	1251040	This is from increasing the context length.
+1251040	1253240	So I started a little bit of a performance log here.
+1253240	1259180	And previously where we were is we were getting a performance of 2.10 on the validation loss.
+1259180	1265080	And now simply scaling up the context length from 3 to 8 gives us a performance of 2.02.
+1265080	1267060	So quite a bit of an improvement here.
+1267060	1270900	And also when you sample from the model, you see that the names are definitely improving
+1270900	1273260	qualitatively as well.
+1273260	1278140	So we could, of course, spend a lot of time here tuning things and making it even bigger
+1278140	1283880	and scaling up the network further, even with the simple sort of setup here.
+1283880	1287580	But let's continue and let's implement the hierarchical model and treat this as just
+1287580	1289960	a rough baseline performance.
+1289960	1294360	But there's a lot of optimization left on the table in terms of some of the hyperparameters
+1294360	1296260	that you're hopefully getting a sense of now.
+1296260	1300400	Okay, so let's scroll up now and come back up.
+1300400	1304360	And what I've done here is I've created a bit of a scratch space for us to just look
+1304360	1307040	at the forward pass of the neural net and inspect the shape of the network.
+1307040	1308040	So let's go ahead and do that.
+1308040	1310000	So let's go ahead and look at the shape of the tensors along the way as the neural net
+1310000	1312360	forwards.
+1312360	1317580	So here I'm just temporarily for debugging, creating a batch of just, say, four examples.
+1317580	1319320	So four random integers.
+1319320	1322460	Then I'm plucking out those rows from our training set.
+1322460	1326720	And then I'm passing into the model the input XB.
+1326720	1331040	Now the shape of XB here, because we have only four examples, is four by eight.
+1331040	1334480	And this eight is now the current block size.
+1334480	1337980	So inspecting XB, we just see that we have four examples.
+1337980	1341720	Each one of them is a row of XB.
+1341720	1344620	And we have eight characters here.
+1344620	1349740	And this integer tensor just contains the identities of those characters.
+1349740	1352380	So the first layer of our neural net is the embedding layer.
+1352380	1357020	So passing XB, this integer tensor, through the embedding layer creates an output that
+1357020	1359360	is four by eight by 10.
+1359360	1365020	So our embedding table has, for each character, a 10-dimensional vector that we are trying
+1365020	1366020	to learn.
+1366020	1367300	And so what the embedding layer does here...
+1367300	1372360	What the layer does here is it blocks out the embedding vector for each one of these
+1372360	1378760	integers and organizes it all in a four by eight by 10 tensor now.
+1378760	1383160	So all of these integers are translated into 10-dimensional vectors inside this three-dimensional
+1383160	1384980	tensor now.
+1384980	1389380	Now passing that through the flatten layer, as you recall, what this does is it views
+1389380	1392520	this tensor as just a four by 80 tensor.
+1392520	1396800	And what that effectively does is that all these 10-dimensional embeddings for all these
+1396800	1401800	eight characters just end up being stretched out into a long row.
+1401800	1404820	And that looks kind of like a concatenation operation, basically.
+1404820	1409100	So by viewing the tensor differently, we now have a four by 80.
+1409100	1416380	And inside this 80, it's all the 10-dimensional vectors just concatenated next to each other.
+1416380	1423480	And the linear layer, of course, takes 80 and creates 200 channels just via matrix multiplication.
+1423480	1424480	So so far, so good.
+1424480	1425720	Now I'd like to show you something surprising.
+1425720	1426720	Let's see.
+1426800	1432740	Let's look at the insides of the linear layer and remind ourselves how it works.
+1432740	1437740	The linear layer here in a forward pass takes the input x, multiplies it with a weight,
+1437740	1439760	and then optionally adds bias.
+1439760	1443060	And the weight here is two-dimensional, as defined here, and the bias is one-dimensional
+1443060	1444620	here.
+1444620	1448680	So effectively, in terms of the shapes involved, what's happening inside this linear layer
+1448680	1451240	looks like this right now.
+1451240	1455800	And I'm using random numbers here, but I'm just illustrating the shapes and what happens.
+1455800	1460620	Basically, a four by 80 input comes into the linear layer, gets multiplied by this
+1460620	1464840	80 by 200 weight matrix inside, and then there's a plus 200 bias.
+1464840	1468780	And the shape of the whole thing that comes out of the linear layer is four by 200, as
+1468780	1470780	we see here.
+1470780	1476180	Now notice here, by the way, that this here will create a four by 200 tensor, and then
+1476180	1482360	plus 200, there's a broadcasting happening here, but four by 200 broadcasts with 200,
+1482360	1483680	so everything works here.
+1483680	1484640	So now the surprising thing that I want to show you is this.
+1484640	1485640	I'm going to show you how this works.
+1485640	1489460	One thing that I'd like to show you that you may not expect is that this input here
+1489460	1493640	that is being multiplied doesn't actually have to be two-dimensional.
+1493640	1498180	This matrix multiply operator in PyTorch is quite powerful, and in fact, you can actually
+1498180	1502020	pass in higher dimensional arrays or tensors, and everything works fine.
+1502020	1505960	So for example, this could be four by five by 80, and the result in that case will become
+1505960	1508360	four by five by 200.
+1508360	1511720	You can add as many dimensions as you like on the left here.
+1511720	1515640	And so effectively, what's happening is that the matrix multiplication only works on a
+1515640	1519180	matrix multiplication on the last dimension, and the dimensions before it in the input
+1519180	1524780	tensor are left unchanged.
+1524780	1531740	So basically, these dimensions on the left are all treated as just a batch dimension.
+1531740	1536580	So we can have multiple batch dimensions, and then in parallel over all those dimensions,
+1536580	1539620	we are doing the matrix multiplication on the last dimension.
+1539620	1544520	So this is quite convenient because we can use that in our network now.
+1544520	1545520	Because remember that.
+1545520	1549380	We have these eight characters coming in.
+1549380	1555120	And we don't want to now flatten all of it out into a large eight-dimensional vector
+1555120	1561840	because we don't want to matrix multiply 80 into a weight matrix multiply immediately.
+1561840	1567140	Instead, we want to group these like this.
+1567140	1571380	So every consecutive two elements, one and two and three and four and five and six and
+1571380	1574900	seven and eight, all of these should be now basically flattened.
+1574900	1575520	Okay.
+1575520	1576600	So we can.
+1576600	1578380	End out and multiply by weight matrix.
+1578380	1582240	But all of these four groups here, we'd like to process in parallel.
+1582240	1586080	So it's kind of like a batch dimension that we can introduce.
+1586080	1593820	And then we can, in parallel, basically process all of these bigram groups in the four batch
+1593820	1600020	dimensions of an individual example, and also over the actual batch dimension of the four
+1600020	1601840	examples in our example here.
+1601840	1603380	So let's see how that works.
+1603380	1604880	Effectively, what we want is.
+1604880	1605360	Right now.
+1605360	1611760	Now we take a 4 by 80 and multiply it by 80 by 200 in the linear layer.
+1611840	1612500	This is what happens.
+1613560	1618660	But instead what we want is we don't want 80 characters or 80 numbers to come in.
+1619020	1621840	We only want two characters to come in on the very first layer,
+1622020	1623700	and those two characters should be fused.
+1624820	1628320	So in other words, we just want 20 to come in, right?
+1629020	1630280	20 numbers would come in.
+1630900	1634140	And here we don't want a 4 by 80 to feed into the linear layer.
+1634140	1637220	We actually want these groups of 2 to feed in.
+1637620	1641700	So instead of 4 by 80, we want this to be a 4 by 4 by 20.
+1643260	1648700	So these are the four groups of 2, and each one of them is a 10-dimensional vector.
+1649420	1652380	So what we want now is we need to change the flatten layer
+1652380	1656400	so it doesn't output a 4 by 80, but it outputs a 4 by 4 by 20,
+1657000	1664120	where basically every two consecutive characters are packed in
+1664120	1665400	on the very last dimension.
+1665980	1668400	And then these four is the first batch dimension,
+1668880	1671020	and this four is the second batch dimension,
+1671400	1674380	referring to the four groups inside every one of these examples.
+1675380	1677580	And then this will just multiply like this.
+1677700	1679300	So this is what we want to get to.
+1679880	1681360	So we're going to have to change the linear layer
+1681360	1683280	in terms of how many inputs it expects.
+1683420	1685440	It shouldn't expect 80.
+1685520	1686720	It should just expect 20 numbers.
+1687040	1688700	And we have to change our flatten layer
+1688700	1691880	so it doesn't just fully flatten out this entire example.
+1692280	1694100	It needs to create a 4 by 4.
+1694100	1696580	It needs to create a 4 by 20 instead of a 4 by 80.
+1697060	1698500	So let's see how this could be implemented.
+1699240	1702740	Basically right now we have an input that is a 4 by 8 by 10
+1702740	1704680	that feeds into the flatten layer,
+1705100	1708140	and currently the flatten layer just stretches it out.
+1708500	1710420	So if you remember the implementation of flatten,
+1711260	1715220	it takes our x and it just views it as whatever the batch dimension is,
+1715320	1716100	and then negative 1.
+1716940	1722000	So effectively what it does right now is it does e.view of 4, negative 1,
+1722000	1724080	and the shape of this, of course, is 4 by 80.
+1724100	1727500	So that's what currently happens,
+1727660	1730260	and we instead want this to be a 4 by 4 by 20,
+1730500	1733280	where these consecutive 10-dimensional vectors get concatenated.
+1734180	1738500	So you know how in Python you can take a list of range of 10?
+1739780	1742280	So we have numbers from 0 to 9,
+1742640	1745740	and we can index like this to get all the even parts,
+1746280	1748740	and we can also index like starting at 1
+1748740	1751720	and going in steps of 2 to get all the odd parts.
+1753060	1754080	So one way to implement this is to take a list of range of 10,
+1754080	1756380	and one way to implement this, it would be as follows.
+1756380	1761200	We can take e, and we can index into it for all the batch elements,
+1761720	1764440	and then just even elements in this dimension,
+1765020	1768100	so at indexes 0, 2, 4, and 8,
+1768840	1772200	and then all the parts here from this last dimension,
+1773480	1776800	and this gives us the even characters,
+1777300	1781180	and then here this gives us all the odd characters.
+1781500	1783800	And basically what we want to do is we want to make sure
+1783800	1786140	that these get concatenated in PyTorch,
+1786380	1789420	and then we want to concatenate these two tensors
+1789420	1791200	along the second dimension.
+1793020	1796280	So this and the shape of it would be 4 by 4 by 20.
+1796440	1798160	This is definitely the result we want.
+1798360	1802080	We are explicitly grabbing the even parts and the odd parts,
+1802220	1805220	and we're arranging those 4 by 4 by 10
+1805220	1807240	right next to each other and concatenate.
+1808240	1811140	So this works, but it turns out that what also works
+1811140	1813700	is you can simply use a view again,
+1813800	1816040	and just request the right shape.
+1816380	1818020	And it just so happens that in this case,
+1818540	1821480	those vectors will again end up being arranged
+1821480	1822640	exactly the way we want.
+1823260	1824640	So in particular, if we take e,
+1824760	1826920	and we just view it as a 4 by 4 by 20,
+1827060	1827900	which is what we want,
+1828600	1830960	we can check that this is exactly equal to,
+1831680	1835020	let me call this, this is the explicit concatenation, I suppose.
+1836760	1839540	So explicit dot shape is 4 by 4 by 20.
+1840100	1841820	If you just view it as 4 by 4 by 20,
+1841820	1843120	you can check that,
+1843120	1845120	when you compare it to explicit,
+1846220	1848580	you get a big, this is element-wise operation,
+1848840	1850340	so making sure that all of them are true,
+1851140	1851720	values to true.
+1852620	1854160	So basically, long story short,
+1854240	1856880	we don't need to make an explicit call to concatenate, etc.
+1857200	1861220	We can simply take this input tensor to flatten,
+1861680	1864140	and we can just view it in whatever way we want.
+1865020	1866400	And in particular,
+1866520	1868740	we don't want to stretch things out with negative 1.
+1868980	1871100	We want to actually create a three-dimensional array,
+1871400	1872800	and depending on how many,
+1872800	1874800	vectors that are consecutive,
+1875280	1877700	we want to fuse,
+1877920	1878920	like for example, 2,
+1879580	1881960	then we can just simply ask for this dimension to be 20,
+1882520	1885320	and use a negative 1 here,
+1885660	1887940	and PyTorch will figure out how many groups it needs to pack
+1888020	1889940	into this additional batch dimension.
+1890780	1893160	So let's now go into flatten and implement this.
+1893420	1895040	Okay, so I scrolled up here to flatten,
+1895580	1897900	and what we'd like to do is we'd like to change it now.
+1898140	1899360	So let me create a constructor,
+1899680	1902200	and take the number of elements that are consecutive,
+1902300	1902800	that we would like to use,
+1902880	1904800	and then we'd like to concatenate now
+1904880	1906880	in the last dimension of the output.
+1907400	1909400	So here we're just going to remember,
+1909480	1910480	self.n equals n.
+1911120	1913120	And then I want to be careful here,
+1913200	1916200	because PyTorch actually has a torch.flatten,
+1916280	1918280	and its keyword arguments are different,
+1918360	1920360	and they kind of like function differently.
+1920440	1923440	So our flatten is going to start to depart from PyTorch flatten.
+1923520	1926200	So let me call it flatten consecutive,
+1926280	1927280	or something like that,
+1927360	1930160	just to make sure that our APIs are about equal.
+1930520	1931520	So this,
+1931520	1935000	basically flattens only some n consecutive elements,
+1935080	1937080	and puts them into the last dimension.
+1937720	1941400	Now here, the shape of x is b by t by c.
+1941480	1945480	So let me pop those out into variables.
+1945560	1947680	And recall that in our example down below,
+1947760	1950760	b was 4, t was 8, and c was 10.
+1953680	1957680	Now, instead of doing x.view of b by negative 1,
+1959600	1961480	right, this is what we had before.
+1961560	1968560	We want this to be b by negative 1 by,
+1968640	1972640	and basically here, we want c times n.
+1972720	1975720	That's how many consecutive elements we want.
+1975800	1978040	And here, instead of negative 1,
+1978120	1979920	I don't super love the use of negative 1,
+1980000	1981920	because I like to be very explicit,
+1982000	1983000	so that you get error messages
+1983080	1985320	when things don't go according to your expectation.
+1985400	1986880	So what do we expect here?
+1986960	1990360	We expect this to become t divide n,
+1990440	1991480	using integer division here.
+1991560	1993680	So that's what I expect to happen.
+1993760	1996120	And then one more thing I want to do here is,
+1996200	1998600	remember previously, all the way in the beginning,
+1998680	2002560	n was 3, and basically we're concatenating
+2002640	2005360	all the three characters that existed there.
+2005440	2009040	So we basically concatenated everything.
+2009120	2010960	And so sometimes that can create
+2011040	2012680	a spurious dimension of 1 here.
+2012760	2016480	So if it is the case that x.shapeAt1 is 1,
+2016560	2018520	then it's kind of like a spurious dimension.
+2018600	2020440	So we don't want to return a 3,
+2020480	2021440	so we don't want to return a 3,
+2021480	2024600	so we don't want to return a 3-dimensional tensor with a 1 here.
+2024680	2026480	We just want to return a 2-dimensional tensor
+2026560	2028640	exactly as we did before.
+2028720	2033560	So in this case, basically, we will just say x equals x.squeeze,
+2033640	2037560	that is a PyTorch function.
+2037640	2041920	And squeeze takes a dimension that it either squeezes out
+2042000	2044720	all the dimensions of a tensor that are 1,
+2044800	2047760	or you can specify the exact dimension
+2047840	2049360	that you want to be squeezed.
+2049440	2051400	And again, I like to be as explicit as possible,
+2051480	2055480	always, so I expect to squeeze out the first dimension only
+2055560	2058880	of this tensor, this 3-dimensional tensor.
+2058960	2060400	And if this dimension here is 1,
+2060480	2064120	then I just want to return b by c times n.
+2064200	2069120	And so self.out will be x, and then we return self.out.
+2069200	2071000	So that's the candidate implementation.
+2071080	2074840	And of course, this should be self.in instead of just n.
+2074920	2080520	So let's run, and let's come here now and take it for a spin.
+2080560	2086080	So flattened consecutive, and in the beginning,
+2086160	2087640	let's just use 8.
+2087720	2090120	So this should recover the previous behavior.
+2090200	2095680	So flattened consecutive of 8, which is the current block size,
+2095760	2099320	we can do this, that should recover the previous behavior.
+2099400	2102600	So we should be able to run the model.
+2102680	2106920	And here we can inspect, I have a little code snippet here,
+2107000	2110480	where I iterate over all the layers, I print the name,
+2110560	2114680	of this class, and the shape.
+2114760	2117720	And so we see the shapes as we expect them
+2117800	2120600	after every single layer in its output.
+2120680	2124640	So now let's try to restructure it using our flattened consecutive
+2124720	2126600	and do it hierarchically.
+2126680	2129520	So in particular, we want to flatten consecutive,
+2129600	2133000	not just block size, but just 2.
+2133080	2135280	And then we want to process this with linear.
+2135360	2137960	Now, the number of inputs to this linear will not be
+2138040	2140400	n embed times block size, it will now only be
+2140440	2144240	n embed times 2, 20.
+2144320	2146240	This goes through the first layer.
+2146320	2149800	And now we can, in principle, just copy paste this.
+2149880	2154000	Now, the next linear layer should expect n hidden times 2.
+2154080	2161560	And the last piece of it should expect n hidden times 2 again.
+2161640	2165400	So this is sort of like the naive version of it.
+2165480	2169040	So running this, we now have a much, much bigger model.
+2169120	2170360	And we should be able to basically just
+2170440	2173640	just forward the model.
+2173720	2177720	And now we can inspect the numbers in between.
+2177800	2183240	So 4x8x20 was flattened consecutively into 4x4x20.
+2183320	2186640	This was projected into 4x4x200.
+2186720	2190240	And then BatchNorm just worked out of the box.
+2190320	2192400	We have to verify that BatchNorm does the correct thing,
+2192480	2193960	even though it takes a three-dimensional input
+2194040	2196480	instead of two-dimensional input.
+2196560	2198800	Then we have 10H, which is element-wise.
+2198880	2200280	Then we crushed it again.
+2200320	2204400	So we flattened consecutively and ended up with a 4x2x400 now.
+2204480	2208360	Then linear brought it back down to 200, BatchNorm 10H.
+2208440	2210800	And lastly, we get a 4x400.
+2210880	2213840	And we see that the flattened consecutive for the last flatten here,
+2213920	2216800	it squeezed out that dimension of 1.
+2216880	2218920	So we only ended up with 4x400.
+2219000	2224440	And then linear BatchNorm 10H and the last linear layer to get our logits.
+2224520	2227600	And so the logits end up in the same shape as they were before.
+2227680	2229360	But now we actually have a nice three-layer,
+2229360	2231400	neural net.
+2231480	2234600	And it basically corresponds to, whoops, sorry.
+2234680	2237600	It basically corresponds exactly to this network now,
+2237680	2241000	except only this piece here because we only have three layers.
+2241080	2244760	Whereas here in this example, there's four layers
+2244840	2248480	with a total receptive field size of 16 characters
+2248560	2250360	instead of just eight characters.
+2250440	2252640	So the block size here is 16.
+2252720	2256960	So this piece of it is basically implemented here.
+2257040	2259320	Now we just have to kind of figure out some good,
+2259400	2261360	channel numbers to use here.
+2261440	2265320	Now in particular, I changed the number of hidden units to be 68
+2265400	2267560	in this architecture because when I use 68,
+2267640	2270200	the number of parameters comes out to be 22,000.
+2270280	2272720	So that's exactly the same that we had before.
+2272800	2275600	And we have the same amount of capacity at this neural net
+2275680	2277360	in terms of the number of parameters.
+2277440	2279560	But the question is whether we are utilizing those parameters
+2279640	2281480	in a more efficient architecture.
+2281560	2285640	So what I did then is I got rid of a lot of the debugging cells here
+2285720	2287360	and I rerun the optimization.
+2287440	2289080	And scrolling down to the result,
+2289120	2292760	we see that we get the identical performance roughly.
+2292840	2297680	So our validation loss now is 2.029 and previously it was 2.027.
+2297760	2299640	So controlling for the number of parameters,
+2299720	2303480	changing from the flat to hierarchical is not giving us anything yet.
+2303560	2306600	That said, there are two things to point out.
+2306680	2310080	Number one, we didn't really torture the architecture here very much.
+2310160	2311480	This is just my first guess.
+2311560	2314000	And there's a bunch of hyperparameter search that we could do
+2314080	2318920	in terms of how we allocate our budget of parameters to what layers.
+2319080	2323720	Number two, we still may have a bug inside the BatchNorm1D layer.
+2323800	2330640	So let's take a look at that because it runs but doesn't do the right thing.
+2330720	2334440	So I pulled up the layer inspector sort of that we have here
+2334520	2336200	and printed out the shape along the way.
+2336280	2338960	And currently it looks like the BatchNorm is receiving an input
+2339040	2342480	that is 32 by 4 by 68, right?
+2342560	2345120	And here on the right, I have the current implementation of BatchNorm
+2345200	2346520	that we have right now.
+2346600	2348920	Now, this BatchNorm assumed, in the way
+2348920	2352040	we wrote it and at the time, that X is two-dimensional.
+2352120	2356040	So it was N by D, where N was the batch size.
+2356120	2360560	So that's why we only reduced the mean and the variance over the zeroth dimension.
+2360640	2363080	But now X will basically become three-dimensional.
+2363160	2365000	So what's happening inside the BatchNorm layer right now?
+2365080	2368200	And how come it's working at all and not giving any errors?
+2368280	2371560	The reason for that is basically because everything broadcasts properly,
+2371640	2375560	but the BatchNorm is not doing what we want it to do.
+2375640	2378200	So in particular, let's basically think through what's happening
+2378280	2378520	inside the BatchNorm.
+2378920	2383760	I'm looking at what's happening here.
+2383840	2385440	I have the code here.
+2385520	2389600	So we're receiving an input of 32 by 4 by 68.
+2389680	2392720	And then we are doing here, X dot mean.
+2392800	2394600	Here I have E instead of X.
+2394680	2397160	But we're doing the mean over zero.
+2397240	2399680	And that's actually giving us 1 by 4 by 68.
+2399760	2402640	So we're doing the mean only over the very first dimension.
+2402720	2407880	And it's giving us a mean and a variance that still maintain this dimension here.
+2407880	2412160	So these means are only taken over 32 numbers in the first dimension.
+2412240	2417000	And then when we perform this, everything broadcasts correctly still.
+2417080	2426200	But basically what ends up happening is when we also look at the running mean,
+2426280	2426880	the shape of it.
+2426960	2428480	So I'm looking at the model that layers the three,
+2428560	2429920	which is the first BatchNorm layer,
+2430000	2434120	and then looking at whatever the running mean became and its shape.
+2434200	2437640	The shape of this running mean now is 1 by 4 by 68.
+2437880	2444480	Instead of it being just size of dimension, because we have 68 channels,
+2444560	2448320	we expect to have 68 means and variances that we're maintaining.
+2448400	2450960	But actually we have an array of 4 by 68.
+2451040	2455120	And so basically what this is telling us is this BatchNorm is only...
+2455200	2465960	This BatchNorm is currently working in parallel over 4 times 68 instead of just 68 channels.
+2466040	2467200	So basically we are maintaining this.
+2467880	2473680	We are maintaining statistics for every one of these four positions individually and independently.
+2473760	2477880	And instead what we want to do is we want to treat this 4 as a Batch dimension,
+2477960	2479840	just like the 0th dimension.
+2479920	2482800	So as far as the BatchNorm is concerned,
+2482880	2484440	it doesn't want to average...
+2484520	2486440	We don't want to average over 32 numbers.
+2486520	2492720	We want to now average over 32 times 4 numbers for every single one of these 68 channels.
+2492800	2497080	And so let me now remove this.
+2497080	2502320	It turns out that when you look at the documentation of Torch.mean...
+2502400	2509600	So let's go to Torch.mean.
+2509680	2513200	In one of its signatures, when we specify the dimension,
+2513280	2515200	we see that the dimension here is not just...
+2515280	2518400	It can be int or it can also be a tuple of ints.
+2518480	2521880	So we can reduce over multiple integers at the same time,
+2521960	2523760	over multiple dimensions at the same time.
+2523840	2526840	So instead of just reducing over 0, we can pass in a tuple,
+2526840	2530400	0, 1, and here 0, 1 as well.
+2530480	2533840	And then what's going to happen is the output, of course, is going to be the same.
+2533920	2537240	But now what's going to happen is because we reduce over 0 and 1,
+2537320	2542440	if we look at inmean.shape, we see that now we've reduced.
+2542520	2546840	We took the mean over both the 0th and the first dimension.
+2546920	2550920	So we're just getting 68 numbers and a bunch of spurious dimensions here.
+2551000	2553640	So now this becomes 1 by 1 by 68.
+2553720	2556160	And the running mean and the running variance,
+2556160	2558800	analogously, will become 1 by 1 by 68.
+2558880	2561040	So even though there are the spurious dimensions,
+2561120	2566200	the correct thing will happen in that we are only maintaining means and variances
+2566280	2569640	for 68 channels.
+2569720	2574200	And we're now calculating the mean and variance across 32 times 4 dimensions.
+2574280	2576040	So that's exactly what we want.
+2576120	2579720	And let's change the implementation of BatchNorm1D that we have
+2579800	2583400	so that it can take in two-dimensional or three-dimensional inputs
+2583480	2585240	and perform accordingly.
+2585320	2585960	So at the end of the day,
+2585960	2588000	the fix is relatively straightforward.
+2588080	2592240	Basically, the dimension we want to reduce over is either 0
+2592320	2595400	or the tuple 0 and 1, depending on the dimensionality of x.
+2595480	2599280	So if x.ndim is 2, so it's a two-dimensional tensor,
+2599360	2602520	then the dimension we want to reduce over is just the integer 0.
+2602600	2605840	And if x.ndim is 3, so it's a three-dimensional tensor,
+2605920	2611440	then the dims we're going to assume are 0 and 1 that we want to reduce over.
+2611520	2613880	And then here, we just pass in dim.
+2613960	2615680	And if the dimensionality of x is anything else,
+2615680	2617840	we're going to get an error, which is good.
+2617920	2620560	So that should be the fix.
+2620640	2622320	Now, I want to point out one more thing.
+2622400	2625720	We're actually departing from the API of PyTorch here a little bit,
+2625800	2628560	because when you come to BatchNorm1D in PyTorch,
+2628640	2631720	you can scroll down and you can see that the input to this layer
+2631800	2634680	can either be n by c, where n is the batch size
+2634760	2636840	and c is the number of features or channels,
+2636920	2639600	or it actually does accept three-dimensional inputs,
+2639680	2642720	but it expects it to be n by c by l,
+2642800	2645520	where l is, say, like the sequence length or something like that.
+2645680	2651040	So this is a problem because you see how c is nested here in the middle.
+2651120	2654000	And so when it gets three-dimensional inputs,
+2654080	2659120	this BatchNorm layer will reduce over 0 and 2 instead of 0 and 1.
+2659200	2666400	So basically, PyTorch BatchNorm1D layer assumes that c will always be the first dimension,
+2666480	2670240	whereas we assume here that c is the last dimension,
+2670320	2672560	and there are some number of batch dimensions beforehand.
+2672640	2675440	And so,
+2675440	2677440	it expects n by c or n by c by l.
+2677520	2679440	We expect n by c or n by l by c.
+2679520	2681520	And so, it's a deviation.
+2681600	2683600	I think it's okay.
+2683680	2685680	I prefer it this way, honestly,
+2685760	2688400	so this is the way that we will keep it for our purposes.
+2688480	2691200	So I redefined the layers, reinitialized the neural net,
+2691280	2694480	and did a single forward pass with a break just for one step.
+2694560	2697600	Looking at the shapes along the way, they're, of course, identical.
+2697680	2699280	All the shapes are the same,
+2699360	2702560	but the way we see that things are actually working as we want them to,
+2702640	2704880	is that we can actually do the same thing.
+2704880	2706880	So the way we see that things are actually working as we want them to now
+2706960	2708880	is that when we look at the BatchNorm layer,
+2708960	2710880	the running mean shape is now 1 by 1 by 68.
+2710960	2714800	So we're only maintaining 68 means for every one of our channels,
+2714880	2718800	and we're treating both the 0th and the first dimension as a batch dimension,
+2718880	2720800	which is exactly what we want.
+2720880	2722800	So let me retrain the neural net now.
+2722880	2724800	Okay, so I've retrained the neural net with the bug fix.
+2724880	2726800	We get a nice curve.
+2726880	2728800	And when we look at the validation performance,
+2728880	2730800	we do actually see a slight improvement.
+2730880	2732800	So it went from 2.029 to 2.022.
+2732880	2734800	So basically, the bug inside the BatchNorm was holding us back, like,
+2734880	2736800	a little bit, it looks like.
+2736880	2738800	And we are getting a tiny improvement now,
+2738880	2742800	but it's not clear if this is statistically significant.
+2742880	2744800	And the reason we slightly expect an improvement
+2744880	2748800	is because we're not maintaining so many different means and variances
+2748880	2750800	that are only estimated using 32 numbers, effectively.
+2750880	2754800	Now we are estimating them using 32 times 4 numbers.
+2754880	2756800	So you just have a lot more numbers
+2756880	2758800	that go into any one estimate of the mean and variance.
+2758880	2762800	And it allows things to be a bit more stable and less wiggly
+2762880	2764800	inside those estimates of the BatchNorm.
+2764880	2766800	So pretty nice.
+2766880	2768800	With this more general architecture in place,
+2768880	2770800	we are now set up to push the performance further
+2770880	2772800	by increasing the size of the network.
+2772880	2774800	So, for example,
+2774880	2776800	I've bumped up the number of embeddings to 24 instead of 10,
+2776880	2778800	and also increased the number of hidden units.
+2778880	2780800	But using the exact same architecture,
+2780880	2782800	we now have 76,000 parameters,
+2782880	2784800	and the training takes a lot longer,
+2784880	2786800	but we do get a nice curve.
+2786880	2788800	And then when you actually evaluate the performance,
+2788880	2790800	we are now getting validation performance of 1.993.
+2790880	2792800	So we've crossed over 1.993.
+2792880	2794800	So we've crossed over 1.993.
+2794880	2796800	We've crossed over the 2.0 sort of territory.
+2796880	2798800	And we're at about 1.99.
+2798880	2800800	But we are starting to have to wait quite a bit longer.
+2800880	2802800	But we are starting to have to wait quite a bit longer.
+2802880	2804800	And we're a little bit in the dark
+2804880	2806800	with respect to the correct setting of the hyperparameters here
+2806880	2808800	and the learning rates and so on,
+2808880	2810800	because the experiments are starting to take longer to train.
+2810880	2812800	And so we are missing sort of like an experimental harness
+2812880	2814800	on which we could run a number of experiments
+2814880	2816800	on which we could run a number of experiments
+2816880	2818800	and really tune this architecture very well.
+2818880	2820800	So I'd like to conclude now with a few notes.
+2820880	2822800	We basically improved our performance
+2822880	2824800	from a starting of 2.1
+2824800	2826720	to 2.9.
+2826800	2828720	But I don't want that to be the focus
+2828800	2830720	because honestly we're kind of in the dark.
+2830800	2832720	We have no experimental harness.
+2832800	2834720	We're just guessing and checking.
+2834800	2836720	And this whole thing is terrible.
+2836800	2838720	We're just looking at the training loss.
+2838800	2840720	Normally you want to look at both the training
+2840800	2842720	and the validation loss together.
+2842800	2844720	The whole thing looks different
+2844800	2846720	if you're actually trying to squeeze out numbers.
+2846800	2848720	That said, we did implement this architecture
+2848800	2850720	from the WaveNet paper.
+2850800	2852720	But we did not implement this specific forward pass of it
+2852800	2854720	where you have a more complicated
+2854720	2856640	structure that is this gated
+2856720	2858640	linear layer kind of.
+2858720	2860640	And there's residual connections and skip connections
+2860720	2862640	and so on. So we did not implement that.
+2862720	2864640	We just implemented this structure.
+2864720	2866640	I would like to briefly hint or preview
+2866720	2868640	how what we've done here relates
+2868720	2870640	to convolutional neural networks
+2870720	2872640	as used in the WaveNet paper.
+2872720	2874640	And basically the use of convolutions
+2874720	2876640	is strictly for efficiency.
+2876720	2878640	It doesn't actually change the model we've implemented.
+2878720	2880640	So here for example,
+2880720	2882640	let me look at a specific name
+2882720	2884640	to work with an example.
+2884640	2886560	So we have a name in our training set
+2886640	2888560	and it's D'Andre.
+2888640	2890560	And it has seven letters.
+2890640	2892560	So that is eight independent examples in our model.
+2892640	2894560	So all these rows here
+2894640	2896560	are independent examples of D'Andre.
+2896640	2898560	Now you can forward of course
+2898640	2900560	any one of these rows independently.
+2900640	2902560	So I can take my model
+2902640	2904560	and call it on
+2904640	2906560	any individual index.
+2906640	2908560	Notice by the way here
+2908640	2910560	I'm being a little bit tricky.
+2910640	2912560	The reason for this is that
+2912560	2916480	it's a one dimensional array of eight.
+2916560	2918480	So you can't actually call the model on it.
+2918560	2920480	You're going to get an error
+2920560	2922480	because there's no batch dimension.
+2922560	2924480	So when you do extra at
+2924560	2926480	a list of seven
+2926560	2928480	then the shape of this becomes one by eight.
+2928560	2930480	So I get an extra batch dimension
+2930560	2932480	of one and then we can forward the model.
+2932560	2934480	So
+2934560	2936480	that forwards a single example
+2936560	2938480	and you might imagine that you actually
+2938560	2940480	may want to forward all of these eight
+2940560	2942480	at the same time.
+2942480	2944400	So pre-allocating some memory
+2944480	2946400	and then doing a for loop
+2946480	2948400	eight times and forwarding all of those
+2948480	2950400	eight here will give us
+2950480	2952400	all the logits in all these different cases.
+2952480	2954400	Now for us with the model
+2954480	2956400	as we've implemented it right now
+2956480	2958400	this is eight independent calls to our model.
+2958480	2960400	But what convolutions allow you to do
+2960480	2962400	is it allow you to basically slide
+2962480	2964400	this model efficiently
+2964480	2966400	over the input sequence.
+2966480	2968400	And so this for loop can be done
+2968480	2970400	not outside in Python
+2970480	2972400	but inside of kernels in CUDA.
+2972480	2974400	And so this for loop gets hidden into the convolution.
+2974480	2976400	So the convolution
+2976480	2978400	basically you can think of it as
+2978480	2980400	it's a for loop applying a little linear
+2980480	2982400	filter over space
+2982480	2984400	of some input sequence.
+2984480	2986400	And in our case the space we're interested in is one dimensional
+2986480	2988400	and we're interested in sliding these filters
+2988480	2990400	over the input data.
+2990480	2992400	So this diagram
+2992480	2994400	actually is fairly good as well.
+2994480	2996400	Basically what we've done is
+2996480	2998400	here they are highlighting in black
+2998480	3000400	one single sort of like tree
+3000480	3002400	of this calculation.
+3002400	3004320	So just calculating the single output
+3004400	3006320	example here.
+3006400	3008320	And so this is basically
+3008400	3010320	what we've implemented here.
+3010400	3012320	We've implemented a single, this black structure
+3012400	3014320	we've implemented that
+3014400	3016320	and calculated a single output, like a single example.
+3016400	3018320	But what convolutions
+3018400	3020320	allow you to do is it allows you to take
+3020400	3022320	this black structure and
+3022400	3024320	kind of like slide it over the input sequence
+3024400	3026320	here and calculate
+3026400	3028320	all of these orange
+3028400	3030320	outputs at the same time.
+3030400	3032320	Or here that corresponds to calculating
+3032320	3034240	all of these outputs of
+3034320	3036240	at all the positions of
+3036320	3038240	deandre at the same time.
+3038320	3040240	And the reason that
+3040320	3042240	this is much more efficient is because
+3042320	3044240	number one, as I mentioned, the for loop
+3044320	3046240	is inside the CUDA kernels in the
+3046320	3048240	sliding. So that makes
+3048320	3050240	it efficient. But number two, notice
+3050320	3052240	the variable reuse here. For example
+3052320	3054240	if we look at this circle, this node here,
+3054320	3056240	this node here is the right child
+3056320	3058240	of this node, but it's also
+3058320	3060240	the left child of the node here.
+3060320	3062240	And so basically this
+3062240	3064160	node and its value is used
+3064240	3066160	twice. And so
+3066240	3068160	right now, in this naive way,
+3068240	3070160	we'd have to recalculate it.
+3070240	3072160	But here we are allowed to reuse it.
+3072240	3074160	So in the convolutional neural network,
+3074240	3076160	you think of these linear layers that we have
+3076240	3078160	up above as filters.
+3078240	3080160	And we take these filters
+3080240	3082160	and they're linear filters, and you slide them over
+3082240	3084160	input sequence, and we calculate
+3084240	3086160	the first layer, and then the second layer,
+3086240	3088160	and then the third layer, and then the output layer
+3088240	3090160	of the sandwich, and it's all done very
+3090240	3092160	efficiently using these convolutions.
+3092240	3094160	So we're going to cover that in a future video.
+3094240	3096160	The second thing I hope you took away from this video
+3096240	3098160	is you've seen me basically implement
+3098240	3100160	all of these layer
+3100240	3102160	Lego building blocks, or module
+3102240	3104160	building blocks. And I'm
+3104240	3106160	implementing them over here, and we've implemented
+3106240	3108160	a number of layers together, and we're also
+3108240	3110160	implementing these containers.
+3110240	3112160	And we've overall
+3112240	3114160	PyTorchified our code quite a bit more.
+3114240	3116160	Now, basically what we're doing
+3116240	3118160	here is we're reimplementing Torch.nn,
+3118240	3120160	which is the neural network's
+3120240	3122160	library on top of
+3122240	3124080	Torch.tensor. And it looks very much
+3124160	3126080	like this, except it is much better
+3126160	3128080	because it's in PyTorch
+3128160	3130080	instead of jinkling my Jupyter
+3130160	3132080	notebook. So I think going forward
+3132160	3134080	I will probably have considered us having
+3134160	3136080	unlocked Torch.nn.
+3136160	3138080	We understand roughly what's in there,
+3138160	3140080	how these modules work, how they're nested,
+3140160	3142080	and what they're doing on top of
+3142160	3144080	Torch.tensor. So hopefully we'll just
+3144160	3146080	switch over and continue
+3146160	3148080	and start using Torch.nn directly.
+3148160	3150080	The next thing I hope you got a bit of a sense of
+3150160	3152080	is what the development process
+3152080	3154000	of building deep neural networks looks like.
+3154080	3156000	Which I think was relatively representative
+3156080	3158000	to some extent. So number one,
+3158080	3160000	we are spending a lot of time
+3160080	3162000	in the documentation page of PyTorch.
+3162080	3164000	And we're reading through all the layers,
+3164080	3166000	looking at documentations,
+3166080	3168000	what are the shapes of the inputs,
+3168080	3170000	what can they be, what does the layer do,
+3170080	3172000	and so on. Unfortunately,
+3172080	3174000	I have to say the PyTorch documentation
+3174080	3176000	is not very good.
+3176080	3178000	They spend a ton of time on hardcore
+3178080	3180000	engineering of all kinds of distributed primitives,
+3180080	3182000	etc. But as far as I can tell,
+3182000	3183920	no one is maintaining documentation.
+3184000	3185920	It will lie to you,
+3186000	3187920	it will be wrong, it will be incomplete,
+3188000	3189920	it will be unclear.
+3190000	3191920	So unfortunately, it is what it is
+3192000	3193920	and you just kind of do your best
+3194000	3195920	with what they've
+3196000	3197920	given us.
+3198000	3199920	Number two,
+3200000	3201920	the other thing that I hope you got
+3202000	3203920	a sense of is there's a ton of
+3204000	3205920	trying to make the shapes work.
+3206000	3207920	And there's a lot of gymnastics around these multi-dimensional
+3208000	3209920	arrays. And are they two-dimensional,
+3210000	3211920	three-dimensional, four-dimensional?
+3211920	3213840	Do the layers take what shapes?
+3213920	3215840	Is it NCL or NLC?
+3215920	3217840	And you're permuting and viewing,
+3217920	3219840	and it just gets pretty messy.
+3219920	3221840	And so that brings me to number three.
+3221920	3223840	I very often prototype these layers
+3223920	3225840	and implementations in Jupyter Notebooks
+3225920	3227840	and make sure that all the shapes work out.
+3227920	3229840	And I'm spending a lot of time basically
+3229920	3231840	babysitting the shapes and making sure
+3231920	3233840	everything is correct. And then once I'm
+3233920	3235840	satisfied with the functionality in a Jupyter Notebook,
+3235920	3237840	I will take that code and copy-paste it into
+3237920	3239840	my repository of actual code
+3239920	3241840	that I'm training with. And so
+3241840	3243760	then I'm working with VS Code on the side.
+3243840	3245760	So I usually have Jupyter Notebook and VS Code.
+3245840	3247760	I develop in Jupyter Notebook, I paste
+3247840	3249760	into VS Code, and then I kick off experiments
+3249840	3251760	from the repo, of course,
+3251840	3253760	from the code repository.
+3253840	3255760	So that's roughly some notes on the
+3255840	3257760	development process of working with neural nets.
+3257840	3259760	Lastly, I think this lecture unlocks a lot
+3259840	3261760	of potential further lectures
+3261840	3263760	because, number one, we have to convert our
+3263840	3265760	neural network to actually use these dilated
+3265840	3267760	causal convolutional layers,
+3267840	3269760	so implementing the comnet.
+3269840	3271760	Number two, I potentially start
+3271760	3273680	to get into what this means,
+3273760	3275680	where are residual connections and
+3275760	3277680	skip connections and why are they useful.
+3277760	3279680	Number three,
+3279760	3281680	as I mentioned, we don't have any experimental harness.
+3281760	3283680	So right now I'm just guessing, checking
+3283760	3285680	everything. This is not representative of
+3285760	3287680	typical deep learning workflows. You have to
+3287760	3289680	set up your evaluation harness.
+3289760	3291680	You can kick off experiments. You have lots of arguments
+3291760	3293680	that your script can take.
+3293760	3295680	You're kicking off a lot of experimentation.
+3295760	3297680	You're looking at a lot of plots of training and validation
+3297760	3299680	losses, and you're looking at what is working
+3299760	3301680	and what is not working. And you're working on this
+3301680	3303600	like population level, and you're doing
+3303680	3305600	all these hyperparameter searches.
+3305680	3307600	And so we've done none of that so far.
+3307680	3309600	So how to set that up
+3309680	3311600	and how to make it good, I think
+3311680	3313600	is a whole another topic.
+3313680	3315600	And number three, we should probably cover
+3315680	3317600	recurring neural networks. RNNs, LSTMs,
+3317680	3319600	Grooves, and of course Transformers.
+3319680	3321600	So many
+3321680	3323600	places to go,
+3323680	3325600	and we'll cover that in the future.
+3325680	3327600	For now, bye. Sorry, I forgot to say that
+3327680	3329600	if you are interested, I think
+3329680	3331600	it is kind of interesting to try to beat this number
+3331600	3333520	1.993, because
+3333600	3335520	I really haven't tried a lot of experimentation
+3335600	3337520	here, and there's quite a bit of longing for it potentially,
+3337600	3339520	to still push this further.
+3339600	3341520	So I haven't tried any other
+3341600	3343520	ways of allocating these channels in this
+3343600	3345520	neural net. Maybe the number of
+3345600	3347520	dimensions for the embedding is all
+3347600	3349520	wrong. Maybe it's possible to actually
+3349600	3351520	take the original network with just one hidden layer
+3351600	3353520	and make it big enough and actually
+3353600	3355520	beat my fancy hierarchical
+3355600	3357520	network. It's not obvious.
+3357600	3359520	That would be kind of embarrassing if this
+3359600	3361520	did not do better, even once you torture
+3361520	3363440	it a little bit. Maybe you can read the
+3363520	3365440	WaveNet paper and try to figure out how some of these
+3365520	3367440	layers work and implement them yourselves using
+3367520	3369440	what we have. And of course
+3369520	3371440	you can always tune some of the initialization
+3371520	3373440	or some of the optimization
+3373520	3375440	and see if you can improve it that way.
+3375520	3377440	So I'd be curious if people can come up with some
+3377520	3379440	ways to beat this.
+3379520	3381440	And yeah, that's it for now. Bye.
