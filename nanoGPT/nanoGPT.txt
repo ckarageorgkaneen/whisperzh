@@ -1,0 +1,1773 @@
+Hi everyone. So by now you have probably heard of ChatGPT. It has taken the world and the AI
+community by storm, and it is a system that allows you to interact with an AI and give it text-based
+tasks. So for example, we can ask ChatGPT to write us a small haiku about how important it is that
+people understand AI, and then they can use it to improve the world and make it more prosperous.
+So when we run this, AI knowledge brings prosperity for all to see, embrace its power.
+Okay, not bad. And so you could see that ChatGPT went from left to right and generated all these
+words sort of sequentially. Now, I asked it already the exact same prompt a little bit earlier,
+and it generated a slightly different outcome. AI's power to grow, ignorance holds us back,
+learn, prosperity waits. So pretty good in both cases and slightly different. So you can see that
+ChatGPT is a probabilistic system, and for any one prompt, it can give us multiple answers,
+sort of replying.
+Now, this is just one example of a prompt. People have come up with many, many examples,
+and there are entire websites that index interactions with ChatGPT. And so many of
+them are quite humorous. Explain HTML to me like I'm a dog, write release notes for chess too,
+write a note about Elon Musk buying a Twitter, and so on. So as an example,
+please write a breaking news article about a leaf falling from a tree,
+and a shocking turn of events.
+The leaf falling from a tree in the local park. Witnesses report that the leaf, which was
+previously attached to a branch of a tree, detached itself and fell to the ground. Very
+dramatic. So you can see that this is a pretty remarkable system, and it is what we call a
+language model, because it models the sequence of words or characters or tokens more generally,
+and it knows how certain words follow each other in English language. And so from its perspective,
+what it is doing is it is completing the sequence.
+So I give it the start of a sequence, and it completes the sequence with the outcome.
+And so it's a language model in that sense. Now, I would like to focus on the under the hood of
+under the hood components of what makes ChatGPT work. So what is the neural network under the
+hood that models the sequence of these words? And that comes from this paper called Attention
+is All You Need. In 2017, a landmark paper, a landmark paper in AI that produced and proposed
+the Transformer and the Translator. And this paper is called the Transformer and the Translator. And
+this paper is called the Transformer and the Translator. And this paper is called the Transformer
+Architecture. So GPT is short for generatively, generatively pre trained transformer. So
+transformer is the neural net that actually does all the heavy lifting under the hood.
+It comes from this paper in 2017. Now, if you read this paper, this reads like a pretty random
+machine translation paper. And that's because I think the authors didn't fully anticipate the
+impact that the transformer would have on the field. And this architecture that they produced
+in the context of machine translation, in their case, actually ended up taking over
+the rest of AI in the next five years after. And so this architecture with minor changes was copy
+pasted into a huge amount of applications in AI in more recent years. And that includes at the core
+of ChatGPT. Now, we are not going to, what I'd like to do now is I'd like to build out
+something like ChatGPT. But we're not going to be able to, of course, reproduce ChatGPT.
+This is a very serious production grade system. It is trained on
+a good chunk of internet. And then there's a lot of pre training and fine tuning stages to it.
+And so it's very complicated. What I'd like to focus on is just to train a transformer based
+language model. And in our case, it's going to be a character level language model. I still think
+that is a very educational with respect to how these systems work. So I don't want to train on
+the chunk of internet, we need a smaller data set. In this case, I propose that we work with
+my favorite toy data set. It's called ChatGPT. And I'm going to show you how that works. I'm going to
+show you what it looks like. So first, I'm going to create a little tiny Shakespeare. And what it
+is is basically it's a concatenation of all of the works of Shakespeare in my understanding. And so
+this is all of Shakespeare in a single file. This file is about one megabyte. And it's just all of
+Shakespeare. And what we are going to do now is we're going to basically model how these characters
+follow each other. So for example, given a chunk of these characters like this, given some context
+of characters in the past, the transformer neural network will look at the model of the character.
+characters that i've highlighted and it's going to predict that g is likely to come next in the
+sequence and it's going to do that because we're going to train that transformer on shakespeare
+and it's just going to try to produce character sequences that look like this and in that process
+is going to model all the patterns inside this data so once we've trained the system i just
+like to give you a preview we can generate infinite shakespeare and of course it's a fake
+thing that looks kind of like shakespeare um apologies for there's some jank that i'm not
+able to resolve in in here but um you can see how this is going character by character and it's kind
+of like predicting shakespeare-like language so verily my lord the sights have left the again
+the king coming with my curses with precious pale and then tronio says something else etc
+and this is just coming out of the transformer in a very similar manner as it would come out in
+chat gpt in our case character by character in chat gpt it's coming out on the token by token
+level and tokens are these sort of like little subword pieces so they're not word level they're
+kind of like word chunk level um and now i've already written this entire code uh to train
+these transformers um and it is in a github repository that you can find and it's called
+nano gpt so nano gpt is a repository that you can find on my github and it's a repository for
+training transformers um on any given text and what i think is interesting about it because
+there's many ways to train transformers but this is a very simple implementation so it's just two
+files of 300 lines of code each one file defines the gpt model the transformer and one file trains
+it on some given text dataset and here i'm showing that if you train it on a open web text dataset
+web pages then i reproduce the the performance of gpt2 so gpt2 is an early version of openai's gpt
+from 2017 if i recall correctly and i've only so far reproduced the the smallest 124 million
+parameter model but basically this is just proving that the code base is correctly arranged and i'm
+able to load the neural network weights that openai has released later so you can take a look
+at the finished code here in nano gpt
+what i would like to do in this lecture is i would like to basically write this repository
+from scratch so we're going to begin with an empty file and we're going to define a transformer piece
+by piece we're going to train it on the tiny shakespeare dataset and we'll see how we can then
+generate infinite shakespeare and of course this can copy paste to any arbitrary text dataset
+that you like but my goal really here is to just make you understand and appreciate
+how under the hood chat gpt works
+and really all that's required is a proficiency in python and some basic understanding of calculus
+and statistics and it would help if you also see my previous videos on the same youtube channel
+in particular my make more series where i define smaller and simpler neural network language models
+so multi-layered perceptrons and so on it really introduces the language modeling framework
+and then here in this video we're going to focus on the transformer
+so let's look at the general structure of the neural network itself
+okay so i created a new google collab jupiter notebook here and this will allow me to later
+easily share this code that we're going to develop together with you so you can follow along so this
+will be in a video description later now here i've just done some preliminaries i downloaded
+the dataset the tiny shakespeare dataset at this url and you can see that it's about a one megabyte
+file then here i open the input.txt file and just read in all the text of the string
+and you can see that we are working with one million characters roughly
+and the first 1000 characters if we just print them out are basically what you would expect
+this is the first 1000 characters of the tiny shakespeare dataset roughly up to here
+so so far so good next we're going to take this text and the text is a sequence of characters
+in python so when i call the set constructor on it i'm just going to get the set of all the
+characters that occur in this text
+and then i'm just going to set the set of all the characters that occur in this text
+and then i'm going to I'm going to sort that to create a list of those characters instead of just
+a set so that i have an ordering an arbitrary ordering and then i sort that so basically we
+get just all the characters that occur in the entire data set and they're sorted now the number
+of them is going to be our vocabulary size these are the possible elements of our sequences and
+we see that when i print here the characters there's 65 of them in total there's a space character and then all kinds of special characters
+lowercase letters so that's our vocabulary and that's the sort of like possible characters that
+the model can see or emit okay so next we would like to develop some strategy to tokenize the
+input text now when people say tokenize they mean convert the raw text as a string to some
+sequence of integers according to some notebook according to some vocabulary of possible elements
+so as an example here we are going to be building a character level language model
+so we're simply going to be translating individual characters into integers
+so let me show you a chunk of code that sort of does that for us so we're building both the
+encoder and the decoder and let me just talk through what's happening here when we encode
+an arbitrary text like hi there we're going to receive a list of integers that represents that
+string so for example 46 47 etc and then we also have the reverse mapping so we can take this list
+and decode it into a string so we can take this list and decode it into a string so we can take
+this list and decode it to get back the exact same string so it's really just like a translation
+to integers and back for arbitrary string and for us it is done on a character level
+now the way this was achieved is we just iterate over all the characters here
+and create a lookup table from the character to the integer and vice versa
+and then to encode some string we simply translate all the characters individually
+and to decode it back we use the reverse mapping concatenate all of it now this is only one of many
+possible encodings or many possible tokenizers and it's a very simple one but there's many
+other schemas that people have come up with in practice so for example Google uses SENTENCEPIECE
+so SENTENCEPIECE will also encode text into integers but in a different schema
+and using a different vocabulary and SENTENCEPIECE is a sub-word sort of tokenizer and what that
+means is that you're not encoding entire words but you're not also encoding individual characters
+it's a subword unit level and that's usually what's adopted in practice. For example also
+OpenAI has this library called tiktoken that uses a byte pair encoding tokenizer
+and that's what GPT uses and you can also just encode words into like hello world into lists
+of integers. So as an example I'm using the tiktoken library here I'm getting the encoding
+for GPT-2 or that was used for GPT-2. Instead of just having 65 possible characters or tokens
+they have 50 000 tokens and so when they encode the exact same string high there we only get a
+list of three integers but those integers are not between 0 and 64 they are between 0 and 50 256.
+So basically you can trade off the codebook size and the sequence lengths so you can have a very
+long string and you can have a very long string and you can have a very long string and you can
+have a very long string and you can have a very long string and you can have a very long string and
+you can have a very long string and you can have a very long string and you can have a very long
+sequences of integers with very small vocabularies or you can have short
+sequences of integers with very large vocabularies and so typically people use in practice these
+subword encodings but I'd like to keep our tokenizer very simple so we're using character
+level tokenizer and that means that we have very small codebooks we have very simple encode and
+decode functions but we do get very long sequences as a result but that's the level at which we're
+going to stick with this lecture because it's the simplest thing okay so now that we have an encoder
+and a decoder effectively a tokenizer we can tokenize the entire training set of Shakespeare
+so here's a chunk of code that does that and I'm going to start to use the pytorch library
+and specifically the torch.tensor from the pytorch library so we're going to take all of the text
+in tiny Shakespeare encode it and then wrap it into a torch.tensor to get the data tensor so
+here's what the data tensor looks like when I look at just the first one thousand character
+or the one thousand elements of it so we see that we have a massive sequence of integers
+and this sequence of integers here is basically an identical translation of the first 1000 characters
+here so I believe for example that zero is a new line character and maybe one is a space I'm not
+100 sure but from now on the entire data set of text is re-represented as just it's just stretched
+out as a single very large sequence of integers let me do one more thing before we move on here
+we're going to separate out our data set into a train and a validation split so in particular
+we're going to take the first 90 of the data set and consider that to be the training data
+for the transformer and we're going to withhold the last 10 at the end of it to be the validation
+data and this will help us understand to what extent our model is overfitting so we're going
+to basically hide and keep the validation data on the side because we don't want just a perfect
+memorization of this exact Shakespeare we want a neural network that sort of creates Shakespeare's
+like text and so it should be fairly likely for it to produce the actual like stowed away
+true Shakespeare text and so we're going to use this to get a sense of the overfitting okay so now
+we would like to start plugging these text sequences or integer sequences into the
+transformer so that it can train and learn those patterns now the important thing to realize is
+we're never going to actually feed entire text into transformer all at once that would be
+very expensive and prohibitive so when we actually train a transformer on a lot of these data sets
+we only work with chunks of the data set and when we train the transformer we basically sample random
+little chunks out of the training set and train them just chunks at a time and these chunks have
+basically some kind of a length and some maximum length now the maximum length typically at least
+in the code i usually write is called block size you can you can find it under different names
+like context length or something like that
+let's start with the block size of just eight and let me look at the first train data characters
+the first block size plus one characters i'll explain why plus one in a second
+so this is the first nine characters in the sequence in the training set now what i'd like
+to point out is that when you sample a chunk of data like this so say these nine characters out
+of the training set this actually has multiple examples packed into it and that's because all
+of these characters follow each other
+and so what this thing is going to say when we plug it into a transformer is we're going to
+actually simultaneously train it to make a prediction at every one of these positions
+now in the in a chunk of nine characters there's actually eight individual examples packed in there
+so there's the example that when 18 when in the context of 18 47 likely comes next in a context of
+18 and 47 56 comes next in the context of 1847
+47, 56, 57 can come next, and so on.
+So that's the eight individual examples.
+Let me actually spell it out with code.
+So here's a chunk of code to illustrate.
+X are the inputs to the transformer.
+It will just be the first block size characters.
+Y will be the next block size characters.
+So it's offset by one.
+And that's because Y are the targets for each position in the input.
+And then here I'm iterating over all the block size of eight.
+And the context is always all the characters in X up to T and including T.
+And the target is always the T character, but in the targets array Y.
+So let me just run this.
+And basically it spells out what I said in words.
+These are the eight examples hidden in a chunk of nine characters
+that we sampled from the training set.
+I want to make sure that I'm not missing anything.
+Let me just mention one more thing.
+We train on all the eight examples here with context between one
+all the way up to context of block size.
+And we train on that not just for computational reasons
+because we happen to have the sequence already or something like that.
+It's not just done for efficiency.
+It's also done to make the transformer network be used to seeing contexts
+all the way from as little as one all the way to block size.
+And we'd like the transformer to be used to seeing everything in between.
+And that's going to be useful.
+Later during inference, because while we're sampling,
+we can start to set a sampling generation with as little as one character of context.
+And the transformer knows how to predict the next character
+with all the way up to just context of one.
+And so then it can predict everything up to block size.
+And after block size, we have to start truncating because the transformer will never
+receive more than block size inputs when it's predicting the next character.
+Okay, so we've looked at the time dimension of the tensors that are going to be feeding into the transformer.
+There's one more dimension to care about, and that is the batch dimension.
+And so as we're sampling these chunks of text, we're going to be actually every time we're going to feed them into a transformer,
+we're going to have many batches of multiple chunks of text that are all like stacked up in a single tensor.
+And that's just done for efficiency just so that we can keep the GPUs busy because they are very good at parallel processing of data.
+And so we just want to process multiple chunks all at the same time.
+But those chunks are processed completely independently.
+They don't take up too much space.
+They don't talk to each other and so on.
+So let me basically just generalize this and introduce a batch dimension.
+Here's a chunk of code.
+Let me just run it and then I'm going to explain what it does.
+So here, because we're going to start sampling random locations in the data sets to pull chunks from, I am setting the seed so that in the random number generator, so that the numbers I see here are going to be the same numbers you see later if you try to reproduce this.
+Now, the batch size here is how many independent sequences we are producing.
+We're processing every forward backward pass of the transformer.
+The block size, as I explained, is the maximum context length to make those predictions.
+So let's say batch size four, block size eight.
+And then here's how we get batch for any arbitrary split.
+If the split is a training split, then we're going to look at train data, otherwise at val data.
+That gives us the data array.
+And then when I generate random positions to grab a chunk out of, I actually grab, I actually generate random data.
+I actually generate random positions to grab a chunk out of.
+I actually generate random positions to grab a chunk out of.
+I actually generate random positions to grab a chunk out of.
+assumeonline, will generate batch size number of random offsets.
+So because this is four, we are, i, x is going to be a four numbers that are randomly generated between 0 and len of data minus block size.
+are randomly generated between 0 and len of data minus block size.
+So it's just random offsets into the training set.
+And then x' as I explained are the first block size characters, starting at i.
+The y' are the offset by 1 of that.
+So just add plus 1.
+And then we're going to get roughly how many random fields are generated.
+So just add plus 1.
+get those chunks for every one of integers i in ix and use a torch.stack to take all those
+one-dimensional tensors as we saw here and we're going to stack them up as rows
+and so they all become a row in a four by eight tensor so here's where i'm printing them
+when i sample a batch xb and yb the inputs the transformer now are the input x is the four by
+eight tensor four rows of eight columns and each one of these is a chunk of the training set
+and then the targets here are in the associated array y and they will come in to the transformer
+all the way at the end to create the loss function so they will give us the
+correct answer for every single position inside x and then these are the four independent rows
+so spelled out as we did before this 4x8 array contains a total of 32 examples
+and they're completely independent as far as the transformer is concerned
+so when the input is 24 the target is 43 or rather 43 here in the y array when the input is 2443
+the target is 58. when the input is 2443 58 the target is 5 etc or like when it is a 52581 the
+target is 58 right so you can sort of see this spelled out these are the 32 independent examples
+packed in to a single batch of the input x and then the desired targets are in y
+and so now this integer tensor of x is going to feed into the transformer
+and that transformer is going to simultaneously process all these examples and then look up the
+correct integers to predict in every one of these positions in the tensor y okay so now
+that we have our batch of input that we'd like to feed into a transformer let's start basically
+feeding this into neural networks now we're going to start off with the simplest possible
+neural network which in the case of language modeling in my opinion is the bigram language
+model and we've covered the bigram language model in my make more series in a lot of depth and so
+here i'm going to sort of go faster and let's just implement the pytorch module directly that
+implements the bigram language model so i'm importing the pytorch nn module
+for reproducibility and then here i'm constructing a bigram language model which is a subclass of
+nn module and then i'm calling it and i'm passing in the inputs and the targets
+and i'm just printing now when the inputs and targets come here you see that i'm just taking the
+index the inputs and targets and then i'm just printing the inputs and targets and then i'm just
+printing the inputs x here which i rename to idx and i'm just passing them into this token
+embedding table so what's going on here is that here in the constructor we are creating a token
+embedding table and it is of size vocab size by vocab size and we're using an endot embedding
+which is a very thin wrapper around basically a tensor of shape vocab size by vocab size
+and what's happening here is that when we pass idx here every single integer in our input is going to
+refer to this embedding table and is going to pluck out a row of that embedding table corresponding
+to its index so 24 here will go to the embedding table and we'll pluck out the 24th row and then 43
+will go here and pluck out the 43rd row etc and then pytorch is going to arrange all of this into
+a batch by time by channel tensor in this case batch is 4 time is 8 and c which is the channels
+and so we're just going to pluck out all those rows arrange them in a b by t by c
+and now we're going to interpret this as the logits which are basically the scores
+for the next character in a sequence and so what's happening here is
+we are predicting what comes next based on just the individual identity of a single token
+and you can do that because um i mean currently the tokens are not talking to each other and
+they're not seeing any context except for they're just seeing themselves so i'm a i'm a token number
+five and then i can actually make pretty decent predictions about what comes next just by knowing
+that i'm token 5 because some characters know um follow other characters in typical scenarios
+so we saw a lot of this in a lot more depth in the make more series and here if i just run this
+then we currently get the predictions the scores the logits for every one of the four by eight
+positions now that we've made predictions about what comes next we'd like to evaluate the loss
+function and so in this case we want to make predictions about how would the loss function Te intentions are impact the sc noises you would get this this existence and then we oriented out we would get the loss function and so at
+make more series we saw that a good way to measure a loss or like a quality of the predictions is to
+use the negative log likelihood loss which is also implemented in PyTorch under the name cross
+entropy. So what we'd like to do here is loss is the cross entropy on the predictions and the
+targets and so this measures the quality of the logits with respect to the targets. In other words
+we have the identity of the next character so how well are we predicting the next character based
+on the logits and intuitively the correct dimension of logits depending on whatever
+the target is should have a very high number and all the other dimensions should be very low number
+right. Now the issue is that this won't actually this is what we want we want to basically output
+the logits and the loss this is what we want but unfortunately this won't actually run we get an
+error message but intuitively we want to
+you
+measure this. Now when we go to the PyTorch cross entropy documentation here
+we're trying to call the cross entropy in its functional form so that means we don't have to
+create like a module for it but here when we go to the documentation you have to look into the
+details of how PyTorch expects these inputs and basically the issue here is PyTorch expects
+if you have multi-dimensional input which we do because we have a b by t by c tensor
+then it actually expects a multi-dimensional input which we do because we have a b by t by c tensor
+then it actually really wants the channels to be the second dimension here so if you
+so basically it wants a b by c by t instead of a b by t by c and so just the details of how PyTorch
+treats these kinds of inputs and so we don't actually want to deal with that so what we're
+going to do instead is we need to basically reshape our logits. So here's what I like to do I
+like to take basically give names to the dimensions
+So logits.shape is B by T by C and unpack those numbers.
+And then let's say that logits equals logits.view.
+And we want it to be a B times C, B times T by C.
+So just a two-dimensional array, right?
+So we're going to take all the,
+we're going to take all of these positions here
+and we're going to stretch them out
+in a one-dimensional sequence
+and preserve the channel dimension as the second dimension.
+So we're just kind of like stretching out the array
+so it's two-dimensional.
+And in that case, it's going to better conform
+to what PyTorch sort of expects in its dimensions.
+Now we have to do the same to targets
+because currently targets are of shape B by T
+and we want it to be just B times T.
+So one-dimensional.
+Now, alternatively, you could always still just do minus one
+because PyTorch will guess what this should be
+if you want to lay it out.
+But let me just be explicit
+and say if you can see it.
+If you can see it, it's going to be B times T.
+Once we reshape this,
+it will match the cross-entropy case
+and then we should be able to evaluate our loss.
+Okay, so that right now, and we can do loss.
+And so currently we see that the loss is 4.87.
+Now, because we have 65 possible vocabulary elements,
+we can actually guess at what the loss should be.
+And in particular,
+we covered negative log likelihood in a lot of detail.
+We are expecting,
+we're expecting log or lon of one over 65
+and negative of that.
+So we're expecting the loss to be about 4.17,
+but we're getting 4.87.
+And so that's telling us that the initial predictions
+are not super diffuse.
+They've got a little bit of entropy.
+And so we're guessing wrong.
+So yes, but actually we are able to evaluate the loss.
+Okay, so now that we can evaluate the quality of the model
+on some data,
+we'd like to also be able to generate from the model.
+So let's do the generation.
+Now I'm going to go again a little bit faster here
+because I covered all this already in the previous videos.
+So here's a generate function for the model.
+So we take some,
+we take the same kind of input IDX here.
+And basically this is the current context of some characters
+in a batch, in some batch.
+So it's also B by T.
+And the job of generate is to basically take this B by T
+and extend it to be B by T plus one, plus two, plus three.
+And so it's just basically,
+it continues the generation in all the batch dimensions
+in the time dimension.
+So that's its job.
+And it will do that for max new tokens.
+So you can see here on the bottom,
+there's going to be some stuff here,
+but on the bottom,
+whatever is predicted is concatenated
+on top of the previous IDX along the first dimension,
+which is the time dimension to create a B by T plus one.
+So that becomes a new IDX.
+So the job of generate is to take a B by T
+and make it a B by T plus one, plus two, plus three,
+as many as we want max new tokens.
+So this is the generation from the model.
+Now inside the generation, what are we doing?
+We're taking the current indices.
+We're getting the predictions.
+So we get those are in the logits.
+And then the loss here is going to be ignored
+because we're not using that.
+And we have no targets that are sort of ground truth targets
+that we're going to be comparing with.
+Then once we get the logits,
+we are only focusing on the last step.
+So instead of a B by T by C,
+we're going to pluck out the negative one,
+the last element in the time dimension,
+because those are the predictions for what comes next.
+So that gives us the logits,
+which we then convert to probabilities via softmax.
+And then we use torch.multinomial
+to sample from those probabilities.
+And we ask PyTorch to give us one sample.
+And so IDX next,
+we'll become a B by one,
+because in each one of the batch dimensions,
+we're going to have a single prediction for what comes next.
+So this numSamples equals one,
+will make this be a one.
+And then we're going to take those integers
+that come from the sampling process
+according to the probability distribution given here.
+And those integers got just concatenated
+on top of the current sort of like running stream of integers.
+And this gives us a B by T plus one.
+And then we can return that.
+Now, one thing here is,
+here is you see how i'm calling self of idx which will end up going to the forward function
+i'm not providing any targets so currently this would give an error because targets is uh is uh
+sort of like not given so target has to be optional so targets is none by default and
+then if targets is none then there's no loss to create so it's just loss is none but else
+all of this happens and we can create a loss so this will make it so um if we have the targets
+we provide them and get a loss if we have no targets we'll just get the logits so this here
+will generate from the model and let's take that for a ride now oops so i have another code chunk
+here which will generate for the model from the model and okay this is kind of crazy so maybe let
+me let me break this down
+so these are the idx right
+i'm creating a batch will be just one time will be just one
+so i'm creating a little one by one tensor and it's holding a zero and the d type the data type
+is uh integer so zero is going to be how we kick off the generation and remember that zero is uh
+is the element standing for a new line character so it's kind of like a reasonable thing to
+to feed in as the very first character
+sequence to be the new line um so it's going to be idx which we're going to feed in here
+then we're going to ask for 100 tokens and then end that generate will continue that
+now because uh generate works on the level of batches we then have to index into the
+zero throw to basically unplug the um the single batch dimension that exists and then that gives us
+a um
+time steps is just a one-dimensional array of all the indices which we will convert to simple python
+list from pytorch tensor so that that can feed into our decode function and convert those integers
+into text so let me bring this back and we're generating 100 tokens let's run and uh here's
+the generation that we achieved so obviously it's garbage and the reason it's garbage is because
+this is a totally random model so next up we're going to want to do is we're going to want to do a
+we're going to want to train this model now one more thing i wanted to point out here is
+this function is written to be general but it's kind of like ridiculous right now because
+we're feeding in all this we're building out this context and we're concatenating it all
+and we're always feeding it all into the model but that's kind of ridiculous because this is
+just a simple bigram model so to make for example this prediction about k we only needed this w
+but actually what we fed into the model is we fed the entire sequence
+and then we only looked at the very last piece and predicted k so the only reason i'm writing
+it in this way is because right now this is a bigram model but i'd like to keep this function
+fixed and i'd like it to work later when our characters actually basically look further in
+the history and so right now the history is not used so this looks silly but eventually
+the history will be used and so that's why we want to do it this way so just a quick comment on that
+so now we see that this is random so let's train the model so it becomes a bit less random okay
+let's now train the model so first what i'm going to do is i'm going to create a pytorch optimization
+object so here we are using the optimizer adam w now in the make more series we've only ever used
+stochastic gradient descent the simplest possible optimizer which you can get using the sgd instead
+but i want to use adam which is a much more advanced and popular optimizer and it works
+extremely well for a lot of other optimizers but i want to use adam which is a much more advanced and popular optimizer and it works extremely well
+typical good setting for the learning rate is roughly 3e negative 4 but for very very small
+networks like it's the case here you can get away with much much higher learning rates
+1-3 or even higher probably but let me create the optimizer object which will basically take
+the gradients and update the parameters using the gradients and then here our batch size up above
+was only 4 so let me actually use something bigger let's say 32 and then for some number of steps
+we're sampling a new batch of data we're evaluating the loss we're zeroing out all the gradients from
+the previous step getting the gradients for all the parameters and then using those gradients to
+update our parameters so typical training loop as we saw in the make more series so let me now
+run this for say 100 iterations and let's see what kind of loss is we're going to get
+so we started around 4.7 and now we're getting down to like 4.6
+so the optimization is definitely happening but let's sort of try to increase the number
+of iterations and only print at the end because we probably will not train for longer
+okay so we're down to 3.6 roughly
+roughly down to three
+this is the most janky optimization
+if we do that and clean those up we get six hours of telly in in mobile
+okay it's working let's just do 10 000
+and then from here we want to copy this
+and hopefully we're going to get something reasonable and of course it's not going to
+be shakespeare from a bigger model but at least we see that the loss is improving
+and hopefully we're expecting something a bit more reasonable
+so we're down in about 2.5-ish let's see what we get
+okay
+Let me just increase the number of tokens.
+Okay, so we see that we're starting to get something at least like reasonable-ish.
+Certainly not Shakespeare, but the model is making progress.
+So that is the simplest possible model.
+So now what I'd like to do is, obviously, this is a very simple model because the tokens are not talking to each other.
+So given the previous context of whatever was generated, we're only looking at the very last character to make the predictions about what comes next.
+So now these tokens have to start talking to each other and figuring out what is in the context so that they can make better predictions for what comes next.
+And this is how we're going to kick off the transformer.
+Okay, so next, I took the code that we developed in this Jupyter notebook and I converted it to be a script.
+And I'm doing this because I just want to simplify our intermediate work, which is just the final product that we have.
+At this point, so in the top here, I put all the hyperparameters that we've defined.
+I introduced a few and I'm going to speak to that in a little bit.
+Otherwise, a lot of this should be recognizable, reproducibility, read data, get the encoder and decoder, create the train and test splits, use the kind of like data loader that gets a batch of the inputs and targets.
+This is new, and I'll talk about it in a second.
+Now, this is the bigram language model that we developed.
+And it can forward and give us a logits and loss and it can generate.
+And then here we are creating the optimizer and this is the training loop.
+So everything here should look pretty familiar.
+Now, some of the small things that I added.
+Number one, I added the ability to run on a GPU if you have it.
+So if you have a GPU, then you can, this will use CUDA instead of just CPU and everything will be a lot more faster.
+Now, when device becomes CUDA, then we need to make sure that when we load the data.
+We move it to device.
+When we create the model, we want to move the model parameters to device.
+So as an example, here we have the in an embedding table and it's got a dot weight inside it, which stores the sort of lookup table.
+So that would be moved to the GPU so that all the calculations here happen on the GPU and they can be a lot faster.
+And then finally here, when I'm creating the context that feeds into generate, I have to make sure that I create on the device.
+Number two, when I enter.
+Introduced is the fact that here in the training loop.
+Here, I was just printing the loss dot item inside the training loop.
+But this is a very noisy measurement of the current loss because every batch will be more or less lucky.
+And so what I want to do usually is I have an estimate loss function and the estimate loss basically then goes up here and it averages up.
+The loss over multiple batches.
+So in particular, we're going to iterate eval, either times and we're going to basically get our loss and then we're going to get the average loss for both splits.
+And so this will be a lot less noisy.
+So here when we call the estimate loss, we're going to report the pretty accurate train and validation loss.
+Now when we come back up, you'll notice a few things here.
+I'm setting the model to evaluation phase and down here.
+I'm resetting it back to training phase.
+Now right now for our model as is, this doesn't actually do anything because the only thing inside this model is this nn.embedding and this network would behave the same in both evaluation mode and training mode.
+We have no dropout layers.
+We have no batch drum layers, etc.
+But it is a good practice to think through what mode your neural network is in because some layers will have different behavior at inference time or training time.
+And there's also this context manager, torch.nograd, and this is just telling PyTorch that everything that happens inside this function, we will not call .backward on.
+And so PyTorch can be a lot more efficient with its memory use because it doesn't have to store all the intermediate variables because we're never going to call backward.
+And so it can be a lot more efficient in that way.
+So also a good practice to tell PyTorch when we don't intend to do backpropagation.
+So,
+right now,
+this script is about 120 lines of code of and that's kind of our starter code.
+I'm calling it bigram.py and I'm going to release it later.
+Now running this script gives us output in the terminal and it looks something like this.
+It basically, as I ran this code, it was giving me the train loss and val loss.
+And we see that we convert to somewhere around 2.5 with the bigram model.
+And then here's the sample that we produced at the end.
+And so we have everything packaged up in the script and we're in a good position now to iterate on this.
+Okay,
+so we are almost ready to start writing our very first self-attention block for processing these tokens.
+Now,
+before we actually get there,
+I want to get you used to a mathematical trick that is used in the self-attention inside a transformer and is really just like at the heart of an efficient implementation of self-attention.
+And so I want to work with this toy example to just get you used to this operation.
+And then it's going to make it much more clear once we actually get to it in the script again.
+So let's create a B by T by C where B, T and C are just 4, 8 and 2 in this toy example.
+And these are basically channels and we have batches and we have the time component and we have some information at each point in the sequence.
+So C.
+Now what we would like to do is we would like these tokens.
+So we have up to eight tokens here in a batch.
+And these eight tokens are currently not talking to each other and we would like them to talk to each other.
+We'd like to couple them.
+And in particular,
+we don't we want to couple them in this very specific way.
+So the token,
+for example,
+at the fifth location,
+it should not communicate with tokens in the sixth seventh and eighth location because those are future tokens in the sequence.
+The token on the fifth location should only talk to the one in the fourth third second and first.
+So it's only so information only flows.
+From previous context to the current time step and we cannot get any information from the future because we are about to try to predict the future.
+So what is the easiest way for tokens to communicate?
+Okay, the easiest way I would say is okay.
+If we are up to if we're a fifth token and I'd like to communicate with my past the simplest way we can do that is to just do a weight is to just do an average of all the of all the preceding elements.
+So for example,
+if I'm the fifth token,
+I would like to take the channels that make up that are information at my step,
+but then also the channels from the fourth step third step second step in the first step.
+I'd like to average those up and then that would become sort of like a feature vector that summarizes me in the context of my history.
+Now,
+of course,
+just doing a sum or like an average is an extremely weak form of interaction.
+Like this communication is extremely lossy.
+We've lost a ton of information about spatial arrangements of all those tokens,
+but that's okay.
+For now,
+we'll see how we can bring that information back later.
+For now,
+what we would like to do is for every single batch element independently for every teeth token in that sequence.
+We'd like to now calculate the average of all the vectors in all the previous tokens and also at this token.
+So let's write that out.
+I have a small snippet here and instead of just fumbling around,
+let me just copy paste it and talk to it.
+So in other words,
+we're going to create X and B O W is short for bag of words because bag of words is is kind of like a term that people use when you are just averaging up things.
+So this is just a bag of words.
+Basically,
+there's a word stored on every one of these eight locations and we're doing a bag of words for just averaging.
+So in the beginning,
+we're going to say that it's just initialized at zero and then I'm doing a for loop here.
+So we're not being efficient yet.
+That's coming.
+But for now,
+we're just iterating over all the batch dimensions independently.
+Iterating over time
+and then the previous tokens are at this batch dimension
+and then everything up to and including the teeth token.
+Okay.
+So when we slice out X in this way,
+Xprev becomes of shape,
+how many T elements there were in the past and then of course C.
+So all the two-dimensional information from these little tokens.
+So that's the previous sort of chunk of
+tokens from my current sequence.
+And then I'm just doing the average or the mean over the zero dimension.
+So I'm averaging out the time here and I'm just going to get a little C one-dimensional vector,
+which I'm going to store in X bag of words.
+So I can run this and this is not going to be very informative because let's see.
+So this is X of zero.
+So this is the zeroth batch element and then expo at zero.
+Now,
+you see how the
+at the first location here,
+you see that the two are equal
+and that's because it's we're just doing an average of this one token.
+But here this one is now an average of these two.
+And now this one is an average of these three.
+And so on.
+So and this last one is the average of all of these elements.
+So vertical average just averaging up all the tokens now gives this outcome.
+Here.
+So this is all well and good,
+but this is very inefficient.
+Now.
+The trick is that we can be very very efficient about doing this using matrix multiplication.
+So that's the mathematical trick.
+And let me show you what I mean.
+Let's work with the toy example here.
+You run it and I'll explain.
+I have a simple matrix here.
+That is three by three of all ones a matrix B of just random numbers and it's a three by two and a matrix C,
+which will be three by three multiply three by two.
+Which will give out a three by two.
+So here we're just using
+matrix multiplication.
+So a multiply B gives us C.
+Okay, so how are these numbers in C achieved?
+Right?
+So this number in the top left is the first row of a dot product with the first column of B.
+And since all the row of a right now is all just once then the dot product here with with this column of
+B.
+Is just going to do a sum of these of this column.
+So two plus six plus six is 14.
+The element here in the output of C is also the first column here.
+The first row of a multiplied now with the second column of B.
+So seven plus four plus plus five is 16.
+Now you see that there's repeating elements here.
+So this 14 again is because this row is again all once and it's multiplying the first column of B.
+So we get 14 and this one is and so on.
+So this last number here is the.
+The last row dot product last column.
+Now the trick here is the following.
+This is just a boring number of is just a boring array of all once but torch has this function called trill which is short for a triangular.
+Something like that and you can wrap it in torch that once and it will just return the lower triangular portion of this.
+Okay.
+So now it will basically zero out.
+Of these guys here.
+So we just get the lower triangular part.
+Well, what happens if we do that?
+So now we'll have a like this and be like this.
+And now what are we getting here and see?
+Well, what is this number?
+Well, this is the first row times the first column and because this is zeros.
+These elements here are now ignored.
+So we just get a two and then this number here is the first row times the second column.
+And because these are zeros they get ignored and it's just seven.
+The seven multiplies this one.
+But look what happened here because this is one and then zeros.
+We what ended up happening is we're just plucking out the row of this row of B and that's what we got.
+Now here we have one one zero.
+So here one one zero dot product with these two columns will now give us two plus six which is eight and seven plus four which is 11.
+And because this is one one one we ended up with.
+The addition of all of them.
+And so basically depending on how many ones and zeros we have here.
+We are basically doing a sum currently of the variable number of these rows and that gets deposited into C.
+So currently we're doing sums because these are ones but we can also do average right and you can start to see how we could do average of the rows of B sort of an incremental fashion.
+Because we don't have to we can basically normalize.
+These rows so that they sum to one and then we're going to get an average.
+So if we took a and then we did a equals a divide a torch dot sum in the.
+Of a in the.
+One.
+Dimension and then let's keep them is true.
+So therefore the broadcasting will work out.
+So if I rerun this you see now that these rows now sum to one.
+So this row is one this row is point five point five zero.
+And here we get one thirds.
+And now when we do a multiply be what are we getting.
+Here we are just getting the first row first row.
+Here now we are getting the average of the first two rows.
+Okay so two and six average is four and four and seven averages five point five.
+And on the bottom here we are now getting the average of these three rows.
+So the average of all of elements of B are now deposited here.
+And so you can see that by manipulating these elements of this multiplying matrix and then multiplying it with any given matrix.
+We can do these averages in this incremental fashion because we just get.
+And we can manipulate that based on the elements of a.
+Okay so that's very convenient so let's swing back up here and see how we can vectorize this and make it much more efficient using what we've learned.
+So in particular.
+We are going to produce an array.
+But here I'm going to call it way short for weights.
+But this is our a.
+And this is how much of every row we want to average up and it's going to be an average because you can see that these rows sum to one.
+So this is our a and then our B in this example of course is.
+X.
+So it's going to happen here now is that we are going to have an expo to.
+And this expo to is going to be way.
+Multiplying.
+Rx.
+So let's think this through way is T by T and this is matrix multiplying in PyTorch a B by T by C.
+And it's giving us.
+What shape.
+So PyTorch will come here and it will see that these shapes are not the same so it will create a bash dimension here and this is a batch matrix multiply.
+And so it will apply this matrix multiplication in all the batch elements.
+In parallel.
+And individually and then for each batch element there will be a T by T multiplying T by C exactly as we had below.
+So this will now create.
+B by T by C.
+And expo to will now become identical to expo.
+So.
+We can see that torched out all close.
+Of expo and expo to should be true now.
+So this kind of like misses us that these are in fact the same.
+So expo and expo to if I just print them.
+Okay, we're not going to be able to.
+Okay, we're not going to be able to just stare it down but.
+Well, let me try expo basically just at the 0th element and expo to at the 0th element.
+So just the first batch and we should see that this and that should be identical which they are.
+Right.
+So what happened here.
+The trick is we were able to use batch matrix multiply to do this aggregation really and it's a weighted aggregation and the weights are specified in this T by T array.
+And we're basically doing weighted sums and these weighted sums are according to the weights inside here that take on sort of this triangular form.
+And so that means that a token at the teeth dimension will only get.
+Sort of information from the tokens preceding it.
+So that's exactly what we want.
+And finally, I would like to rewrite it in one more way.
+And we're going to see why that's useful.
+So this is the third version and it's also identical to the first and second, but let me talk through it.
+It uses softmax.
+So trill here is this Matrix lower triangular once way begins as all zero.
+Okay, so if I just print way in the beginning, it's all zero then I used masked fill.
+So what this is doing is wait that masked fill it's all zeros.
+And I'm saying for all the elements where trill is equals equals zero make them be negative Infinity.
+So all the elements where trill is zero will become negative Infinity now.
+So this is what we get.
+And then the final line here is softmax.
+So if I take a softmax along every single so dim is negative one so long every single row if I do a softmax, what is that going to do?
+Well softmax is is also like a normalization operation, right?
+And so spoiler alert you get the exact same Matrix.
+Let me bring back the softmax and recall that in softmax.
+We're going to exponentiate every single one of these.
+And then we're going to divide by the sum.
+And so if we exponentiate every single element here, we're going to get a one and here we're going to get basically zero zero zero zero everywhere else.
+And then when we normalize we just get one here.
+We're going to get one one and then zeros and then softmax will again divide and this will give us 0.5 0.5 and so on.
+And so this is also the same way to produce this mask.
+Now the reason that this is a bit more interesting.
+And the reason we're going to end up using it in self-attention is that these weights here begin with zero and you can think of this as like an interaction strength or like an affinity.
+So basically it's telling us how much of each token from the past do we want to aggregate and average up and then this line is saying tokens from the past cannot communicate by setting them to negative Infinity.
+We're saying that we will not.
+Aggregate anything from those tokens.
+And so basically this then goes through softmax and through the weighted and this is the aggregation through matrix multiplication.
+And so what this is now is you can think of these as
+the zeros are currently just set by us to be zero but quick preview is that these affinities between the tokens are not going to be just constant at zero.
+They're going to be data dependent.
+These tokens are going to start looking at each other and some tokens will find other tokens.
+More or less interesting and depending on what their values are, they're going to find each other interesting to different amounts and I'm going to call those affinities.
+I think and then here we are saying the future cannot communicate with the past.
+We're going to clamp them.
+And then when we normalize and some we're going to aggregate sort of their values depending on how interesting they find each other.
+And so that's the preview for self-attention and basically long story short from this entire section is that.
+You can do weighted aggregations of your past elements by having by using matrix multiplication of a lower triangular fashion.
+And then the elements here in the lower triangular part are telling you how much of each element fuses into this position.
+So we're going to use this trick now to develop the self-attention block.
+So first let's get some quick preliminaries out of the way.
+First the thing I'm kind of bothered by is that you see how we're passing in vocab size into the constructor.
+You don't need to do that because vocab size is already defined up top as a global variable.
+So there's no need to pass this stuff around.
+Next what I want to do is I don't want to actually create.
+I want to create like a level of indirection here where we don't directly go to the embedding for the logits.
+But instead we go through this intermediate phase because we're going to start making that bigger.
+So let me introduce a new variable and embed it short for number of embedding dimensions.
+So an embed.
+Here will be say 32.
+That was a suggestion from GitHub copilot by the way.
+It also suggested 32 which is a good number.
+So this is an embedding table and only 32 dimensional embeddings.
+So then here this is not going to give us logits directly.
+Instead this is going to give us token embeddings.
+That's what I'm going to call it.
+And then to go from the token embeddings to the logits we're going to need a linear layer.
+So self.lmhead let's call it short for language modeling head.
+Is an in linear from an embed up to vocab size.
+And then we swing over here.
+We're actually going to get the logits by exactly what the copilot says.
+Now we have to be careful here because this C and this C are not equal.
+This is an embed C and this is vocab size.
+So let's just say that an embed is equal to C.
+And then this just creates one spurious layer of indirection through a linear layer.
+But this should basically run.
+So we see that this runs and this currently looks kind of spurious.
+But we're going to build on top of this.
+Now next up so far.
+We've taken these indices and we've encoded them based on the identity of the tokens inside IDX.
+The next thing that people very often do is that we're not just encoding the identity of these tokens, but also their position.
+So we're going to have a second position embedding table here.
+So solve that position embedding table is an embedding of block size by an embed.
+And so each position from zero to block size minus one will also get its own embedding vector.
+And then here first, let me decode B by T from IDX dot shape.
+And then here we're also going to have a plus embedding, which is the positional embedding.
+And these are this is torr dash arrange.
+So this will be basically just integers from zero to zero.
+To T minus one.
+And all of those integers from zero to T minus one get embedded through the table to create a T by C.
+And then here this gets renamed to just say X and X will be the addition of the token embeddings with the positional embeddings.
+And here the broadcasting note will work out.
+So B by T by C plus T by C.
+This gets right aligned and new dimension of one gets added and it gets broadcasted across batch.
+So at this point X.
+Holds not just the token identities, but the positions at which these tokens occur.
+And this is currently not that useful because of course, we just have a simple migraine model.
+So it doesn't matter if you're in the fifth position, the second position or wherever it's all translation invariant at this stage.
+So this information currently wouldn't help.
+But as we work on the self-attention block, we'll see that this starts to matter.
+Okay, so now we get the crux of self-attention.
+So this is probably the most important part of this video.
+To understand.
+We're going to implement a small self-attention for a single individual head as they're called.
+So we start off with where we were.
+So all of this code is familiar.
+So right now I'm working with an example where I change the number of channels from 2 to 32.
+So we have a 4 by 8 arrangement of tokens and each token and the information at each token is currently 32 dimensional.
+But we just are working with random numbers.
+Now we saw here that
+The code as we had it before does a simple weight simple average of all the past tokens and the current token.
+So it's just the previous information and current information is just being mixed together in an average.
+And that's what this code currently achieves.
+And it does so by creating this lower triangular structure, which allows us to mask out this weight matrix that we create.
+So we mask it out and then we normalize it and currently
+When we initialize the affinities between all the different sort of tokens or nodes, I'm going to use those terms interchangeably.
+So when we initialize the affinities between all the different tokens to be zero, then we see that way gives us this structure where every single row has these
+Uniform numbers.
+And so that's what that's what then in this matrix multiply makes it so that we're doing a simple average.
+Now,
+We don't actually want.
+This to be
+All uniform
+Because different tokens will find different other tokens more or less interesting and we want that to be data dependent.
+So for example, if I'm a vowel then maybe I'm looking for consonants in my past and maybe I want to know what those consonants are and I want that information to flow to me.
+And so I want to now gather information from the past, but I want to do it in a data dependent way.
+And this is the problem that self-attention solves.
+Now the way self-attention solves this
+Is the following.
+Every single node or every single token at each position will emit two vectors.
+It will emit a query and it will emit a key.
+Now the query vector roughly speaking is what am I looking for?
+And the key vector roughly speaking is what do I contain?
+And then the way we get affinities between these tokens now in a sequence is we basically just do a dot product between the keys and the query.
+So my query dot products with all the keys of all the other tokens and that dot product now becomes way.
+And so if the key and the query are sort of aligned, they will interact to a very high amount and then I will get to learn more about that specific token as opposed to any other token in the sequence.
+So let's implement this now.
+We're going to implement a single
+what's called head of self-attention.
+So this is just one head.
+There's a hyper parameter involved with these heads, which is the head size.
+And then here I'm initializing linear modules and I'm using bias equals false.
+So these are just going to apply a matrix multiply with some fixed weights.
+And now let me produce a key and Q K and Q by forwarding these modules on X.
+So the size of this.
+This will not become
+B by T by 16 because that is the head size and the same here B by T by 16.
+So this being the head size.
+So you see here that when I forward this linear on top of my X all the tokens in all the positions in the B by T arrangement all of them in parallel and independently produce a key and a query.
+So no communication has happened yet.
+But the communication comes now.
+All the queries will dot product with all the keys.
+So basically what we want is we want way now or the affinities between these to be query multiplying key,
+but we have to be careful with we can't matrix multiply this.
+We actually need to transpose K but we have to be also careful because these are when you have the batch dimension.
+So in particular we want to transpose the last two dimensions.
+Dimension.
+Negative one and dimension negative two.
+So negative two negative one.
+And so this matrix multiply now will basically do the following B by T by 16.
+Matrix multiplies B by 16 by T to give us B by T by T.
+Right?
+So for every row of B,
+we're not going to have a T square matrix giving us the affinity.
+We're going to have a T square matrix giving us the affinities and these are now the way so they're not zeros.
+They are now coming from this dot product between the keys in the queries.
+So this can now run I can I can run this and the weighted aggregation now is a function in a data abandoned manner between the keys and queries of these notes.
+So just inspecting what happened here the way takes on this form.
+And you see that before way was just a constant.
+There's no way to all the batch elements.
+But now every single batch elements will have different sort of way because every single batch element contains different tokens at different positions.
+And so this is not data dependent.
+So when we look at just the zero row,
+for example in the input,
+these are the weights that came out.
+And so you can see now that they're not just exactly uniform.
+And in particular as an example here for the last row,
+this was the eighth token and the eighth token knows what content.
+It has and it knows at what position it's in.
+And now the eight token based on that creates a query.
+Hey, I'm looking for this kind of stuff.
+I'm a vowel.
+I'm on the eighth position.
+I'm looking for any consonants at positions up to four.
+And then all the nodes get to emit keys and maybe one of the channels could be I am a I am a consonant and I am in a position up to four.
+And that key would have a high number in that specific channel.
+And that's how the query and the key when they
+dark product,
+they can find each other and create a high affinity.
+And when they have a high affinity,
+like say this token was pretty interesting to to this eighth token.
+When they have a high affinity,
+then through the softmax,
+I will end up aggregating a lot of its information into my position.
+And so I'll get to learn a lot about it.
+Now just this was looking at way after this has already happened.
+Let me erase this operation as well.
+So let me erase the masking and the softmax just to show you the under the hood internals and how that works.
+So without the masking and the softmax way comes out like this,
+right?
+This is the outputs of the dark products.
+And these are the raw outputs and they take on values from negative,
+you know,
+two to positive two Etc.
+So that's the raw interactions and raw Affinities between all the nodes.
+But now if I'm a if I'm a fifth node,
+I will not want to aggregate anything from the sixth node seventh node and the eighth node.
+So actually we use the upper triangular masking.
+So those are not allowed to communicate.
+And now we actually want to have a nice distribution.
+So we don't want to aggregate negative point one one of this note.
+That's crazy.
+So instead we exponentiate and normalize.
+And now we get a nice distribution that sums to one.
+And this is telling us now in the data dependent manner,
+how much of information to aggregate from any of these tokens in the past.
+So that's way.
+And it's not zeros anymore,
+but but it's calculated in this way.
+Now,
+there's one more part to a single self-attention head.
+And that is that when we do the aggregation,
+we don't actually aggregate the tokens.
+Exactly.
+We aggregate,
+we produce one more value here and we call that the value.
+So in the same way that we produced key and query,
+we're also going to create a value.
+And then here we don't aggregate.
+X we calculate a V,
+which is just achieved by propagating this linear on top of X again.
+And then we output way multiplied by V.
+So V is the elements that we aggregate or the vector that we aggregate instead of the raw X.
+And now of course,
+this will make it so that the output here of the single head will be 16 dimensional because that is the head size.
+So you can think of X as kind of like private information.
+So you can think of X as kind of like private information.
+To this token,
+if you if you think about it that way.
+So X is kind of private to this token.
+So I'm a fifth token at some and I have some identity and my information is kept in vector X.
+And now for the purposes of the single head,
+here's what I'm interested in.
+Here's what I have.
+And if you find me interesting,
+here's what I will communicate to you.
+And that's stored in V.
+And so V is the thing that gets aggregated for the purposes of this single head between the different nodes.
+And that's basically the self-attention mechanism.
+This is this is what it does.
+There are a few notes that I would make like to make about attention.
+Number one attention is a communication mechanism.
+You can really think about it as a communication mechanism
+where you have a number of nodes in a directed graph
+where basically you have edges pointing between nodes like this.
+And what happens is every node has some vector of information
+and it gets to aggregate information
+via a weighted sum from all of the nodes that point to it.
+And this is done in a data dependent manner.
+So depending on whatever data is actually stored at each node at any point in time.
+Now,
+our graph doesn't look like this.
+Our graph has a different structure.
+We have eight nodes because the block size is eight and there's always eight tokens.
+And the first node is only pointed to by itself.
+The second node is pointed to by the first node and itself
+all the way up to the eighth node,
+which is pointed to by itself.
+Pointed to by all the previous nodes and itself.
+And so that's the structure that are directed graph has or happens happens to have
+an autoregressive sort of scenario like language modeling.
+But in principle attention can be applied to any arbitrary directed graph
+and it's just a communication mechanism between the nodes.
+The second note is that notice that there is no notion of space.
+So attention simply acts over like a set of vectors in this graph.
+And so by default these nodes have no idea where they are positioned in the space.
+And that's why we need to
+encode them positionally and sort of give them some information that is anchors to a specific
+position so that they sort of know where they are.
+And this is different than for example from convolution because if you run for example,
+a convolution operation over some input there is a very specific sort of layout of the information
+in space and the convolutional filters sort of act in space.
+And so it's it's not like an attention and attention is just a set of vectors out there in space.
+They communicate and if you want them to have a
+notion of space you need to specifically add it which is what we've done when we calculated the
+relative the positional encode encodings and added that information to the vectors.
+The next thing that I hope is very clear is that the elements across the batch dimension which are
+independent examples never talk to each other.
+They're always processed independently and this is a batch matrix multiply that applies basically a
+matrix multiplication kind of in parallel across the batch dimension.
+So maybe it would be more accurate to say that in this analogy of a directed graph.
+We really have because the batch size is for we really have four separate pools of eight
+nodes and those eight nodes only talk to each other but in total there's like 32 nodes that are being
+processed but there's sort of four separate pools of eight you can look at it that way.
+The next note is that here in the case of language modeling we have this specific structure of
+directed graph where the future tokens will not communicate to the past tokens but this doesn't
+necessarily have to be the constraint in the general case.
+And in fact in many cases you may want to have all of the notes talk to each other fully.
+So as an example if you're doing sentiment analysis or something like that with a transformer you might
+have a number of tokens and you may want to have them all talk to each other fully because later you
+are predicting for example the sentiment of the sentence and so it's okay for these notes to talk to
+each other and so in those cases you will use an encoder block of self-attention and all it means
+that it's an encoder block.
+Is that you will delete this line of code allowing all the notes to completely talk to each other.
+What we're implementing here is sometimes called a decoder block and it's called a decoder because
+it is sort of like decoding language and it's got this autoregressive format where you have to mask
+with the triangular matrix so that notes from the future never talk to the past because they would
+give away the answer.
+And so basically in encoder blocks you would delete this allow all the notes to talk to each other.
+In decoder blocks this will always be present so that you have this triangular structure but both are
+allowed and attention doesn't care.
+Attention supports arbitrary connectivity between notes.
+The next thing I wanted to comment on is you keep me you keep hearing me say attention self-attention
+etc.
+There's actually also something called cross attention.
+What is the difference?
+So basically the reason this attention is self-attention is because the keys queries and the values are all coming
+from the same source.
+From X so the same source X produces keys queries and values.
+So these nodes are self-attending but in principle attention is much more general than that.
+So for example in encoder decoder transformers you can have a case where the queries are produced from
+X but the keys and the values come from a whole separate external source and sometimes from encoder blocks
+that encode some context that we'd like to condition on and so the keys and the values will actually come
+from a whole separate source.
+Those are nodes on the side and here.
+We're just producing queries and we're reading off information from the side.
+So cross attention is used when there's a separate source of nodes.
+We'd like to pull information from into our notes and it's self-attention.
+If we just have nodes that would like to look at each other and talk to each other.
+So this attention here happens to be self-attention.
+But in principle attention is a lot more general.
+Okay in the last note at this stage is
+if we come to the attention is all you need paper here.
+We've already implemented attention.
+So given query key and value we've multiplied the query on the key.
+We've soft maxed it and then we are aggregating the values.
+There's one more thing that we're missing here, which is the dividing by 1 over square root of the head size.
+The DK here is the head size.
+Why are they doing this?
+Why is this important?
+So they call it a scaled attention and it's kind of like an important normalization to basically have.
+The problem is.
+If you have unit Gaussian inputs, so 0 mean unit variance, K and Q are unit Gaussian.
+And if you just do way naively, then you see that your way actually will be the variance will be on the order of head size,
+which in our case is 16.
+But if you multiply by 1 over head size square root,
+so this is square root and this is 1 over then the variance of way will be 1.
+So it will be preserved.
+Now, why is this important?
+You'll notice that way here will feed into softmax.
+And so it's really important, especially at initialization that way be fairly diffuse.
+So in our case here, we sort of lucked out here and way had a fairly diffuse numbers here.
+So like this.
+Now, the problem is that because of softmax,
+if weight takes on very positive and very negative numbers inside it,
+softmax will actually converge towards one hot vectors.
+And so I can illustrate that here.
+Say,
+we are applying softmax to a tensor of values that are very close to zero.
+Then we're going to get a diffuse thing out of softmax.
+But the moment I take the exact same thing and I start sharpening it,
+making it bigger by multiplying these numbers by 8,
+for example,
+you'll see that the softmax will start to sharpen.
+And in fact, it will sharpen towards the max.
+So it will sharpen towards whatever number here is the highest.
+And so basically we don't want these values to be too extreme,
+especially the initialization.
+Otherwise softmax will be way too peaky and
+um,
+you're basically aggregating information from like a single node.
+Every node just aggregates information from a single other node.
+That's not what we want,
+especially at initialization.
+And so the scaling is used just to control the variance at initialization.
+Okay.
+So having said all that,
+let's now take our self-attention knowledge and let's take it for a spin.
+So here in the code,
+I've created this head module and implements a single head of self-attention.
+So you give it a head size and then here it creates the key query and evaluate.
+Linear layers.
+Typically people don't use biases in these.
+So those are the linear projections that we're going to apply to all of our nodes.
+Now here,
+I'm creating this trill variable.
+Trill is not a parameter of the module.
+So in sort of pytorch naming conventions,
+this is called a buffer.
+It's not a parameter and you have to call it.
+You have to assign it to the module using a register buffer.
+So that creates the trill,
+the lower triangular matrix.
+And when we're given the input X,
+this should look very familiar now.
+We calculate the keys,
+the queries,
+we calculate the attention scores inside way.
+We normalize it.
+So we're using scaled attention here.
+Then we make sure that sure doesn't communicate with the past.
+So this makes it a decoder block
+and then softmax and then aggregate the value and output.
+Then here in the language model,
+I'm creating a head in the constructor and I'm calling it self-attention head
+and the head size.
+I'm going to keep as the same and embed just for now.
+And then here once we've encoded the information with the token embeddings
+and the position embeddings,
+we're simply going to feed it into the self-attention head
+and then the output of that is going to go into the decoder language modeling
+head and create the logits.
+So this is sort of the simplest way to plug in a self-attention component
+into our network right now.
+I had to make one more change,
+which is that here in the generate,
+we have to make sure that our IDX that we feed into the model
+because now we're using positional embeddings,
+we can never have more than block size coming in
+because if IDX is more than block size,
+then our position embedding table is going to run out of scope
+because it only has embeddings for up to block size.
+And so therefore I added some code here to crop the context
+that we're going to feed into self
+so that we never pass in more than block size elements.
+So those are the changes and let's now train the network.
+Okay, so I also came up to the script here and I decreased the learning rate
+because the self-attention can't tolerate very very high learning rates.
+And then I also increased the number of iterations
+because the learning rate is lower and then I trained it
+and previously we were only able to get to up to 2.5
+and now we are down to 2.4.
+So we definitely see a little bit of improvement from 2.5 to 2.4 roughly,
+but the text is still not amazing.
+So clearly the self-attention head is doing
+some useful communication,
+but we still have a long way to go.
+Okay.
+So now we've implemented the scale dot product attention.
+Now next up in the attention is all you need paper.
+There's something called multi-head attention.
+And what is multi-head attention?
+It's just applying multiple attentions in parallel
+and concatenating the results.
+So they have a little bit of diagram here.
+I don't know if this is super clear.
+It's really just multiple attentions in parallel.
+So let's implement that fairly straightforward.
+If we want a multi-head attention,
+then we want multiple heads of self-attention running in parallel.
+So in PyTorch we can do this by simply creating multiple heads.
+So however many heads you want
+and then what is the head size of each
+and then we run all of them in parallel into a list
+and simply concatenate all of the outputs
+and we're concatenating over the channel dimension.
+So the way this looks now is we don't have just a single attention
+that has a head size of 32 because remember an embed is 32.
+Instead of having one communication channel,
+we now have four communication channels in parallel
+and each one of these communication channels typically
+will be smaller correspondingly.
+So because we have four communication channels,
+we want eight-dimensional self-attention.
+And so from each communication channel,
+we're getting together eight-dimensional vectors
+and then we have four of them.
+And that concatenates to give us 32,
+which is the original and embed.
+And so this is kind of similar to if you're familiar with convolutions,
+this is kind of like a group convolution
+because basically instead of having one large convolution,
+we do convolution in groups and that's multi-headed self-attention.
+And so then here we just use essay heads,
+self-attention heads instead.
+Now, I actually ran it and scrolling down,
+I ran the same thing and then we now get down
+to 2.28 roughly and the output is still,
+the generation is still not amazing,
+but clearly the validation loss is improving
+because we were at 2.4 just now.
+And so it helps to have multiple communication channels
+because obviously these tokens have a lot to talk about.
+They want to find the consonants, the vowels,
+they want to find the vowels just from certain positions,
+they want to find any kinds of different things.
+And so it helps to create multiple independent channels of communication,
+gather lots of different types of data
+and then
+decode the output.
+Now going back to the paper for a second,
+of course,
+I didn't explain this figure in full detail,
+but we are starting to see some components of what we've already implemented.
+We have the positional encodings,
+the token encodings that add,
+we have the masked multi-headed attention implemented.
+Now, here's another multi-headed attention,
+which is a cross attention to an encoder,
+which we haven't,
+we're not going to implement in this case.
+I'm going to come back to that later.
+But I want you to notice that there's a feed forward part here
+and then this is grouped into a block that gets repeated.
+And again,
+now the feed forward part here is just a simple multi-layer perceptron.
+So the multi-headed,
+so here position wise feed forward networks is just a simple little MLP.
+So I want to start basically in a similar fashion.
+Also adding computation into the network
+and this computation is on the per node level.
+So
+I've already implemented it and you can see the diff highlighted on the left here
+when I've added or changed things.
+Now before we had the
+multi-headed self-attention that did the communication,
+but we went way too fast to calculate the logits.
+So the tokens looked at each other,
+but didn't really have a lot of time to think on what they found from the other tokens.
+And so
+what I've implemented here is a little feed forward single layer
+and this little layer is just a linear followed by a relu non-linearity
+and that's it.
+So it's just a little layer
+and then I call it feed forward
+and embed.
+And then this feed forward is just called sequentially right after the self-attention.
+So we self-attend then we feed forward
+and you'll notice that the feed forward here when it's applying linear.
+This is on a per token level.
+All the tokens do this independently.
+So the self-attention is the communication
+and then once they've gathered all the data now they need to think on that data individually.
+And so that's what feed forward is doing
+and that's why I've added it here.
+Now when I train this the validation laws actually continues to go down now to 2.24.
+Which is down from 2.28.
+The output still look kind of terrible,
+but at least we've improved the situation.
+And so as a preview
+we're going to now start to intersperse
+the communication with the computation
+and that's also what the transformer does
+when it has blocks that communicate and then compute
+and it groups them and replicates them.
+Okay, so let me show you what we'd like to do.
+We'd like to do something like this.
+We have a block
+and this block is basically
+this part here
+except for the cross attention.
+Now the block basically intersperses communication and then computation.
+The computation is done using multi-headed self-attention
+and then the computation is done using a feed forward network
+on all the tokens independently.
+Now what I've added here also is you'll notice
+this takes the number of embeddings in the embedding dimension
+and number of heads that we would like
+which is kind of like group size in group convolution.
+And I'm saying that number of heads we'd like is four
+and so because this is 32
+we calculate that because this is 32
+the number of heads should be four
+the head size should be eight
+so that everything sort of works out channel wise.
+So this is how the transformer structures
+sort of the sizes typically.
+So the head size will become eight
+and then this is how we want to intersperse them.
+And then here I'm trying to create blocks
+which is just a sequential application of block block block.
+So that we're interspersing communication feed forward many many times
+and then finally we decode.
+Now actually try to run this
+and the problem is this doesn't actually give a very good answer
+and very good result.
+And the reason for that is we're starting to actually get like a pretty deep neural net
+and deep neural nets suffer from optimization issues.
+And I think that's what we're kind of like slightly starting to run into.
+So we need one more idea that we can borrow from the
+transformer paper to resolve those difficulties.
+Now there are two optimizations that dramatically help
+with the depth of these networks
+and make sure that the networks remain optimizable.
+Let's talk about the first one.
+The first one in this diagram is you see this arrow here
+and then this arrow and this arrow.
+Those are skip connections or sometimes called residual connections.
+They come from this paper
+the procedural learning for image recognition from about 2015
+that introduced the concept.
+Now these are basically what it means
+is you transform the data,
+but then you have a skip connection with addition
+from the previous features.
+Now the way I like to visualize it
+that I prefer
+is the following.
+Here the computation happens from the top to bottom
+and basically you have this residual pathway
+and you are free to fork off from the residual pathway,
+perform some computation
+and then project back to the residual pathway via addition.
+And so you go from the
+the inputs to the targets
+only via plus and plus and plus.
+And the reason this is useful is because during dot propagation
+remember from our micrograd video earlier
+addition distributes gradients equally to both of its branches
+that fed as the input.
+And so the supervision or the gradients from the loss
+basically hop through every addition node
+all the way to the input
+and then also fork off into the residual blocks.
+But basically you have this
+gradient superhighway that goes directly from the supervision
+all the way to the input unimpeded.
+And then these residual blocks are usually initialized in the beginning.
+So they contribute very very little if anything to the residual pathway.
+They are initialized that way.
+So in the beginning they are sort of almost kind of like not there.
+But then during the optimization they come online over time
+and they start to contribute
+but at least at the initialization
+you can go from directly supervision to the input
+gradient is unimpeded and just flows.
+And then the blocks over time kick in.
+And so that dramatically helps with the optimization.
+So let's implement this.
+So coming back to our block here.
+Basically what we want to do is
+we want to do x equals x plus
+self-attention and x equals x plus self.feedforward.
+So this is x and then we fork off and do some communication and come back
+and we fork off and we do some computation and come back.
+So those are residual connections
+and then swinging back up here.
+We also have to introduce this projection.
+So nn.linear
+and this is going to be from
+after we concatenate this.
+This is the size and embed.
+So this is the output of the self-attention itself.
+But then we actually want the to apply the projection
+and that's the result.
+So the projection is just a linear transformation of the outcome of this layer.
+So that's the projection back into the residual pathway.
+And then here in a feedforward,
+it's going to be the same thing.
+I could have a self.projection here as well.
+But let me just simplify it
+and let me
+couple it inside the same sequential container.
+And so this is the projection layer going back into the residual pathway.
+And so
+that's well, that's it.
+So now we can train this.
+So I implemented one more small change.
+When you look into the paper again,
+you see that the dimensionality of input and output
+is 512 for them.
+And they're saying that the inner layer here in the feedforward
+has dimensionality of 2048.
+So there's a multiplier of 4.
+And so the inner layer of the feedforward network
+should be multiplied by 4 in terms of channel sizes.
+So I came here and I multiplied 4 times embed
+here for the feedforward
+and then from 4 times an embed coming back down to an embed
+when we go back to the projection.
+So adding a bit of computation here and growing that layer
+that is in the residual block on the side
+of the residual pathway.
+And then I train this and we actually get down all the way to
+2.08 validation loss.
+And we also see that network is starting to get big enough
+that our train loss is getting ahead of validation loss.
+So we started to see like a little bit of overfitting
+and
+our
+our
+generations here are still not amazing.
+But at least you see that we can see like is here this now grief sync
+like this starts to almost look like English.
+So
+yeah,
+we're starting to really get there.
+Okay.
+And the second innovation that is very helpful for optimizing very deep
+neural networks is right here.
+So we have this addition now that's the residual part.
+But this norm is referring to something called layer norm.
+So layer norm is implemented in pytorch.
+It's a paper that came out a while back here.
+And layer norm is very very similar to bash norm.
+So remember back to our make more series part three.
+We implemented bash normalization and bash normalization basically just
+made sure that across the batch dimension.
+Any individual neuron had unit Gaussian distribution.
+So it was zero mean and unit standard deviation one standard deviation
+output.
+So what I did here is I'm copy pasting the bathroom 1D that we developed
+in our make more series and see here we can initialize for example this
+module and we can have a batch of 32 100 dimensional vectors feeding through
+the bathroom layer.
+So what this does is it guarantees that when we look at just the 0th column,
+it's a zero mean one standard deviation.
+So it's normalizing every single column of this input.
+Now the rows are not going to be normalized by default because we're just
+normalizing columns.
+So let's not implement layer norm.
+It's very complicated.
+Look we come here.
+We change this from 0 to 1 so we don't normalize the columns.
+We normalize.
+The rows and now we've implemented layer norm.
+So now the columns are not going to be normalized.
+But the rows are going to be normalized for every individual example.
+It's 100 dimensional vector is normalized in this way and because our
+computation now does not span across examples, we can delete all of this
+buffers stuff because we can always apply this operation and don't need to
+maintain any running buffers.
+So we don't need the buffers.
+We don't there's no distinction between training and test time.
+And we don't need these running buffers.
+We do keep gamma and beta.
+We don't need the momentum.
+We don't care if it's training or not.
+And this is now a layer norm and it normalizes the ropes instead of the
+columns and this here is identical to basically this here.
+So let's.
+Now implement layer norm in our transformer before I incorporate the
+layer norm.
+I just wanted to note that as I said very few details about the transformer
+have changed in the last five years, but this is actually something that's
+likely departs from the original paper.
+You see that the ad and norm is applied after the transformation.
+But now it is a bit more basically common to apply the layer norm before
+the transformation.
+So there's a reshuffling of the layer norms.
+So this is called the pre norm formulation and that the one that we're
+going to implement as well.
+So slight deviation from the original paper.
+Basically, we need to layer norms layer norm.
+One is an end dot layer norm and we tell it how many was the embedding
+dimension and we need the second layer norm.
+And then here the layer norms are applied immediately on X.
+So self-taught layer norm one in applied on X and self-taught layer norm
+two applied on X before it goes into self-attention and feed forward and
+the size of the layer norm here is an embed so 32.
+So when the layer norm is normalizing our features it is the normalization
+here happens the mean and the variance are taken over 32 numbers.
+So the batch and the time act as batch dimensions both of them.
+So this is kind of like a per token transformation that just normalizes
+the features and makes them a unit mean unit Gaussian at initialization.
+But of course because these layer norms inside it have these gamma and beta
+trainable parameters the layer normal eventually create outputs that might
+not be unit Gaussian but the optimization will determine that so for
+now, this is the this is incorporating the layer norms and let's train them
+up.
+Okay, so I let it run and we see that we get down to 2.06 which is better
+than the previous 2.08.
+So a slight improvement by adding the layer norms and I'd expect that they
+help.
+Even more if we have bigger and deeper network.
+One more thing.
+I forgot to add is that there should be a layer norm here.
+Also typically as at the end of the transformer and right before the final
+linear layer that decodes into vocabulary.
+So I added that as well.
+So at this stage, we actually have a pretty complete transformer coming to
+the original paper and it's a decoder only transformer.
+I'll I'll talk about that in a second but at this stage the major pieces
+are in place so we can try to scale this up and see how well we can push
+this number now in order to scale up the model.
+I had to perform some cosmetic changes here to make it nicer.
+So I introduced this variable called in layer which just specifies how
+many layers of the blocks.
+We're going to have I create a bunch of blocks and we have a new variable
+number of heads as well.
+I pulled out the layer norm here.
+And so this is identical.
+Now one thing that I did briefly change is I added dropout.
+So dropout is something that you can add right before the residual connection.
+Back right before the connection back into the residual pathway.
+So we can drop out that as the last layer here.
+We can drop out here at the end of the multi-headed extension as well.
+And we can also drop out here when we calculate the basically affinities
+and after the softmax we can drop out some of those so we can randomly
+prevent some of the notes from communicating.
+And so dropout comes from this paper from 2014 or so.
+And basically it takes your neural net and it randomly every forward backward
+pass shuts off some subset of neurons so randomly drops them to zero and
+trains without them and what this does effectively is because the mask of
+what being dropped out has changed every single forward backward pass it
+ends up kind of training an ensemble of sub networks and then at test time
+everything is fully enabled and kind of all those sub networks.
+Are merged into a single ensemble.
+If you can if you want to think about it that way.
+So I would read the paper to get the full detail for now.
+We're just going to stay on the level of this is a regularization technique
+and I added it because I'm about to scale up the model quite a bit and I
+was concerned about overfitting.
+So now when we scroll up to the top we'll see that I changed a number of
+hyper parameters here about our neural net.
+So I made the batch size be much larger now 64.
+I changed the block size to be 256.
+So previously was just eight.
+Eight characters of context.
+Now it is 256 characters of context to predict the 257th.
+I brought down the learning rate a little bit because the neural net is
+now much bigger.
+So I brought down the learning rate.
+The embedding dimension is not 384 and there are six heads.
+So 384 divide 6 means that every head is 64 dimensional as it as a standard
+and then there was going to be six layers of that and the dropout will be
+a point to so every forward backward pass.
+20% of all these intermediate calculations are disabled and dropped to
+zero and then I already trained this and I ran it.
+So drumroll how does it perform?
+So let me just scroll up here.
+We get a validation loss of 1.48 which is actually quite a bit of an
+improvement on what we had before which I think was 2.07.
+So we went from 2.07 all the way down to 1.48 just by scaling up this
+neural net with the code that we have.
+And this of course ran for a lot longer.
+This may be trained for I want to say about 15 minutes on my A100 GPU.
+So that's a pretty good GPU and if you don't have a GPU you're not going to
+be able to reproduce this on a CPU.
+This would be I would not run this on the CPU or MacBook or something like
+that.
+You'll have to break down the number of layers and the embedding dimension
+and so on.
+But in about 15 minutes we can get this kind of a result and I'm printing
+some of the Shakespeare here.
+But what I did also is I printed 10,000 characters.
+So a lot more and I wrote them to a file.
+And so here we see some of the outputs.
+So it's a lot more recognizable as the input text file.
+So the input text file just for reference look like this.
+So there's always like someone speaking in this matter and our predictions
+now take on that form except of course they're nonsensical when you
+actually read them.
+So
+it is every crimp to be a house.
+Oh those probation we give heed.
+You know.
+Oh ho sent me you mighty Lord.
+Anyway, so you can read through this.
+It's nonsensical of course, but this is just a transformer trained on the
+character level for 1 million characters that come from Shakespeare.
+So there's sort of like blabbers on in Shakespeare like math.
+Banner, but it doesn't of course make sense at this scale.
+But I think I think still a pretty good demonstration of what's possible.
+So now
+I think that kind of like concludes the programming section of this video.
+We basically kind of did a pretty good job and of implementing this
+transformer, but the picture doesn't exactly match up to what we've done.
+So what's going on with all these additional parts here?
+So let me finish explaining this architecture and why it looks so funky.
+Basically, what's happening here is what we implemented here is a decoder
+only transformer.
+So there's no component here.
+This part is called the encoder and there's no cross attention block here.
+Our block only has a self attention and the feed forward.
+So it is missing this third in between piece here.
+This piece does cross attention.
+So we don't have it and we don't have the encoder.
+We just have the decoder and the reason we have a decoder only is because we are
+just generating text.
+And it's unconditioned on anything or just we're just blabbering on according
+to a given data set.
+What makes it a decoder is that we are using the triangular mask in our
+transformer.
+So it has this autoregressive property where we can just go and sample from it.
+So the fact that it's using the triangulate triangular mask to mask out the
+attention makes it a decoder and it can be used for language modeling.
+Now, the reason that the original paper had an encoder decoder architecture is
+because it is a machine translation paper.
+So it is concerned with a different setting in particular.
+It expects some tokens that encode say for example French and then it is expected to
+decode the translation in English.
+So so you typically these here are special tokens.
+So you are expected to read in this and condition on it and then you start off the
+generation with a special token called start.
+So this is a special new token that you introduce and always place in the beginning and then
+the.
+Network is expected to output neural networks are awesome and then a special end token to
+finish the generation.
+So this part here will be decoded exactly as we have we've done it neural networks are
+awesome will be identical to what we did but unlike what we did they want to condition the
+generation on some additional information.
+And in that case this additional information is the French sentence that they should be
+translating.
+So what they do now is they.
+Bring the encoder now the encoder reads this part here.
+So we're all going to take the part of French and we're going to create tokens from it exactly as
+we've seen in our video and we're going to put a transformer on it, but there's going to be no
+triangular mask.
+And so all the tokens are allowed to talk to each other as much as they want and they're just
+encoding whatever the content of this French sentence once they've encoded it they've they
+basically come out in the top here.
+And then what happens here is in our decoder which does the language modeling.
+There's an additional connection here to the outputs of the encoder and that is brought in
+through a cross attention.
+So the queries are still generated from X but now the keys and the values are coming from the
+side the keys and the values are coming from the top generated by the nodes that came outside
+of the decode the encoder and those tops the keys and the values there the top of it.
+Feed in on the side into every single block of the decoder and so that's why there's an additional
+cross attention and really what is doing is it's conditioning the decoding not just on the past of
+this current decoding but also on having seen the full fully encoded French prompt sort of and so
+it's an encoder decoder model, which is why we have those two transformers and additional block
+and so on.
+So we did not do this because we have no we have nothing to do.
+Nothing to encode.
+There's no conditioning.
+We just have a text file and we just want to imitate it and that's why we are using a decoder only
+transformer exactly as done in GPT.
+Okay.
+So now I wanted to do a very brief walkthrough of nano GPT, which you can find in my GitHub and nano
+GPT is basically two files of interest.
+There's train.pi and model.pi train.pi is all the boilerplate code for training the network.
+It is basically all the stuff that we had here is the training loop.
+It's just that.
+It's a lot more complicated because we're saving and loading checkpoints and pre-trained weights
+and we are decaying the learning rate and compiling the model and using distributed training across
+multiple nodes or GPUs.
+So the training that Pi gets a little bit more hairy, complicated.
+There's more options Etc, but the model that I should look very very similar to what we've done
+here.
+In fact, the model is almost identical.
+So first here we have the causal self-attention block and all of this should look very very
+very similar.
+recognizable to you we're producing queries keys values we're doing dot products we're masking
+applying softmax optionally dropping out and here we are pooling the values what is different here
+is that in our code i have separated out the multi-headed attention into just a single
+individual head and then here i have multiple heads and i explicitly concatenate them whereas
+here all of it is implemented in a batched manner inside a single causal self-attention
+and so we don't just have a b and a t and a c dimension we also end up with a fourth dimension
+which is the heads and so it just gets a lot more sort of hairy because we have four-dimensional
+array tensors now but it is equivalent mathematically so the exact same thing is
+happening as what we have it's just it's a bit more efficient because all the heads are now
+treated as a batch dimension as well then we have the multi-layered perceptron
+and we have the multi-layered perceptron and we have the multi-layered perceptron
+it's using the gelu non-linearity which is defined here except instead of relu and this
+is done just because openly i used it and i want to be able to load their checkpoints
+the blocks of the transformer are identical the communicate and the compute phase as we saw
+and then the gpt will be identical we have the position encodings token encodings
+the blocks the layer norm at the end the final linear layer and this should look all very
+recognizable and there's a bit more here because i'm loading checkpoints and stuff like that
+i'm separating out the parameters into those that should be weight decayed and those that
+shouldn't but the generate function should also be very very similar so a few details are different
+but you should definitely be able to look at this file and be able to understand a lot of the pieces
+now so let's now bring things back to chat gpt what would it look like if we wanted to train
+chat gpt ourselves and how does it relate to what we learned today well to train the chat gpt there
+are roughly two stages first is the pre-training stage and then the fine-tuning stage and then the
+pre-training stage in the pre-training stage we are training on a large chunk of internet and just
+trying to get a first decoder only transformer to babble text so it's very very similar to what
+we've done ourselves except we've done like a tiny little baby pre-training step and so in our case
+this is how you print a number of parameters i printed it and it's about 10 million
+so this transformer that i created here to create a little shakespeare
+transformer was about 10 million parameters our data set is roughly 1 million characters so
+roughly 1 million tokens but you have to remember that openai uses different vocabulary they're not
+on the character level they use these subword chunks of words and so they have a vocabulary
+of 50 000 roughly elements and so their sequences are a bit more condensed so our data set the
+shakespeare data set would be probably around 300 000 tokens in the openai vocabulary roughly
+so we trained about 10 million parameter model on roughly 300 000 tokens now when you go to the gpt3 paper
+and you look at the transformers that they trained they trained a number of transformers
+of different sizes but the biggest transformer here has 175 billion parameters uh so ours is
+again 10 million they used this number of layers in the transformer this is the n embed this is
+the number of heads and this is the head size
+and then this is the batch size so ours was 65 and the learning rate is similar
+now when they train this transformer they trained on 300 billion tokens so
+again remember ours is about 300,000 so this is about a million fold increase
+and this number would not be even that large by today's standards you'd be
+going up 1 trillion and above so they are training a significantly larger
+model on a good chunk of the internet and that is the pre-training stage but
+otherwise these hyperparameters should be fairly recognizable to you and the
+architecture is actually like nearly identical to what we implemented
+ourselves but of course it's a massive infrastructure challenge to train this
+you're talking about typically thousands of GPUs having to you know talk to each
+other to train models of this size so that's just a pre-training stage now
+after you complete the pre-training stage you don't get something that
+you don't get something that you don't get something that you don't get
+a response to your questions with answers and it's not helpful and etc you
+get a document completer right so it babbles but it doesn't babble Shakespeare
+it babbles internet it will create arbitrary news articles and documents
+and it will try to complete documents because that's what it's trained for
+it's trying to complete the sequence so when you give it a question it would
+just potentially just give you more questions it would follow with more
+questions it will do whatever it looks like the some closed document would do
+in the training data
+on the internet and so who knows you're getting kind of like undefined behavior
+it might basically answer with two questions with other questions it might
+ignore your question it might just try to complete some news article it's
+totally unaligned as we say so the second fine-tuning stage is to actually
+align it to be an assistant and this is the second stage and so this chat GPT
+blog post from opening I talks a little bit about how this stage is achieved we
+basically
+roughly three steps to it to this stage so what they do here is they start to
+collect training data that looks specifically like what an assistant
+would do so there are documents that have the format where the question is on
+top and then an answer is below and they have a large number of these but
+probably not on the order of the internet this is probably on the order
+of maybe thousands of examples and so they they then fine-tune the model to
+basically only focus on documents that look like that and so you're starting to
+slowly align it so it's going to expect a question at the top and it's going to
+expect to complete the answer and these very very large models are very sample
+efficient during their fine-tuning so this actually somehow works but that's
+just step one that's just fine-tuning so then they actually have more steps where
+okay the second step is you let the model respond and then different raters
+look at the different responses and rank them for their preferences to which one
+is better than the other they use that to train a reward model so they can predict a
+basically using a different network, how much of any candidate response would be desirable.
+And then once they have a reward model, they run PPO, which is a form of policy gradient
+reinforcement learning optimizer, to fine-tune this sampling policy so that the answers that
+the chat GPT now generates are expected to score a high reward according to the reward model.
+And so basically there's a whole aligning stage here, or fine-tuning stage. It's got multiple
+steps in between there as well, and it takes the model from being a document completer to a
+question answerer, and that's like a whole separate stage. A lot of this data is not
+available publicly. It is internal to OpenAI, and it's much harder to replicate this stage.
+And so that's roughly what would give you a chat GPT. And NanoGPT focuses on the pre-training stage.
+Okay.
+And that's everything that I wanted to cover today. So we trained, to summarize, a decoder-only
+transformer following this famous paper, Attention is All You Need, from 2017. And so that's
+basically a GPT. We trained it on tiny Shakespeare and got sensible results. All of the training
+code is roughly 200 lines of code. I will be releasing this code base. So also it comes with
+all the...
+Git log commits along the way, as we built it up. In addition to this code, I'm going to release
+the notebook, of course, the Google Colab. And I hope that gave you a sense for how you can train
+these models, like, say, GPT-3, that will be architecturally basically identical to what we
+have, but they are somewhere between 10,000 and 1 million times bigger, depending on how you count.
+And so that's all I have for now. We did not talk about any of the fine-tuning stages. That would,
+typically, go on top of this. So if you're interested in something that's not just language
+modeling, but you actually want to, you know, say, perform tasks, or you want them to be aligned in
+a specific way, or you want to detect sentiment or anything like that, basically, any time you
+don't want something that's just a document completer, you have to complete further stages
+of fine-tuning, which we did not cover. And that could be simple, supervised fine-tuning,
+or it can be something more fancy, like we see in ChatGPT, where we actually train a reward model,
+and then do rounds of PPO to...
+align it with respect to the reward model. So there's a lot more that can be done on top of it.
+I think for now, we're starting to get to about two hours, Mark. So I'm going to kind of finish
+here. I hope you enjoyed the lecture. And yeah, go forth and transform. See you later.

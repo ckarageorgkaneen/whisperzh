@@ -1,0 +1,5321 @@
+WEBVTT
+
+00:00.000 --> 00:05.360
+Hi everyone. So by now you have probably heard of ChatGPT. It has taken the world and the AI
+
+00:05.360 --> 00:11.700
+community by storm, and it is a system that allows you to interact with an AI and give it text-based
+
+00:11.700 --> 00:17.080
+tasks. So for example, we can ask ChatGPT to write us a small haiku about how important it is that
+
+00:17.080 --> 00:20.720
+people understand AI, and then they can use it to improve the world and make it more prosperous.
+
+00:21.420 --> 00:27.080
+So when we run this, AI knowledge brings prosperity for all to see, embrace its power.
+
+00:27.080 --> 00:33.300
+Okay, not bad. And so you could see that ChatGPT went from left to right and generated all these
+
+00:33.300 --> 00:39.100
+words sort of sequentially. Now, I asked it already the exact same prompt a little bit earlier,
+
+00:39.300 --> 00:44.660
+and it generated a slightly different outcome. AI's power to grow, ignorance holds us back,
+
+00:44.920 --> 00:50.820
+learn, prosperity waits. So pretty good in both cases and slightly different. So you can see that
+
+00:50.820 --> 00:55.520
+ChatGPT is a probabilistic system, and for any one prompt, it can give us multiple answers,
+
+00:55.660 --> 00:57.020
+sort of replying.
+
+00:57.080 --> 01:02.060
+Now, this is just one example of a prompt. People have come up with many, many examples,
+
+01:02.520 --> 01:08.220
+and there are entire websites that index interactions with ChatGPT. And so many of
+
+01:08.220 --> 01:13.640
+them are quite humorous. Explain HTML to me like I'm a dog, write release notes for chess too,
+
+01:14.580 --> 01:19.900
+write a note about Elon Musk buying a Twitter, and so on. So as an example,
+
+01:20.460 --> 01:23.180
+please write a breaking news article about a leaf falling from a tree,
+
+01:23.180 --> 01:26.320
+and a shocking turn of events.
+
+01:27.080 --> 01:30.340
+The leaf falling from a tree in the local park. Witnesses report that the leaf, which was
+
+01:30.340 --> 01:35.040
+previously attached to a branch of a tree, detached itself and fell to the ground. Very
+
+01:35.040 --> 01:40.000
+dramatic. So you can see that this is a pretty remarkable system, and it is what we call a
+
+01:40.000 --> 01:47.560
+language model, because it models the sequence of words or characters or tokens more generally,
+
+01:47.980 --> 01:53.260
+and it knows how certain words follow each other in English language. And so from its perspective,
+
+01:53.260 --> 01:56.520
+what it is doing is it is completing the sequence.
+
+01:57.080 --> 02:02.040
+So I give it the start of a sequence, and it completes the sequence with the outcome.
+
+02:02.040 --> 02:07.400
+And so it's a language model in that sense. Now, I would like to focus on the under the hood of
+
+02:08.360 --> 02:12.920
+under the hood components of what makes ChatGPT work. So what is the neural network under the
+
+02:12.920 --> 02:19.080
+hood that models the sequence of these words? And that comes from this paper called Attention
+
+02:19.080 --> 02:26.200
+is All You Need. In 2017, a landmark paper, a landmark paper in AI that produced and proposed
+
+02:26.200 --> 02:26.900
+the Transformer and the Translator. And this paper is called the Transformer and the Translator. And
+
+02:26.900 --> 02:27.060
+this paper is called the Transformer and the Translator. And this paper is called the Transformer
+
+02:27.080 --> 02:34.280
+Architecture. So GPT is short for generatively, generatively pre trained transformer. So
+
+02:34.280 --> 02:38.360
+transformer is the neural net that actually does all the heavy lifting under the hood.
+
+02:38.360 --> 02:44.440
+It comes from this paper in 2017. Now, if you read this paper, this reads like a pretty random
+
+02:44.440 --> 02:48.120
+machine translation paper. And that's because I think the authors didn't fully anticipate the
+
+02:48.120 --> 02:52.680
+impact that the transformer would have on the field. And this architecture that they produced
+
+02:52.680 --> 02:56.900
+in the context of machine translation, in their case, actually ended up taking over
+
+02:56.900 --> 03:03.860
+the rest of AI in the next five years after. And so this architecture with minor changes was copy
+
+03:03.860 --> 03:11.060
+pasted into a huge amount of applications in AI in more recent years. And that includes at the core
+
+03:11.060 --> 03:16.340
+of ChatGPT. Now, we are not going to, what I'd like to do now is I'd like to build out
+
+03:16.340 --> 03:21.220
+something like ChatGPT. But we're not going to be able to, of course, reproduce ChatGPT.
+
+03:21.220 --> 03:24.580
+This is a very serious production grade system. It is trained on
+
+03:24.580 --> 03:31.540
+a good chunk of internet. And then there's a lot of pre training and fine tuning stages to it.
+
+03:31.540 --> 03:37.380
+And so it's very complicated. What I'd like to focus on is just to train a transformer based
+
+03:37.380 --> 03:42.820
+language model. And in our case, it's going to be a character level language model. I still think
+
+03:42.820 --> 03:47.620
+that is a very educational with respect to how these systems work. So I don't want to train on
+
+03:47.620 --> 03:52.740
+the chunk of internet, we need a smaller data set. In this case, I propose that we work with
+
+03:52.740 --> 03:54.560
+my favorite toy data set. It's called ChatGPT. And I'm going to show you how that works. I'm going to
+
+03:54.580 --> 03:57.120
+show you what it looks like. So first, I'm going to create a little tiny Shakespeare. And what it
+
+03:57.120 --> 04:01.920
+is is basically it's a concatenation of all of the works of Shakespeare in my understanding. And so
+
+04:01.920 --> 04:07.960
+this is all of Shakespeare in a single file. This file is about one megabyte. And it's just all of
+
+04:07.960 --> 04:13.920
+Shakespeare. And what we are going to do now is we're going to basically model how these characters
+
+04:13.920 --> 04:20.440
+follow each other. So for example, given a chunk of these characters like this, given some context
+
+04:20.440 --> 04:24.560
+of characters in the past, the transformer neural network will look at the model of the character.
+
+04:24.580 --> 04:28.900
+characters that i've highlighted and it's going to predict that g is likely to come next in the
+
+04:28.900 --> 04:34.020
+sequence and it's going to do that because we're going to train that transformer on shakespeare
+
+04:34.020 --> 04:40.180
+and it's just going to try to produce character sequences that look like this and in that process
+
+04:40.180 --> 04:45.220
+is going to model all the patterns inside this data so once we've trained the system i just
+
+04:45.220 --> 04:50.900
+like to give you a preview we can generate infinite shakespeare and of course it's a fake
+
+04:50.900 --> 04:59.300
+thing that looks kind of like shakespeare um apologies for there's some jank that i'm not
+
+04:59.300 --> 05:06.820
+able to resolve in in here but um you can see how this is going character by character and it's kind
+
+05:06.820 --> 05:14.020
+of like predicting shakespeare-like language so verily my lord the sights have left the again
+
+05:14.020 --> 05:20.500
+the king coming with my curses with precious pale and then tronio says something else etc
+
+05:20.900 --> 05:25.380
+and this is just coming out of the transformer in a very similar manner as it would come out in
+
+05:25.380 --> 05:32.180
+chat gpt in our case character by character in chat gpt it's coming out on the token by token
+
+05:32.180 --> 05:36.820
+level and tokens are these sort of like little subword pieces so they're not word level they're
+
+05:36.820 --> 05:44.820
+kind of like word chunk level um and now i've already written this entire code uh to train
+
+05:44.820 --> 05:50.580
+these transformers um and it is in a github repository that you can find and it's called
+
+05:50.900 --> 05:57.380
+nano gpt so nano gpt is a repository that you can find on my github and it's a repository for
+
+05:57.380 --> 06:02.900
+training transformers um on any given text and what i think is interesting about it because
+
+06:02.900 --> 06:07.620
+there's many ways to train transformers but this is a very simple implementation so it's just two
+
+06:07.620 --> 06:14.260
+files of 300 lines of code each one file defines the gpt model the transformer and one file trains
+
+06:14.260 --> 06:19.620
+it on some given text dataset and here i'm showing that if you train it on a open web text dataset
+
+06:20.900 --> 06:30.180
+web pages then i reproduce the the performance of gpt2 so gpt2 is an early version of openai's gpt
+
+06:31.140 --> 06:36.740
+from 2017 if i recall correctly and i've only so far reproduced the the smallest 124 million
+
+06:36.740 --> 06:41.540
+parameter model but basically this is just proving that the code base is correctly arranged and i'm
+
+06:41.540 --> 06:48.420
+able to load the neural network weights that openai has released later so you can take a look
+
+06:48.420 --> 06:50.420
+at the finished code here in nano gpt
+
+06:50.900 --> 06:56.180
+what i would like to do in this lecture is i would like to basically write this repository
+
+06:56.180 --> 07:01.780
+from scratch so we're going to begin with an empty file and we're going to define a transformer piece
+
+07:01.780 --> 07:07.620
+by piece we're going to train it on the tiny shakespeare dataset and we'll see how we can then
+
+07:08.260 --> 07:13.460
+generate infinite shakespeare and of course this can copy paste to any arbitrary text dataset
+
+07:13.460 --> 07:17.780
+that you like but my goal really here is to just make you understand and appreciate
+
+07:18.660 --> 07:20.500
+how under the hood chat gpt works
+
+07:21.220 --> 07:29.060
+and really all that's required is a proficiency in python and some basic understanding of calculus
+
+07:29.060 --> 07:34.660
+and statistics and it would help if you also see my previous videos on the same youtube channel
+
+07:34.660 --> 07:42.820
+in particular my make more series where i define smaller and simpler neural network language models
+
+07:42.820 --> 07:47.700
+so multi-layered perceptrons and so on it really introduces the language modeling framework
+
+07:47.700 --> 07:50.740
+and then here in this video we're going to focus on the transformer
+
+07:50.900 --> 07:53.940
+so let's look at the general structure of the neural network itself
+
+07:54.820 --> 08:00.340
+okay so i created a new google collab jupiter notebook here and this will allow me to later
+
+08:00.340 --> 08:04.900
+easily share this code that we're going to develop together with you so you can follow along so this
+
+08:04.900 --> 08:10.420
+will be in a video description later now here i've just done some preliminaries i downloaded
+
+08:10.420 --> 08:15.060
+the dataset the tiny shakespeare dataset at this url and you can see that it's about a one megabyte
+
+08:15.060 --> 08:19.860
+file then here i open the input.txt file and just read in all the text of the string
+
+08:19.860 --> 08:22.900
+and you can see that we are working with one million characters roughly
+
+08:23.860 --> 08:27.860
+and the first 1000 characters if we just print them out are basically what you would expect
+
+08:27.860 --> 08:32.980
+this is the first 1000 characters of the tiny shakespeare dataset roughly up to here
+
+08:34.100 --> 08:39.620
+so so far so good next we're going to take this text and the text is a sequence of characters
+
+08:39.620 --> 08:45.780
+in python so when i call the set constructor on it i'm just going to get the set of all the
+
+08:45.780 --> 08:47.780
+characters that occur in this text
+
+08:49.860 --> 08:53.940
+and then i'm just going to set the set of all the characters that occur in this text
+
+08:53.940 --> 08:58.260
+and then i'm going to I'm going to sort that to create a list of those characters instead of just
+
+08:58.260 --> 09:04.020
+a set so that i have an ordering an arbitrary ordering and then i sort that so basically we
+
+09:04.020 --> 09:08.740
+get just all the characters that occur in the entire data set and they're sorted now the number
+
+09:08.740 --> 09:13.940
+of them is going to be our vocabulary size these are the possible elements of our sequences and
+
+09:13.940 --> 09:19.620
+we see that when i print here the characters there's 65 of them in total there's a space character and then all kinds of special characters
+
+09:19.860 --> 09:25.460
+lowercase letters so that's our vocabulary and that's the sort of like possible characters that
+
+09:25.460 --> 09:32.500
+the model can see or emit okay so next we would like to develop some strategy to tokenize the
+
+09:32.500 --> 09:39.140
+input text now when people say tokenize they mean convert the raw text as a string to some
+
+09:39.140 --> 09:44.660
+sequence of integers according to some notebook according to some vocabulary of possible elements
+
+09:45.380 --> 09:49.380
+so as an example here we are going to be building a character level language model
+
+09:49.380 --> 09:52.660
+so we're simply going to be translating individual characters into integers
+
+09:53.380 --> 09:58.100
+so let me show you a chunk of code that sort of does that for us so we're building both the
+
+09:58.100 --> 10:04.100
+encoder and the decoder and let me just talk through what's happening here when we encode
+
+10:04.100 --> 10:10.660
+an arbitrary text like hi there we're going to receive a list of integers that represents that
+
+10:10.660 --> 10:18.740
+string so for example 46 47 etc and then we also have the reverse mapping so we can take this list
+
+10:18.740 --> 10:19.360
+and decode it into a string so we can take this list and decode it into a string so we can take
+
+10:19.360 --> 10:23.840
+this list and decode it to get back the exact same string so it's really just like a translation
+
+10:23.840 --> 10:28.800
+to integers and back for arbitrary string and for us it is done on a character level
+
+10:30.000 --> 10:33.840
+now the way this was achieved is we just iterate over all the characters here
+
+10:33.840 --> 10:38.000
+and create a lookup table from the character to the integer and vice versa
+
+10:38.000 --> 10:42.400
+and then to encode some string we simply translate all the characters individually
+
+10:42.400 --> 10:49.360
+and to decode it back we use the reverse mapping concatenate all of it now this is only one of many
+
+10:49.360 --> 10:54.640
+possible encodings or many possible tokenizers and it's a very simple one but there's many
+
+10:54.640 --> 10:59.600
+other schemas that people have come up with in practice so for example Google uses SENTENCEPIECE
+
+11:00.800 --> 11:06.720
+so SENTENCEPIECE will also encode text into integers but in a different schema
+
+11:06.720 --> 11:13.600
+and using a different vocabulary and SENTENCEPIECE is a sub-word sort of tokenizer and what that
+
+11:13.600 --> 11:19.120
+means is that you're not encoding entire words but you're not also encoding individual characters
+
+11:19.120 --> 11:24.960
+it's a subword unit level and that's usually what's adopted in practice. For example also
+
+11:24.960 --> 11:29.920
+OpenAI has this library called tiktoken that uses a byte pair encoding tokenizer
+
+11:30.960 --> 11:37.600
+and that's what GPT uses and you can also just encode words into like hello world into lists
+
+11:37.600 --> 11:43.040
+of integers. So as an example I'm using the tiktoken library here I'm getting the encoding
+
+11:43.040 --> 11:50.080
+for GPT-2 or that was used for GPT-2. Instead of just having 65 possible characters or tokens
+
+11:50.080 --> 11:57.040
+they have 50 000 tokens and so when they encode the exact same string high there we only get a
+
+11:57.040 --> 12:05.840
+list of three integers but those integers are not between 0 and 64 they are between 0 and 50 256.
+
+12:06.720 --> 12:12.800
+So basically you can trade off the codebook size and the sequence lengths so you can have a very
+
+12:12.800 --> 12:13.000
+long string and you can have a very long string and you can have a very long string and you can
+
+12:13.000 --> 12:13.020
+have a very long string and you can have a very long string and you can have a very long string and
+
+12:13.020 --> 12:13.260
+you can have a very long string and you can have a very long string and you can have a very long
+
+12:13.260 --> 12:17.340
+sequences of integers with very small vocabularies or you can have short
+
+12:19.180 --> 12:25.980
+sequences of integers with very large vocabularies and so typically people use in practice these
+
+12:25.980 --> 12:31.100
+subword encodings but I'd like to keep our tokenizer very simple so we're using character
+
+12:31.100 --> 12:36.460
+level tokenizer and that means that we have very small codebooks we have very simple encode and
+
+12:36.460 --> 12:42.980
+decode functions but we do get very long sequences as a result but that's the level at which we're
+
+12:42.980 --> 12:47.140
+going to stick with this lecture because it's the simplest thing okay so now that we have an encoder
+
+12:47.140 --> 12:52.420
+and a decoder effectively a tokenizer we can tokenize the entire training set of Shakespeare
+
+12:52.980 --> 12:57.220
+so here's a chunk of code that does that and I'm going to start to use the pytorch library
+
+12:57.220 --> 13:02.660
+and specifically the torch.tensor from the pytorch library so we're going to take all of the text
+
+13:02.660 --> 13:09.140
+in tiny Shakespeare encode it and then wrap it into a torch.tensor to get the data tensor so
+
+13:09.140 --> 13:12.900
+here's what the data tensor looks like when I look at just the first one thousand character
+
+13:12.980 --> 13:17.540
+or the one thousand elements of it so we see that we have a massive sequence of integers
+
+13:18.100 --> 13:23.540
+and this sequence of integers here is basically an identical translation of the first 1000 characters
+
+13:23.540 --> 13:30.580
+here so I believe for example that zero is a new line character and maybe one is a space I'm not
+
+13:30.580 --> 13:36.180
+100 sure but from now on the entire data set of text is re-represented as just it's just stretched
+
+13:36.180 --> 13:42.420
+out as a single very large sequence of integers let me do one more thing before we move on here
+
+13:42.980 --> 13:48.580
+we're going to separate out our data set into a train and a validation split so in particular
+
+13:48.580 --> 13:53.380
+we're going to take the first 90 of the data set and consider that to be the training data
+
+13:53.380 --> 13:58.740
+for the transformer and we're going to withhold the last 10 at the end of it to be the validation
+
+13:58.740 --> 14:03.380
+data and this will help us understand to what extent our model is overfitting so we're going
+
+14:03.380 --> 14:08.020
+to basically hide and keep the validation data on the side because we don't want just a perfect
+
+14:08.020 --> 14:12.980
+memorization of this exact Shakespeare we want a neural network that sort of creates Shakespeare's
+
+14:12.980 --> 14:20.260
+like text and so it should be fairly likely for it to produce the actual like stowed away
+
+14:21.380 --> 14:27.780
+true Shakespeare text and so we're going to use this to get a sense of the overfitting okay so now
+
+14:27.780 --> 14:32.100
+we would like to start plugging these text sequences or integer sequences into the
+
+14:32.100 --> 14:37.780
+transformer so that it can train and learn those patterns now the important thing to realize is
+
+14:37.780 --> 14:42.020
+we're never going to actually feed entire text into transformer all at once that would be
+
+14:42.980 --> 14:48.020
+very expensive and prohibitive so when we actually train a transformer on a lot of these data sets
+
+14:48.020 --> 14:53.060
+we only work with chunks of the data set and when we train the transformer we basically sample random
+
+14:53.060 --> 14:58.420
+little chunks out of the training set and train them just chunks at a time and these chunks have
+
+14:58.420 --> 15:05.460
+basically some kind of a length and some maximum length now the maximum length typically at least
+
+15:05.460 --> 15:11.220
+in the code i usually write is called block size you can you can find it under different names
+
+15:11.220 --> 15:12.820
+like context length or something like that
+
+15:13.300 --> 15:17.860
+let's start with the block size of just eight and let me look at the first train data characters
+
+15:18.500 --> 15:22.340
+the first block size plus one characters i'll explain why plus one in a second
+
+15:23.700 --> 15:29.620
+so this is the first nine characters in the sequence in the training set now what i'd like
+
+15:29.620 --> 15:34.740
+to point out is that when you sample a chunk of data like this so say these nine characters out
+
+15:34.740 --> 15:41.060
+of the training set this actually has multiple examples packed into it and that's because all
+
+15:41.060 --> 15:42.740
+of these characters follow each other
+
+15:42.980 --> 15:49.060
+and so what this thing is going to say when we plug it into a transformer is we're going to
+
+15:49.060 --> 15:52.900
+actually simultaneously train it to make a prediction at every one of these positions
+
+15:53.700 --> 16:00.020
+now in the in a chunk of nine characters there's actually eight individual examples packed in there
+
+16:00.500 --> 16:08.340
+so there's the example that when 18 when in the context of 18 47 likely comes next in a context of
+
+16:08.340 --> 16:12.260
+18 and 47 56 comes next in the context of 1847
+
+16:12.980 --> 16:16.880
+47, 56, 57 can come next, and so on.
+
+16:17.280 --> 16:19.180
+So that's the eight individual examples.
+
+16:19.640 --> 16:21.260
+Let me actually spell it out with code.
+
+16:22.480 --> 16:24.160
+So here's a chunk of code to illustrate.
+
+16:25.080 --> 16:26.920
+X are the inputs to the transformer.
+
+16:27.180 --> 16:29.240
+It will just be the first block size characters.
+
+16:30.100 --> 16:33.960
+Y will be the next block size characters.
+
+16:33.960 --> 16:35.340
+So it's offset by one.
+
+16:36.200 --> 16:40.460
+And that's because Y are the targets for each position in the input.
+
+16:40.460 --> 16:44.120
+And then here I'm iterating over all the block size of eight.
+
+16:44.920 --> 16:49.880
+And the context is always all the characters in X up to T and including T.
+
+16:50.580 --> 16:55.500
+And the target is always the T character, but in the targets array Y.
+
+16:56.180 --> 16:56.960
+So let me just run this.
+
+16:58.140 --> 17:00.600
+And basically it spells out what I said in words.
+
+17:01.200 --> 17:04.900
+These are the eight examples hidden in a chunk of nine characters
+
+17:04.900 --> 17:08.820
+that we sampled from the training set.
+
+17:09.680 --> 17:10.440
+I want to make sure that I'm not missing anything.
+
+17:10.440 --> 17:11.120
+Let me just mention one more thing.
+
+17:11.700 --> 17:16.340
+We train on all the eight examples here with context between one
+
+17:16.340 --> 17:18.220
+all the way up to context of block size.
+
+17:18.740 --> 17:21.160
+And we train on that not just for computational reasons
+
+17:21.160 --> 17:23.700
+because we happen to have the sequence already or something like that.
+
+17:23.740 --> 17:25.160
+It's not just done for efficiency.
+
+17:25.660 --> 17:31.500
+It's also done to make the transformer network be used to seeing contexts
+
+17:31.500 --> 17:35.140
+all the way from as little as one all the way to block size.
+
+17:35.700 --> 17:38.900
+And we'd like the transformer to be used to seeing everything in between.
+
+17:38.900 --> 17:40.320
+And that's going to be useful.
+
+17:40.440 --> 17:43.020
+Later during inference, because while we're sampling,
+
+17:43.380 --> 17:47.300
+we can start to set a sampling generation with as little as one character of context.
+
+17:47.680 --> 17:49.880
+And the transformer knows how to predict the next character
+
+17:50.160 --> 17:52.200
+with all the way up to just context of one.
+
+17:52.740 --> 17:55.100
+And so then it can predict everything up to block size.
+
+17:55.440 --> 17:59.500
+And after block size, we have to start truncating because the transformer will never
+
+18:00.200 --> 18:03.660
+receive more than block size inputs when it's predicting the next character.
+
+18:04.780 --> 18:09.300
+Okay, so we've looked at the time dimension of the tensors that are going to be feeding into the transformer.
+
+18:09.300 --> 18:12.120
+There's one more dimension to care about, and that is the batch dimension.
+
+18:12.820 --> 18:18.960
+And so as we're sampling these chunks of text, we're going to be actually every time we're going to feed them into a transformer,
+
+18:19.320 --> 18:24.060
+we're going to have many batches of multiple chunks of text that are all like stacked up in a single tensor.
+
+18:24.660 --> 18:32.500
+And that's just done for efficiency just so that we can keep the GPUs busy because they are very good at parallel processing of data.
+
+18:33.060 --> 18:36.600
+And so we just want to process multiple chunks all at the same time.
+
+18:36.900 --> 18:38.940
+But those chunks are processed completely independently.
+
+18:38.940 --> 18:39.280
+They don't take up too much space.
+
+18:39.280 --> 18:40.900
+They don't talk to each other and so on.
+
+18:41.560 --> 18:44.720
+So let me basically just generalize this and introduce a batch dimension.
+
+18:45.060 --> 18:45.960
+Here's a chunk of code.
+
+18:47.340 --> 18:49.560
+Let me just run it and then I'm going to explain what it does.
+
+18:51.800 --> 19:05.380
+So here, because we're going to start sampling random locations in the data sets to pull chunks from, I am setting the seed so that in the random number generator, so that the numbers I see here are going to be the same numbers you see later if you try to reproduce this.
+
+19:06.460 --> 19:08.860
+Now, the batch size here is how many independent sequences we are producing.
+
+19:09.280 --> 19:12.300
+We're processing every forward backward pass of the transformer.
+
+19:13.780 --> 19:17.800
+The block size, as I explained, is the maximum context length to make those predictions.
+
+19:18.440 --> 19:20.500
+So let's say batch size four, block size eight.
+
+19:20.920 --> 19:24.160
+And then here's how we get batch for any arbitrary split.
+
+19:24.820 --> 19:28.720
+If the split is a training split, then we're going to look at train data, otherwise at val data.
+
+19:30.040 --> 19:32.140
+That gives us the data array.
+
+19:32.860 --> 19:38.620
+And then when I generate random positions to grab a chunk out of, I actually grab, I actually generate random data.
+
+19:38.620 --> 19:39.140
+I actually generate random positions to grab a chunk out of.
+
+19:39.140 --> 19:39.240
+I actually generate random positions to grab a chunk out of.
+
+19:39.240 --> 19:39.260
+I actually generate random positions to grab a chunk out of.
+
+19:39.280 --> 19:42.960
+assumeonline, will generate batch size number of random offsets.
+
+19:43.200 --> 19:48.080
+So because this is four, we are, i, x is going to be a four numbers that are randomly generated between 0 and len of data minus block size.
+
+19:48.080 --> 19:52.060
+are randomly generated between 0 and len of data minus block size.
+
+19:53.460 --> 19:54.840
+So it's just random offsets into the training set.
+
+19:55.620 --> 20:03.520
+And then x' as I explained are the first block size characters, starting at i.
+
+20:03.920 --> 20:06.140
+The y' are the offset by 1 of that.
+
+20:07.280 --> 20:07.960
+So just add plus 1.
+
+20:08.040 --> 20:08.640
+And then we're going to get roughly how many random fields are generated.
+
+20:08.640 --> 20:09.220
+So just add plus 1.
+
+20:09.220 --> 20:16.340
+get those chunks for every one of integers i in ix and use a torch.stack to take all those
+
+20:17.540 --> 20:23.780
+one-dimensional tensors as we saw here and we're going to stack them up as rows
+
+20:24.900 --> 20:30.660
+and so they all become a row in a four by eight tensor so here's where i'm printing them
+
+20:30.660 --> 20:39.600
+when i sample a batch xb and yb the inputs the transformer now are the input x is the four by
+
+20:39.600 --> 20:47.920
+eight tensor four rows of eight columns and each one of these is a chunk of the training set
+
+20:47.920 --> 20:55.100
+and then the targets here are in the associated array y and they will come in to the transformer
+
+20:55.100 --> 21:00.660
+all the way at the end to create the loss function so they will give us the
+
+21:00.660 --> 21:07.220
+correct answer for every single position inside x and then these are the four independent rows
+
+21:08.900 --> 21:16.500
+so spelled out as we did before this 4x8 array contains a total of 32 examples
+
+21:17.060 --> 21:20.100
+and they're completely independent as far as the transformer is concerned
+
+21:22.020 --> 21:30.580
+so when the input is 24 the target is 43 or rather 43 here in the y array when the input is 2443
+
+21:30.660 --> 21:39.220
+the target is 58. when the input is 2443 58 the target is 5 etc or like when it is a 52581 the
+
+21:39.220 --> 21:46.580
+target is 58 right so you can sort of see this spelled out these are the 32 independent examples
+
+21:46.580 --> 21:52.740
+packed in to a single batch of the input x and then the desired targets are in y
+
+21:53.780 --> 22:00.580
+and so now this integer tensor of x is going to feed into the transformer
+
+22:01.300 --> 22:05.860
+and that transformer is going to simultaneously process all these examples and then look up the
+
+22:05.860 --> 22:12.260
+correct integers to predict in every one of these positions in the tensor y okay so now
+
+22:12.260 --> 22:16.660
+that we have our batch of input that we'd like to feed into a transformer let's start basically
+
+22:16.660 --> 22:21.060
+feeding this into neural networks now we're going to start off with the simplest possible
+
+22:21.060 --> 22:24.660
+neural network which in the case of language modeling in my opinion is the bigram language
+
+22:24.660 --> 22:30.100
+model and we've covered the bigram language model in my make more series in a lot of depth and so
+
+22:30.100 --> 22:34.980
+here i'm going to sort of go faster and let's just implement the pytorch module directly that
+
+22:34.980 --> 22:40.740
+implements the bigram language model so i'm importing the pytorch nn module
+
+22:42.180 --> 22:47.060
+for reproducibility and then here i'm constructing a bigram language model which is a subclass of
+
+22:47.060 --> 22:52.740
+nn module and then i'm calling it and i'm passing in the inputs and the targets
+
+22:53.700 --> 22:58.420
+and i'm just printing now when the inputs and targets come here you see that i'm just taking the
+
+22:58.420 --> 23:00.020
+index the inputs and targets and then i'm just printing the inputs and targets and then i'm just
+
+23:00.020 --> 23:04.420
+printing the inputs x here which i rename to idx and i'm just passing them into this token
+
+23:04.420 --> 23:10.580
+embedding table so what's going on here is that here in the constructor we are creating a token
+
+23:10.580 --> 23:17.940
+embedding table and it is of size vocab size by vocab size and we're using an endot embedding
+
+23:17.940 --> 23:23.300
+which is a very thin wrapper around basically a tensor of shape vocab size by vocab size
+
+23:24.020 --> 23:30.020
+and what's happening here is that when we pass idx here every single integer in our input is going to
+
+23:30.020 --> 23:35.380
+refer to this embedding table and is going to pluck out a row of that embedding table corresponding
+
+23:35.380 --> 23:42.740
+to its index so 24 here will go to the embedding table and we'll pluck out the 24th row and then 43
+
+23:42.740 --> 23:48.420
+will go here and pluck out the 43rd row etc and then pytorch is going to arrange all of this into
+
+23:48.420 --> 23:58.500
+a batch by time by channel tensor in this case batch is 4 time is 8 and c which is the channels
+
+24:00.740 --> 24:04.900
+and so we're just going to pluck out all those rows arrange them in a b by t by c
+
+24:05.700 --> 24:09.540
+and now we're going to interpret this as the logits which are basically the scores
+
+24:10.100 --> 24:14.260
+for the next character in a sequence and so what's happening here is
+
+24:14.260 --> 24:19.300
+we are predicting what comes next based on just the individual identity of a single token
+
+24:19.940 --> 24:24.740
+and you can do that because um i mean currently the tokens are not talking to each other and
+
+24:24.740 --> 24:29.940
+they're not seeing any context except for they're just seeing themselves so i'm a i'm a token number
+
+24:30.020 --> 24:35.220
+five and then i can actually make pretty decent predictions about what comes next just by knowing
+
+24:35.220 --> 24:42.580
+that i'm token 5 because some characters know um follow other characters in typical scenarios
+
+24:42.580 --> 24:47.300
+so we saw a lot of this in a lot more depth in the make more series and here if i just run this
+
+24:48.020 --> 24:54.420
+then we currently get the predictions the scores the logits for every one of the four by eight
+
+24:54.420 --> 24:58.740
+positions now that we've made predictions about what comes next we'd like to evaluate the loss
+
+24:58.740 --> 25:00.000
+function and so in this case we want to make predictions about how would the loss function Te intentions are impact the sc noises you would get this this existence and then we oriented out we would get the loss function and so at
+
+25:00.020 --> 25:05.680
+make more series we saw that a good way to measure a loss or like a quality of the predictions is to
+
+25:05.680 --> 25:10.420
+use the negative log likelihood loss which is also implemented in PyTorch under the name cross
+
+25:10.420 --> 25:17.800
+entropy. So what we'd like to do here is loss is the cross entropy on the predictions and the
+
+25:17.800 --> 25:23.260
+targets and so this measures the quality of the logits with respect to the targets. In other words
+
+25:23.260 --> 25:28.960
+we have the identity of the next character so how well are we predicting the next character based
+
+25:28.960 --> 25:36.880
+on the logits and intuitively the correct dimension of logits depending on whatever
+
+25:36.880 --> 25:41.040
+the target is should have a very high number and all the other dimensions should be very low number
+
+25:41.040 --> 25:46.920
+right. Now the issue is that this won't actually this is what we want we want to basically output
+
+25:46.920 --> 25:56.400
+the logits and the loss this is what we want but unfortunately this won't actually run we get an
+
+25:56.400 --> 25:58.540
+error message but intuitively we want to
+
+25:58.540 --> 25:58.940
+you
+
+25:58.940 --> 26:05.640
+measure this. Now when we go to the PyTorch cross entropy documentation here
+
+26:05.640 --> 26:11.760
+we're trying to call the cross entropy in its functional form so that means we don't have to
+
+26:11.760 --> 26:17.500
+create like a module for it but here when we go to the documentation you have to look into the
+
+26:17.500 --> 26:23.140
+details of how PyTorch expects these inputs and basically the issue here is PyTorch expects
+
+26:23.140 --> 26:27.820
+if you have multi-dimensional input which we do because we have a b by t by c tensor
+
+26:27.820 --> 26:28.520
+then it actually expects a multi-dimensional input which we do because we have a b by t by c tensor
+
+26:28.520 --> 26:35.220
+then it actually really wants the channels to be the second dimension here so if you
+
+26:36.620 --> 26:44.620
+so basically it wants a b by c by t instead of a b by t by c and so just the details of how PyTorch
+
+26:44.620 --> 26:51.380
+treats these kinds of inputs and so we don't actually want to deal with that so what we're
+
+26:51.380 --> 26:55.520
+going to do instead is we need to basically reshape our logits. So here's what I like to do I
+
+26:55.520 --> 26:58.420
+like to take basically give names to the dimensions
+
+26:58.420 --> 27:02.660
+So logits.shape is B by T by C and unpack those numbers.
+
+27:02.660 --> 27:07.240
+And then let's say that logits equals logits.view.
+
+27:07.240 --> 27:10.780
+And we want it to be a B times C, B times T by C.
+
+27:10.780 --> 27:14.000
+So just a two-dimensional array, right?
+
+27:14.000 --> 27:16.120
+So we're going to take all the,
+
+27:16.120 --> 27:19.840
+we're going to take all of these positions here
+
+27:19.840 --> 27:21.480
+and we're going to stretch them out
+
+27:21.480 --> 27:23.780
+in a one-dimensional sequence
+
+27:23.780 --> 27:26.840
+and preserve the channel dimension as the second dimension.
+
+27:26.840 --> 27:29.460
+So we're just kind of like stretching out the array
+
+27:29.460 --> 27:30.840
+so it's two-dimensional.
+
+27:30.840 --> 27:32.880
+And in that case, it's going to better conform
+
+27:32.880 --> 27:36.380
+to what PyTorch sort of expects in its dimensions.
+
+27:36.380 --> 27:38.600
+Now we have to do the same to targets
+
+27:38.600 --> 27:43.600
+because currently targets are of shape B by T
+
+27:44.720 --> 27:46.980
+and we want it to be just B times T.
+
+27:46.980 --> 27:48.620
+So one-dimensional.
+
+27:48.620 --> 27:51.860
+Now, alternatively, you could always still just do minus one
+
+27:51.860 --> 27:54.080
+because PyTorch will guess what this should be
+
+27:54.080 --> 27:55.380
+if you want to lay it out.
+
+27:55.380 --> 27:56.500
+But let me just be explicit
+
+27:56.500 --> 27:56.820
+and say if you can see it.
+
+27:56.820 --> 27:58.200
+If you can see it, it's going to be B times T.
+
+27:58.200 --> 27:59.720
+Once we reshape this,
+
+27:59.720 --> 28:02.900
+it will match the cross-entropy case
+
+28:02.900 --> 28:05.200
+and then we should be able to evaluate our loss.
+
+28:07.100 --> 28:11.000
+Okay, so that right now, and we can do loss.
+
+28:11.000 --> 28:14.620
+And so currently we see that the loss is 4.87.
+
+28:14.620 --> 28:19.100
+Now, because we have 65 possible vocabulary elements,
+
+28:19.100 --> 28:21.680
+we can actually guess at what the loss should be.
+
+28:21.680 --> 28:23.200
+And in particular,
+
+28:23.200 --> 28:25.920
+we covered negative log likelihood in a lot of detail.
+
+28:25.920 --> 28:26.480
+We are expecting,
+
+28:26.480 --> 28:31.480
+we're expecting log or lon of one over 65
+
+28:32.380 --> 28:33.940
+and negative of that.
+
+28:33.940 --> 28:37.520
+So we're expecting the loss to be about 4.17,
+
+28:37.520 --> 28:39.260
+but we're getting 4.87.
+
+28:39.260 --> 28:41.200
+And so that's telling us that the initial predictions
+
+28:41.200 --> 28:43.060
+are not super diffuse.
+
+28:43.060 --> 28:44.760
+They've got a little bit of entropy.
+
+28:44.760 --> 28:46.160
+And so we're guessing wrong.
+
+28:47.200 --> 28:52.200
+So yes, but actually we are able to evaluate the loss.
+
+28:52.800 --> 28:55.780
+Okay, so now that we can evaluate the quality of the model
+
+28:55.780 --> 28:57.180
+on some data,
+
+28:57.180 --> 28:59.300
+we'd like to also be able to generate from the model.
+
+28:59.300 --> 29:01.200
+So let's do the generation.
+
+29:01.200 --> 29:03.040
+Now I'm going to go again a little bit faster here
+
+29:03.040 --> 29:06.680
+because I covered all this already in the previous videos.
+
+29:06.680 --> 29:10.240
+So here's a generate function for the model.
+
+29:12.420 --> 29:13.800
+So we take some,
+
+29:13.800 --> 29:17.460
+we take the same kind of input IDX here.
+
+29:17.460 --> 29:22.460
+And basically this is the current context of some characters
+
+29:23.240 --> 29:25.180
+in a batch, in some batch.
+
+29:25.780 --> 29:27.480
+So it's also B by T.
+
+29:27.480 --> 29:30.820
+And the job of generate is to basically take this B by T
+
+29:30.820 --> 29:33.640
+and extend it to be B by T plus one, plus two, plus three.
+
+29:33.640 --> 29:34.700
+And so it's just basically,
+
+29:34.700 --> 29:37.540
+it continues the generation in all the batch dimensions
+
+29:37.540 --> 29:39.320
+in the time dimension.
+
+29:39.320 --> 29:40.500
+So that's its job.
+
+29:40.500 --> 29:43.080
+And it will do that for max new tokens.
+
+29:43.080 --> 29:44.500
+So you can see here on the bottom,
+
+29:44.500 --> 29:45.920
+there's going to be some stuff here,
+
+29:45.920 --> 29:46.820
+but on the bottom,
+
+29:46.820 --> 29:49.760
+whatever is predicted is concatenated
+
+29:49.760 --> 29:53.080
+on top of the previous IDX along the first dimension,
+
+29:53.080 --> 29:55.700
+which is the time dimension to create a B by T plus one.
+
+29:55.780 --> 29:58.280
+So that becomes a new IDX.
+
+29:58.280 --> 30:00.500
+So the job of generate is to take a B by T
+
+30:00.500 --> 30:03.720
+and make it a B by T plus one, plus two, plus three,
+
+30:03.720 --> 30:05.820
+as many as we want max new tokens.
+
+30:05.820 --> 30:08.320
+So this is the generation from the model.
+
+30:08.320 --> 30:10.900
+Now inside the generation, what are we doing?
+
+30:10.900 --> 30:12.740
+We're taking the current indices.
+
+30:12.740 --> 30:14.420
+We're getting the predictions.
+
+30:14.420 --> 30:18.080
+So we get those are in the logits.
+
+30:18.080 --> 30:20.020
+And then the loss here is going to be ignored
+
+30:20.020 --> 30:22.240
+because we're not using that.
+
+30:22.240 --> 30:25.460
+And we have no targets that are sort of ground truth targets
+
+30:25.460 --> 30:27.360
+that we're going to be comparing with.
+
+30:28.620 --> 30:30.020
+Then once we get the logits,
+
+30:30.020 --> 30:32.600
+we are only focusing on the last step.
+
+30:32.600 --> 30:34.940
+So instead of a B by T by C,
+
+30:34.940 --> 30:37.640
+we're going to pluck out the negative one,
+
+30:37.640 --> 30:40.160
+the last element in the time dimension,
+
+30:40.160 --> 30:42.680
+because those are the predictions for what comes next.
+
+30:42.680 --> 30:44.100
+So that gives us the logits,
+
+30:44.100 --> 30:47.600
+which we then convert to probabilities via softmax.
+
+30:47.600 --> 30:48.960
+And then we use torch.multinomial
+
+30:48.960 --> 30:50.760
+to sample from those probabilities.
+
+30:50.760 --> 30:53.900
+And we ask PyTorch to give us one sample.
+
+30:53.900 --> 30:55.000
+And so IDX next,
+
+30:55.000 --> 30:56.980
+we'll become a B by one,
+
+30:56.980 --> 31:00.100
+because in each one of the batch dimensions,
+
+31:00.100 --> 31:02.420
+we're going to have a single prediction for what comes next.
+
+31:02.420 --> 31:04.500
+So this numSamples equals one,
+
+31:04.500 --> 31:06.600
+will make this be a one.
+
+31:06.600 --> 31:09.100
+And then we're going to take those integers
+
+31:09.100 --> 31:10.820
+that come from the sampling process
+
+31:10.820 --> 31:13.340
+according to the probability distribution given here.
+
+31:13.340 --> 31:15.340
+And those integers got just concatenated
+
+31:15.340 --> 31:19.020
+on top of the current sort of like running stream of integers.
+
+31:19.020 --> 31:21.620
+And this gives us a B by T plus one.
+
+31:21.620 --> 31:23.160
+And then we can return that.
+
+31:23.160 --> 31:24.160
+Now, one thing here is,
+
+31:24.160 --> 31:30.320
+here is you see how i'm calling self of idx which will end up going to the forward function
+
+31:30.960 --> 31:36.560
+i'm not providing any targets so currently this would give an error because targets is uh is uh
+
+31:36.560 --> 31:42.240
+sort of like not given so target has to be optional so targets is none by default and
+
+31:42.240 --> 31:49.200
+then if targets is none then there's no loss to create so it's just loss is none but else
+
+31:49.200 --> 31:56.320
+all of this happens and we can create a loss so this will make it so um if we have the targets
+
+31:56.320 --> 32:02.160
+we provide them and get a loss if we have no targets we'll just get the logits so this here
+
+32:02.160 --> 32:11.760
+will generate from the model and let's take that for a ride now oops so i have another code chunk
+
+32:11.760 --> 32:16.640
+here which will generate for the model from the model and okay this is kind of crazy so maybe let
+
+32:16.640 --> 32:18.400
+me let me break this down
+
+32:19.200 --> 32:20.960
+so these are the idx right
+
+32:24.720 --> 32:28.720
+i'm creating a batch will be just one time will be just one
+
+32:29.600 --> 32:35.520
+so i'm creating a little one by one tensor and it's holding a zero and the d type the data type
+
+32:35.520 --> 32:42.720
+is uh integer so zero is going to be how we kick off the generation and remember that zero is uh
+
+32:42.720 --> 32:47.360
+is the element standing for a new line character so it's kind of like a reasonable thing to
+
+32:47.360 --> 32:48.960
+to feed in as the very first character
+
+32:49.200 --> 32:56.000
+sequence to be the new line um so it's going to be idx which we're going to feed in here
+
+32:56.000 --> 33:00.800
+then we're going to ask for 100 tokens and then end that generate will continue that
+
+33:01.680 --> 33:07.840
+now because uh generate works on the level of batches we then have to index into the
+
+33:07.840 --> 33:16.800
+zero throw to basically unplug the um the single batch dimension that exists and then that gives us
+
+33:16.800 --> 33:17.600
+a um
+
+33:17.600 --> 33:24.320
+time steps is just a one-dimensional array of all the indices which we will convert to simple python
+
+33:24.320 --> 33:32.720
+list from pytorch tensor so that that can feed into our decode function and convert those integers
+
+33:32.720 --> 33:40.080
+into text so let me bring this back and we're generating 100 tokens let's run and uh here's
+
+33:40.080 --> 33:44.560
+the generation that we achieved so obviously it's garbage and the reason it's garbage is because
+
+33:44.560 --> 33:47.120
+this is a totally random model so next up we're going to want to do is we're going to want to do a
+
+33:47.120 --> 33:50.880
+we're going to want to train this model now one more thing i wanted to point out here is
+
+33:52.080 --> 33:56.400
+this function is written to be general but it's kind of like ridiculous right now because
+
+33:57.920 --> 34:02.720
+we're feeding in all this we're building out this context and we're concatenating it all
+
+34:02.720 --> 34:08.480
+and we're always feeding it all into the model but that's kind of ridiculous because this is
+
+34:08.480 --> 34:14.240
+just a simple bigram model so to make for example this prediction about k we only needed this w
+
+34:14.240 --> 34:17.040
+but actually what we fed into the model is we fed the entire sequence
+
+34:17.520 --> 34:23.440
+and then we only looked at the very last piece and predicted k so the only reason i'm writing
+
+34:23.440 --> 34:28.320
+it in this way is because right now this is a bigram model but i'd like to keep this function
+
+34:28.320 --> 34:36.000
+fixed and i'd like it to work later when our characters actually basically look further in
+
+34:36.000 --> 34:41.040
+the history and so right now the history is not used so this looks silly but eventually
+
+34:41.040 --> 34:46.720
+the history will be used and so that's why we want to do it this way so just a quick comment on that
+
+34:47.520 --> 34:53.600
+so now we see that this is random so let's train the model so it becomes a bit less random okay
+
+34:53.600 --> 34:58.480
+let's now train the model so first what i'm going to do is i'm going to create a pytorch optimization
+
+34:58.480 --> 35:06.240
+object so here we are using the optimizer adam w now in the make more series we've only ever used
+
+35:06.240 --> 35:11.440
+stochastic gradient descent the simplest possible optimizer which you can get using the sgd instead
+
+35:11.440 --> 35:15.440
+but i want to use adam which is a much more advanced and popular optimizer and it works
+
+35:15.440 --> 35:16.000
+extremely well for a lot of other optimizers but i want to use adam which is a much more advanced and popular optimizer and it works extremely well
+
+35:17.680 --> 35:23.040
+typical good setting for the learning rate is roughly 3e negative 4 but for very very small
+
+35:23.040 --> 35:26.720
+networks like it's the case here you can get away with much much higher learning rates
+
+35:26.720 --> 35:33.280
+1-3 or even higher probably but let me create the optimizer object which will basically take
+
+35:33.280 --> 35:40.480
+the gradients and update the parameters using the gradients and then here our batch size up above
+
+35:40.480 --> 35:45.360
+was only 4 so let me actually use something bigger let's say 32 and then for some number of steps
+
+35:47.120 --> 35:53.600
+we're sampling a new batch of data we're evaluating the loss we're zeroing out all the gradients from
+
+35:53.600 --> 35:58.240
+the previous step getting the gradients for all the parameters and then using those gradients to
+
+35:58.240 --> 36:04.240
+update our parameters so typical training loop as we saw in the make more series so let me now
+
+36:04.240 --> 36:09.200
+run this for say 100 iterations and let's see what kind of loss is we're going to get
+
+36:11.440 --> 36:16.720
+so we started around 4.7 and now we're getting down to like 4.6
+
+36:17.040 --> 36:23.680
+so the optimization is definitely happening but let's sort of try to increase the number
+
+36:23.680 --> 36:28.320
+of iterations and only print at the end because we probably will not train for longer
+
+36:30.240 --> 36:32.240
+okay so we're down to 3.6 roughly
+
+36:35.520 --> 36:36.480
+roughly down to three
+
+36:41.440 --> 36:43.040
+this is the most janky optimization
+
+36:47.680 --> 36:52.720
+if we do that and clean those up we get six hours of telly in in mobile
+
+36:54.320 --> 36:56.080
+okay it's working let's just do 10 000
+
+36:57.520 --> 37:00.640
+and then from here we want to copy this
+
+37:01.760 --> 37:04.640
+and hopefully we're going to get something reasonable and of course it's not going to
+
+37:04.640 --> 37:08.320
+be shakespeare from a bigger model but at least we see that the loss is improving
+
+37:08.880 --> 37:11.680
+and hopefully we're expecting something a bit more reasonable
+
+37:12.960 --> 37:15.600
+so we're down in about 2.5-ish let's see what we get
+
+37:15.600 --> 37:16.240
+okay
+
+37:16.240 --> 37:18.220
+Let me just increase the number of tokens.
+
+37:19.160 --> 37:23.740
+Okay, so we see that we're starting to get something at least like reasonable-ish.
+
+37:26.540 --> 37:30.280
+Certainly not Shakespeare, but the model is making progress.
+
+37:30.640 --> 37:32.640
+So that is the simplest possible model.
+
+37:33.860 --> 37:41.360
+So now what I'd like to do is, obviously, this is a very simple model because the tokens are not talking to each other.
+
+37:41.360 --> 37:48.260
+So given the previous context of whatever was generated, we're only looking at the very last character to make the predictions about what comes next.
+
+37:48.880 --> 37:57.140
+So now these tokens have to start talking to each other and figuring out what is in the context so that they can make better predictions for what comes next.
+
+37:57.520 --> 37:59.840
+And this is how we're going to kick off the transformer.
+
+38:00.500 --> 38:04.880
+Okay, so next, I took the code that we developed in this Jupyter notebook and I converted it to be a script.
+
+38:05.340 --> 38:11.320
+And I'm doing this because I just want to simplify our intermediate work, which is just the final product that we have.
+
+38:11.360 --> 38:16.520
+At this point, so in the top here, I put all the hyperparameters that we've defined.
+
+38:16.760 --> 38:19.520
+I introduced a few and I'm going to speak to that in a little bit.
+
+38:20.120 --> 38:34.880
+Otherwise, a lot of this should be recognizable, reproducibility, read data, get the encoder and decoder, create the train and test splits, use the kind of like data loader that gets a batch of the inputs and targets.
+
+38:35.840 --> 38:37.960
+This is new, and I'll talk about it in a second.
+
+38:39.020 --> 38:41.000
+Now, this is the bigram language model that we developed.
+
+38:41.720 --> 38:44.900
+And it can forward and give us a logits and loss and it can generate.
+
+38:46.800 --> 38:49.980
+And then here we are creating the optimizer and this is the training loop.
+
+38:51.960 --> 38:54.040
+So everything here should look pretty familiar.
+
+38:54.160 --> 38:56.080
+Now, some of the small things that I added.
+
+38:56.200 --> 39:00.280
+Number one, I added the ability to run on a GPU if you have it.
+
+39:00.760 --> 39:06.600
+So if you have a GPU, then you can, this will use CUDA instead of just CPU and everything will be a lot more faster.
+
+39:07.220 --> 39:11.340
+Now, when device becomes CUDA, then we need to make sure that when we load the data.
+
+39:11.460 --> 39:12.960
+We move it to device.
+
+39:13.960 --> 39:18.460
+When we create the model, we want to move the model parameters to device.
+
+39:18.960 --> 39:26.960
+So as an example, here we have the in an embedding table and it's got a dot weight inside it, which stores the sort of lookup table.
+
+39:27.160 --> 39:33.160
+So that would be moved to the GPU so that all the calculations here happen on the GPU and they can be a lot faster.
+
+39:33.960 --> 39:39.460
+And then finally here, when I'm creating the context that feeds into generate, I have to make sure that I create on the device.
+
+39:40.360 --> 39:41.260
+Number two, when I enter.
+
+39:41.460 --> 39:45.960
+Introduced is the fact that here in the training loop.
+
+39:47.660 --> 39:52.960
+Here, I was just printing the loss dot item inside the training loop.
+
+39:53.160 --> 39:57.960
+But this is a very noisy measurement of the current loss because every batch will be more or less lucky.
+
+39:58.660 --> 40:11.160
+And so what I want to do usually is I have an estimate loss function and the estimate loss basically then goes up here and it averages up.
+
+40:11.160 --> 40:13.060
+The loss over multiple batches.
+
+40:13.560 --> 40:22.160
+So in particular, we're going to iterate eval, either times and we're going to basically get our loss and then we're going to get the average loss for both splits.
+
+40:22.560 --> 40:24.160
+And so this will be a lot less noisy.
+
+40:25.060 --> 40:30.760
+So here when we call the estimate loss, we're going to report the pretty accurate train and validation loss.
+
+40:31.960 --> 40:34.560
+Now when we come back up, you'll notice a few things here.
+
+40:34.760 --> 40:38.260
+I'm setting the model to evaluation phase and down here.
+
+40:38.260 --> 40:40.260
+I'm resetting it back to training phase.
+
+40:40.260 --> 40:56.060
+Now right now for our model as is, this doesn't actually do anything because the only thing inside this model is this nn.embedding and this network would behave the same in both evaluation mode and training mode.
+
+40:56.460 --> 40:57.660
+We have no dropout layers.
+
+40:57.660 --> 40:59.160
+We have no batch drum layers, etc.
+
+40:59.660 --> 41:08.460
+But it is a good practice to think through what mode your neural network is in because some layers will have different behavior at inference time or training time.
+
+41:08.460 --> 41:19.360
+And there's also this context manager, torch.nograd, and this is just telling PyTorch that everything that happens inside this function, we will not call .backward on.
+
+41:20.060 --> 41:28.160
+And so PyTorch can be a lot more efficient with its memory use because it doesn't have to store all the intermediate variables because we're never going to call backward.
+
+41:28.660 --> 41:31.560
+And so it can be a lot more efficient in that way.
+
+41:31.860 --> 41:36.560
+So also a good practice to tell PyTorch when we don't intend to do backpropagation.
+
+41:37.660 --> 41:38.160
+So,
+
+41:38.460 --> 41:38.960
+right now,
+
+41:38.960 --> 41:44.560
+this script is about 120 lines of code of and that's kind of our starter code.
+
+41:45.360 --> 41:48.360
+I'm calling it bigram.py and I'm going to release it later.
+
+41:48.960 --> 41:53.860
+Now running this script gives us output in the terminal and it looks something like this.
+
+41:54.860 --> 41:59.560
+It basically, as I ran this code, it was giving me the train loss and val loss.
+
+41:59.760 --> 42:03.960
+And we see that we convert to somewhere around 2.5 with the bigram model.
+
+42:04.460 --> 42:06.960
+And then here's the sample that we produced at the end.
+
+42:08.460 --> 42:13.060
+And so we have everything packaged up in the script and we're in a good position now to iterate on this.
+
+42:13.460 --> 42:13.660
+Okay,
+
+42:13.660 --> 42:20.460
+so we are almost ready to start writing our very first self-attention block for processing these tokens.
+
+42:21.160 --> 42:21.660
+Now,
+
+42:22.260 --> 42:23.360
+before we actually get there,
+
+42:23.560 --> 42:33.960
+I want to get you used to a mathematical trick that is used in the self-attention inside a transformer and is really just like at the heart of an efficient implementation of self-attention.
+
+42:34.660 --> 42:38.160
+And so I want to work with this toy example to just get you used to this operation.
+
+42:38.460 --> 42:44.160
+And then it's going to make it much more clear once we actually get to it in the script again.
+
+42:45.460 --> 42:50.460
+So let's create a B by T by C where B, T and C are just 4, 8 and 2 in this toy example.
+
+42:51.260 --> 42:59.660
+And these are basically channels and we have batches and we have the time component and we have some information at each point in the sequence.
+
+42:59.960 --> 43:00.560
+So C.
+
+43:02.060 --> 43:05.660
+Now what we would like to do is we would like these tokens.
+
+43:05.760 --> 43:08.360
+So we have up to eight tokens here in a batch.
+
+43:08.660 --> 43:12.660
+And these eight tokens are currently not talking to each other and we would like them to talk to each other.
+
+43:12.660 --> 43:13.660
+We'd like to couple them.
+
+43:14.860 --> 43:16.260
+And in particular,
+
+43:16.660 --> 43:19.460
+we don't we want to couple them in this very specific way.
+
+43:19.960 --> 43:20.960
+So the token,
+
+43:20.960 --> 43:21.360
+for example,
+
+43:21.360 --> 43:22.560
+at the fifth location,
+
+43:23.060 --> 43:30.460
+it should not communicate with tokens in the sixth seventh and eighth location because those are future tokens in the sequence.
+
+43:31.060 --> 43:35.560
+The token on the fifth location should only talk to the one in the fourth third second and first.
+
+43:36.060 --> 43:38.460
+So it's only so information only flows.
+
+43:38.560 --> 43:45.260
+From previous context to the current time step and we cannot get any information from the future because we are about to try to predict the future.
+
+43:46.460 --> 43:50.560
+So what is the easiest way for tokens to communicate?
+
+43:50.960 --> 43:53.860
+Okay, the easiest way I would say is okay.
+
+43:53.860 --> 44:05.860
+If we are up to if we're a fifth token and I'd like to communicate with my past the simplest way we can do that is to just do a weight is to just do an average of all the of all the preceding elements.
+
+44:06.160 --> 44:06.760
+So for example,
+
+44:06.760 --> 44:07.660
+if I'm the fifth token,
+
+44:07.760 --> 44:13.260
+I would like to take the channels that make up that are information at my step,
+
+44:13.660 --> 44:17.460
+but then also the channels from the fourth step third step second step in the first step.
+
+44:17.660 --> 44:24.960
+I'd like to average those up and then that would become sort of like a feature vector that summarizes me in the context of my history.
+
+44:25.660 --> 44:25.860
+Now,
+
+44:25.860 --> 44:26.160
+of course,
+
+44:26.160 --> 44:30.260
+just doing a sum or like an average is an extremely weak form of interaction.
+
+44:30.260 --> 44:32.460
+Like this communication is extremely lossy.
+
+44:32.660 --> 44:36.160
+We've lost a ton of information about spatial arrangements of all those tokens,
+
+44:36.960 --> 44:37.560
+but that's okay.
+
+44:37.660 --> 44:38.160
+For now,
+
+44:38.160 --> 44:40.260
+we'll see how we can bring that information back later.
+
+44:41.060 --> 44:41.360
+For now,
+
+44:41.360 --> 44:48.760
+what we would like to do is for every single batch element independently for every teeth token in that sequence.
+
+44:49.160 --> 44:56.560
+We'd like to now calculate the average of all the vectors in all the previous tokens and also at this token.
+
+44:57.460 --> 44:58.460
+So let's write that out.
+
+44:59.960 --> 45:02.960
+I have a small snippet here and instead of just fumbling around,
+
+45:03.560 --> 45:05.160
+let me just copy paste it and talk to it.
+
+45:06.560 --> 45:07.460
+So in other words,
+
+45:08.160 --> 45:18.960
+we're going to create X and B O W is short for bag of words because bag of words is is kind of like a term that people use when you are just averaging up things.
+
+45:18.960 --> 45:20.360
+So this is just a bag of words.
+
+45:20.660 --> 45:20.960
+Basically,
+
+45:20.960 --> 45:26.260
+there's a word stored on every one of these eight locations and we're doing a bag of words for just averaging.
+
+45:27.460 --> 45:28.260
+So in the beginning,
+
+45:28.260 --> 45:31.960
+we're going to say that it's just initialized at zero and then I'm doing a for loop here.
+
+45:31.960 --> 45:33.260
+So we're not being efficient yet.
+
+45:33.260 --> 45:33.960
+That's coming.
+
+45:34.560 --> 45:34.960
+But for now,
+
+45:34.960 --> 45:37.460
+we're just iterating over all the batch dimensions independently.
+
+45:38.060 --> 45:39.460
+Iterating over time
+
+45:40.160 --> 45:45.860
+and then the previous tokens are at this batch dimension
+
+45:46.360 --> 45:49.360
+and then everything up to and including the teeth token.
+
+45:49.860 --> 45:50.260
+Okay.
+
+45:50.960 --> 45:53.060
+So when we slice out X in this way,
+
+45:53.560 --> 45:55.660
+Xprev becomes of shape,
+
+45:56.860 --> 46:00.960
+how many T elements there were in the past and then of course C.
+
+46:00.960 --> 46:04.260
+So all the two-dimensional information from these little tokens.
+
+46:05.260 --> 46:07.460
+So that's the previous sort of chunk of
+
+46:07.560 --> 46:11.260
+tokens from my current sequence.
+
+46:11.960 --> 46:15.560
+And then I'm just doing the average or the mean over the zero dimension.
+
+46:15.560 --> 46:21.660
+So I'm averaging out the time here and I'm just going to get a little C one-dimensional vector,
+
+46:21.660 --> 46:24.360
+which I'm going to store in X bag of words.
+
+46:25.160 --> 46:31.560
+So I can run this and this is not going to be very informative because let's see.
+
+46:31.560 --> 46:32.560
+So this is X of zero.
+
+46:32.560 --> 46:36.660
+So this is the zeroth batch element and then expo at zero.
+
+46:37.160 --> 46:37.660
+Now,
+
+46:38.560 --> 46:39.460
+you see how the
+
+46:39.960 --> 46:41.260
+at the first location here,
+
+46:41.660 --> 46:43.360
+you see that the two are equal
+
+46:43.860 --> 46:46.860
+and that's because it's we're just doing an average of this one token.
+
+46:47.660 --> 46:50.660
+But here this one is now an average of these two.
+
+46:51.860 --> 46:54.860
+And now this one is an average of these three.
+
+46:55.960 --> 46:56.560
+And so on.
+
+46:57.860 --> 47:02.460
+So and this last one is the average of all of these elements.
+
+47:02.460 --> 47:06.360
+So vertical average just averaging up all the tokens now gives this outcome.
+
+47:06.660 --> 47:07.160
+Here.
+
+47:08.360 --> 47:09.760
+So this is all well and good,
+
+47:10.160 --> 47:11.560
+but this is very inefficient.
+
+47:11.960 --> 47:12.160
+Now.
+
+47:12.160 --> 47:16.660
+The trick is that we can be very very efficient about doing this using matrix multiplication.
+
+47:17.360 --> 47:19.060
+So that's the mathematical trick.
+
+47:19.060 --> 47:20.160
+And let me show you what I mean.
+
+47:20.560 --> 47:22.160
+Let's work with the toy example here.
+
+47:23.060 --> 47:24.260
+You run it and I'll explain.
+
+47:25.460 --> 47:27.560
+I have a simple matrix here.
+
+47:27.560 --> 47:34.160
+That is three by three of all ones a matrix B of just random numbers and it's a three by two and a matrix C,
+
+47:34.160 --> 47:36.560
+which will be three by three multiply three by two.
+
+47:36.860 --> 47:38.560
+Which will give out a three by two.
+
+47:39.460 --> 47:40.560
+So here we're just using
+
+47:41.860 --> 47:42.860
+matrix multiplication.
+
+47:43.460 --> 47:45.260
+So a multiply B gives us C.
+
+47:47.060 --> 47:51.860
+Okay, so how are these numbers in C achieved?
+
+47:51.860 --> 47:52.160
+Right?
+
+47:52.160 --> 47:59.460
+So this number in the top left is the first row of a dot product with the first column of B.
+
+48:00.160 --> 48:06.460
+And since all the row of a right now is all just once then the dot product here with with this column of
+
+48:06.460 --> 48:06.560
+B.
+
+48:06.860 --> 48:09.860
+Is just going to do a sum of these of this column.
+
+48:10.060 --> 48:12.460
+So two plus six plus six is 14.
+
+48:13.460 --> 48:17.060
+The element here in the output of C is also the first column here.
+
+48:17.060 --> 48:21.060
+The first row of a multiplied now with the second column of B.
+
+48:21.460 --> 48:23.860
+So seven plus four plus plus five is 16.
+
+48:24.760 --> 48:26.260
+Now you see that there's repeating elements here.
+
+48:26.260 --> 48:31.460
+So this 14 again is because this row is again all once and it's multiplying the first column of B.
+
+48:31.460 --> 48:34.760
+So we get 14 and this one is and so on.
+
+48:34.760 --> 48:36.560
+So this last number here is the.
+
+48:36.660 --> 48:39.360
+The last row dot product last column.
+
+48:40.460 --> 48:42.660
+Now the trick here is the following.
+
+48:43.360 --> 48:53.860
+This is just a boring number of is just a boring array of all once but torch has this function called trill which is short for a triangular.
+
+48:55.360 --> 49:01.860
+Something like that and you can wrap it in torch that once and it will just return the lower triangular portion of this.
+
+49:02.660 --> 49:03.060
+Okay.
+
+49:04.760 --> 49:06.460
+So now it will basically zero out.
+
+49:06.660 --> 49:07.460
+Of these guys here.
+
+49:07.560 --> 49:09.460
+So we just get the lower triangular part.
+
+49:09.760 --> 49:11.960
+Well, what happens if we do that?
+
+49:15.160 --> 49:18.160
+So now we'll have a like this and be like this.
+
+49:18.160 --> 49:19.660
+And now what are we getting here and see?
+
+49:20.360 --> 49:21.560
+Well, what is this number?
+
+49:21.860 --> 49:26.860
+Well, this is the first row times the first column and because this is zeros.
+
+49:28.960 --> 49:30.660
+These elements here are now ignored.
+
+49:30.660 --> 49:36.160
+So we just get a two and then this number here is the first row times the second column.
+
+49:36.660 --> 49:39.660
+And because these are zeros they get ignored and it's just seven.
+
+49:40.160 --> 49:41.460
+The seven multiplies this one.
+
+49:42.460 --> 49:45.260
+But look what happened here because this is one and then zeros.
+
+49:45.560 --> 49:50.860
+We what ended up happening is we're just plucking out the row of this row of B and that's what we got.
+
+49:52.160 --> 49:54.760
+Now here we have one one zero.
+
+49:55.360 --> 50:02.660
+So here one one zero dot product with these two columns will now give us two plus six which is eight and seven plus four which is 11.
+
+50:03.360 --> 50:06.160
+And because this is one one one we ended up with.
+
+50:06.660 --> 50:07.860
+The addition of all of them.
+
+50:08.860 --> 50:11.860
+And so basically depending on how many ones and zeros we have here.
+
+50:12.260 --> 50:20.260
+We are basically doing a sum currently of the variable number of these rows and that gets deposited into C.
+
+50:21.760 --> 50:32.760
+So currently we're doing sums because these are ones but we can also do average right and you can start to see how we could do average of the rows of B sort of an incremental fashion.
+
+50:33.560 --> 50:36.360
+Because we don't have to we can basically normalize.
+
+50:36.360 --> 50:39.660
+These rows so that they sum to one and then we're going to get an average.
+
+50:40.360 --> 50:47.060
+So if we took a and then we did a equals a divide a torch dot sum in the.
+
+50:48.660 --> 50:50.460
+Of a in the.
+
+50:51.360 --> 50:51.760
+One.
+
+50:52.860 --> 50:55.860
+Dimension and then let's keep them is true.
+
+50:56.460 --> 50:58.260
+So therefore the broadcasting will work out.
+
+50:58.860 --> 51:03.460
+So if I rerun this you see now that these rows now sum to one.
+
+51:03.760 --> 51:06.160
+So this row is one this row is point five point five zero.
+
+51:06.860 --> 51:08.360
+And here we get one thirds.
+
+51:08.960 --> 51:11.760
+And now when we do a multiply be what are we getting.
+
+51:12.560 --> 51:14.860
+Here we are just getting the first row first row.
+
+51:15.760 --> 51:19.160
+Here now we are getting the average of the first two rows.
+
+51:21.060 --> 51:25.160
+Okay so two and six average is four and four and seven averages five point five.
+
+51:26.060 --> 51:30.760
+And on the bottom here we are now getting the average of these three rows.
+
+51:31.560 --> 51:35.560
+So the average of all of elements of B are now deposited here.
+
+51:36.460 --> 51:45.060
+And so you can see that by manipulating these elements of this multiplying matrix and then multiplying it with any given matrix.
+
+51:45.360 --> 51:49.860
+We can do these averages in this incremental fashion because we just get.
+
+51:51.460 --> 51:54.060
+And we can manipulate that based on the elements of a.
+
+51:54.660 --> 52:01.460
+Okay so that's very convenient so let's swing back up here and see how we can vectorize this and make it much more efficient using what we've learned.
+
+52:02.360 --> 52:03.060
+So in particular.
+
+52:04.660 --> 52:06.160
+We are going to produce an array.
+
+52:06.860 --> 52:09.360
+But here I'm going to call it way short for weights.
+
+52:10.160 --> 52:11.060
+But this is our a.
+
+52:12.660 --> 52:19.460
+And this is how much of every row we want to average up and it's going to be an average because you can see that these rows sum to one.
+
+52:21.060 --> 52:25.360
+So this is our a and then our B in this example of course is.
+
+52:26.160 --> 52:26.560
+X.
+
+52:27.860 --> 52:30.960
+So it's going to happen here now is that we are going to have an expo to.
+
+52:32.760 --> 52:35.660
+And this expo to is going to be way.
+
+52:36.460 --> 52:37.160
+Multiplying.
+
+52:38.060 --> 52:38.560
+Rx.
+
+52:39.860 --> 52:47.160
+So let's think this through way is T by T and this is matrix multiplying in PyTorch a B by T by C.
+
+52:48.660 --> 52:49.460
+And it's giving us.
+
+52:51.060 --> 52:51.560
+What shape.
+
+52:52.160 --> 53:00.260
+So PyTorch will come here and it will see that these shapes are not the same so it will create a bash dimension here and this is a batch matrix multiply.
+
+53:01.460 --> 53:04.860
+And so it will apply this matrix multiplication in all the batch elements.
+
+53:05.460 --> 53:05.960
+In parallel.
+
+53:06.460 --> 53:14.160
+And individually and then for each batch element there will be a T by T multiplying T by C exactly as we had below.
+
+53:16.660 --> 53:17.860
+So this will now create.
+
+53:18.760 --> 53:20.060
+B by T by C.
+
+53:21.360 --> 53:25.160
+And expo to will now become identical to expo.
+
+53:26.360 --> 53:26.960
+So.
+
+53:28.960 --> 53:30.960
+We can see that torched out all close.
+
+53:31.860 --> 53:35.560
+Of expo and expo to should be true now.
+
+53:37.360 --> 53:41.960
+So this kind of like misses us that these are in fact the same.
+
+53:42.760 --> 53:45.960
+So expo and expo to if I just print them.
+
+53:48.260 --> 53:49.960
+Okay, we're not going to be able to.
+
+53:50.460 --> 53:52.960
+Okay, we're not going to be able to just stare it down but.
+
+53:55.160 --> 53:58.960
+Well, let me try expo basically just at the 0th element and expo to at the 0th element.
+
+53:58.960 --> 54:04.160
+So just the first batch and we should see that this and that should be identical which they are.
+
+54:05.360 --> 54:05.760
+Right.
+
+54:05.860 --> 54:06.860
+So what happened here.
+
+54:07.260 --> 54:20.560
+The trick is we were able to use batch matrix multiply to do this aggregation really and it's a weighted aggregation and the weights are specified in this T by T array.
+
+54:21.460 --> 54:31.360
+And we're basically doing weighted sums and these weighted sums are according to the weights inside here that take on sort of this triangular form.
+
+54:32.160 --> 54:35.660
+And so that means that a token at the teeth dimension will only get.
+
+54:35.860 --> 54:40.360
+Sort of information from the tokens preceding it.
+
+54:40.660 --> 54:41.860
+So that's exactly what we want.
+
+54:42.260 --> 54:44.760
+And finally, I would like to rewrite it in one more way.
+
+54:45.460 --> 54:47.160
+And we're going to see why that's useful.
+
+54:48.060 --> 54:53.760
+So this is the third version and it's also identical to the first and second, but let me talk through it.
+
+54:53.760 --> 54:54.860
+It uses softmax.
+
+54:55.660 --> 55:04.860
+So trill here is this Matrix lower triangular once way begins as all zero.
+
+55:05.860 --> 55:13.560
+Okay, so if I just print way in the beginning, it's all zero then I used masked fill.
+
+55:14.260 --> 55:18.260
+So what this is doing is wait that masked fill it's all zeros.
+
+55:18.260 --> 55:24.760
+And I'm saying for all the elements where trill is equals equals zero make them be negative Infinity.
+
+55:25.460 --> 55:29.160
+So all the elements where trill is zero will become negative Infinity now.
+
+55:30.260 --> 55:31.160
+So this is what we get.
+
+55:32.260 --> 55:34.960
+And then the final line here is softmax.
+
+55:36.760 --> 55:44.860
+So if I take a softmax along every single so dim is negative one so long every single row if I do a softmax, what is that going to do?
+
+55:47.060 --> 55:53.160
+Well softmax is is also like a normalization operation, right?
+
+55:54.160 --> 55:56.860
+And so spoiler alert you get the exact same Matrix.
+
+55:58.560 --> 56:02.160
+Let me bring back the softmax and recall that in softmax.
+
+56:02.160 --> 56:04.560
+We're going to exponentiate every single one of these.
+
+56:05.760 --> 56:07.460
+And then we're going to divide by the sum.
+
+56:08.260 --> 56:16.460
+And so if we exponentiate every single element here, we're going to get a one and here we're going to get basically zero zero zero zero everywhere else.
+
+56:17.060 --> 56:20.260
+And then when we normalize we just get one here.
+
+56:20.260 --> 56:27.460
+We're going to get one one and then zeros and then softmax will again divide and this will give us 0.5 0.5 and so on.
+
+56:28.160 --> 56:32.460
+And so this is also the same way to produce this mask.
+
+56:33.360 --> 56:35.260
+Now the reason that this is a bit more interesting.
+
+56:35.360 --> 56:47.660
+And the reason we're going to end up using it in self-attention is that these weights here begin with zero and you can think of this as like an interaction strength or like an affinity.
+
+56:48.260 --> 57:03.760
+So basically it's telling us how much of each token from the past do we want to aggregate and average up and then this line is saying tokens from the past cannot communicate by setting them to negative Infinity.
+
+57:03.860 --> 57:05.060
+We're saying that we will not.
+
+57:05.260 --> 57:07.060
+Aggregate anything from those tokens.
+
+57:08.360 --> 57:13.760
+And so basically this then goes through softmax and through the weighted and this is the aggregation through matrix multiplication.
+
+57:15.060 --> 57:18.060
+And so what this is now is you can think of these as
+
+57:18.860 --> 57:28.960
+the zeros are currently just set by us to be zero but quick preview is that these affinities between the tokens are not going to be just constant at zero.
+
+57:29.260 --> 57:30.960
+They're going to be data dependent.
+
+57:31.260 --> 57:35.160
+These tokens are going to start looking at each other and some tokens will find other tokens.
+
+57:35.360 --> 57:44.160
+More or less interesting and depending on what their values are, they're going to find each other interesting to different amounts and I'm going to call those affinities.
+
+57:44.160 --> 57:48.460
+I think and then here we are saying the future cannot communicate with the past.
+
+57:48.960 --> 57:50.060
+We're going to clamp them.
+
+57:51.160 --> 57:57.860
+And then when we normalize and some we're going to aggregate sort of their values depending on how interesting they find each other.
+
+57:58.460 --> 58:04.760
+And so that's the preview for self-attention and basically long story short from this entire section is that.
+
+58:05.360 --> 58:15.060
+You can do weighted aggregations of your past elements by having by using matrix multiplication of a lower triangular fashion.
+
+58:15.760 --> 58:22.960
+And then the elements here in the lower triangular part are telling you how much of each element fuses into this position.
+
+58:23.660 --> 58:26.760
+So we're going to use this trick now to develop the self-attention block.
+
+58:27.260 --> 58:29.460
+So first let's get some quick preliminaries out of the way.
+
+58:30.760 --> 58:34.960
+First the thing I'm kind of bothered by is that you see how we're passing in vocab size into the constructor.
+
+58:35.360 --> 58:39.560
+You don't need to do that because vocab size is already defined up top as a global variable.
+
+58:39.560 --> 58:41.360
+So there's no need to pass this stuff around.
+
+58:42.860 --> 58:46.060
+Next what I want to do is I don't want to actually create.
+
+58:46.360 --> 58:52.260
+I want to create like a level of indirection here where we don't directly go to the embedding for the logits.
+
+58:52.460 --> 58:56.960
+But instead we go through this intermediate phase because we're going to start making that bigger.
+
+58:57.560 --> 59:03.360
+So let me introduce a new variable and embed it short for number of embedding dimensions.
+
+59:03.960 --> 59:04.760
+So an embed.
+
+59:05.360 --> 59:08.360
+Here will be say 32.
+
+59:09.060 --> 59:11.260
+That was a suggestion from GitHub copilot by the way.
+
+59:11.960 --> 59:14.160
+It also suggested 32 which is a good number.
+
+59:15.460 --> 59:18.860
+So this is an embedding table and only 32 dimensional embeddings.
+
+59:19.960 --> 59:22.660
+So then here this is not going to give us logits directly.
+
+59:23.160 --> 59:25.360
+Instead this is going to give us token embeddings.
+
+59:25.960 --> 59:26.860
+That's what I'm going to call it.
+
+59:27.260 --> 59:31.060
+And then to go from the token embeddings to the logits we're going to need a linear layer.
+
+59:31.560 --> 59:35.160
+So self.lmhead let's call it short for language modeling head.
+
+59:35.960 --> 59:38.760
+Is an in linear from an embed up to vocab size.
+
+59:39.660 --> 59:40.860
+And then we swing over here.
+
+59:40.960 --> 59:44.660
+We're actually going to get the logits by exactly what the copilot says.
+
+59:45.760 --> 59:50.260
+Now we have to be careful here because this C and this C are not equal.
+
+59:51.360 --> 59:53.760
+This is an embed C and this is vocab size.
+
+59:54.760 --> 59:57.260
+So let's just say that an embed is equal to C.
+
+59:58.660 --> 01:00:02.860
+And then this just creates one spurious layer of indirection through a linear layer.
+
+01:00:03.360 --> 01:00:05.060
+But this should basically run.
+
+01:00:05.260 --> 01:00:16.360
+So we see that this runs and this currently looks kind of spurious.
+
+01:00:16.360 --> 01:00:18.160
+But we're going to build on top of this.
+
+01:00:18.860 --> 01:00:20.260
+Now next up so far.
+
+01:00:20.260 --> 01:00:27.460
+We've taken these indices and we've encoded them based on the identity of the tokens inside IDX.
+
+01:00:28.160 --> 01:00:34.260
+The next thing that people very often do is that we're not just encoding the identity of these tokens, but also their position.
+
+01:00:34.760 --> 01:00:37.860
+So we're going to have a second position embedding table here.
+
+01:00:38.260 --> 01:00:43.460
+So solve that position embedding table is an embedding of block size by an embed.
+
+01:00:43.960 --> 01:00:48.360
+And so each position from zero to block size minus one will also get its own embedding vector.
+
+01:00:49.460 --> 01:00:53.760
+And then here first, let me decode B by T from IDX dot shape.
+
+01:00:55.360 --> 01:00:59.160
+And then here we're also going to have a plus embedding, which is the positional embedding.
+
+01:00:59.260 --> 01:01:01.060
+And these are this is torr dash arrange.
+
+01:01:01.560 --> 01:01:04.060
+So this will be basically just integers from zero to zero.
+
+01:01:04.260 --> 01:01:05.160
+To T minus one.
+
+01:01:06.160 --> 01:01:11.060
+And all of those integers from zero to T minus one get embedded through the table to create a T by C.
+
+01:01:12.360 --> 01:01:20.760
+And then here this gets renamed to just say X and X will be the addition of the token embeddings with the positional embeddings.
+
+01:01:21.960 --> 01:01:23.860
+And here the broadcasting note will work out.
+
+01:01:23.860 --> 01:01:25.960
+So B by T by C plus T by C.
+
+01:01:26.460 --> 01:01:31.560
+This gets right aligned and new dimension of one gets added and it gets broadcasted across batch.
+
+01:01:32.760 --> 01:01:34.160
+So at this point X.
+
+01:01:34.260 --> 01:01:38.860
+Holds not just the token identities, but the positions at which these tokens occur.
+
+01:01:39.660 --> 01:01:43.360
+And this is currently not that useful because of course, we just have a simple migraine model.
+
+01:01:43.460 --> 01:01:49.160
+So it doesn't matter if you're in the fifth position, the second position or wherever it's all translation invariant at this stage.
+
+01:01:49.660 --> 01:01:51.460
+So this information currently wouldn't help.
+
+01:01:52.060 --> 01:01:55.660
+But as we work on the self-attention block, we'll see that this starts to matter.
+
+01:01:59.860 --> 01:02:01.960
+Okay, so now we get the crux of self-attention.
+
+01:02:02.260 --> 01:02:04.160
+So this is probably the most important part of this video.
+
+01:02:04.360 --> 01:02:05.360
+To understand.
+
+01:02:06.460 --> 01:02:10.560
+We're going to implement a small self-attention for a single individual head as they're called.
+
+01:02:11.160 --> 01:02:12.960
+So we start off with where we were.
+
+01:02:13.160 --> 01:02:14.560
+So all of this code is familiar.
+
+01:02:15.360 --> 01:02:20.060
+So right now I'm working with an example where I change the number of channels from 2 to 32.
+
+01:02:20.060 --> 01:02:28.160
+So we have a 4 by 8 arrangement of tokens and each token and the information at each token is currently 32 dimensional.
+
+01:02:28.260 --> 01:02:30.060
+But we just are working with random numbers.
+
+01:02:31.360 --> 01:02:32.960
+Now we saw here that
+
+01:02:32.960 --> 01:02:42.260
+The code as we had it before does a simple weight simple average of all the past tokens and the current token.
+
+01:02:42.460 --> 01:02:46.660
+So it's just the previous information and current information is just being mixed together in an average.
+
+01:02:47.360 --> 01:02:49.260
+And that's what this code currently achieves.
+
+01:02:49.560 --> 01:02:57.260
+And it does so by creating this lower triangular structure, which allows us to mask out this weight matrix that we create.
+
+01:02:57.760 --> 01:03:01.660
+So we mask it out and then we normalize it and currently
+
+01:03:01.660 --> 01:03:09.760
+When we initialize the affinities between all the different sort of tokens or nodes, I'm going to use those terms interchangeably.
+
+01:03:10.660 --> 01:03:19.660
+So when we initialize the affinities between all the different tokens to be zero, then we see that way gives us this structure where every single row has these
+
+01:03:21.160 --> 01:03:22.060
+Uniform numbers.
+
+01:03:22.460 --> 01:03:28.660
+And so that's what that's what then in this matrix multiply makes it so that we're doing a simple average.
+
+01:03:29.660 --> 01:03:30.160
+Now,
+
+01:03:30.860 --> 01:03:31.560
+We don't actually want.
+
+01:03:31.860 --> 01:03:32.660
+This to be
+
+01:03:33.360 --> 01:03:34.260
+All uniform
+
+01:03:34.660 --> 01:03:41.260
+Because different tokens will find different other tokens more or less interesting and we want that to be data dependent.
+
+01:03:41.460 --> 01:03:50.060
+So for example, if I'm a vowel then maybe I'm looking for consonants in my past and maybe I want to know what those consonants are and I want that information to flow to me.
+
+01:03:51.160 --> 01:03:55.960
+And so I want to now gather information from the past, but I want to do it in a data dependent way.
+
+01:03:56.260 --> 01:03:58.160
+And this is the problem that self-attention solves.
+
+01:03:58.960 --> 01:04:00.860
+Now the way self-attention solves this
+
+01:04:01.060 --> 01:04:01.560
+Is the following.
+
+01:04:02.260 --> 01:04:07.760
+Every single node or every single token at each position will emit two vectors.
+
+01:04:08.460 --> 01:04:11.860
+It will emit a query and it will emit a key.
+
+01:04:13.360 --> 01:04:17.360
+Now the query vector roughly speaking is what am I looking for?
+
+01:04:18.260 --> 01:04:21.160
+And the key vector roughly speaking is what do I contain?
+
+01:04:22.560 --> 01:04:31.460
+And then the way we get affinities between these tokens now in a sequence is we basically just do a dot product between the keys and the query.
+
+01:04:32.260 --> 01:04:41.260
+So my query dot products with all the keys of all the other tokens and that dot product now becomes way.
+
+01:04:42.260 --> 01:04:56.260
+And so if the key and the query are sort of aligned, they will interact to a very high amount and then I will get to learn more about that specific token as opposed to any other token in the sequence.
+
+01:04:56.460 --> 01:04:57.460
+So let's implement this now.
+
+01:05:01.660 --> 01:05:03.060
+We're going to implement a single
+
+01:05:04.660 --> 01:05:06.760
+what's called head of self-attention.
+
+01:05:08.060 --> 01:05:09.260
+So this is just one head.
+
+01:05:09.660 --> 01:05:12.760
+There's a hyper parameter involved with these heads, which is the head size.
+
+01:05:13.460 --> 01:05:18.060
+And then here I'm initializing linear modules and I'm using bias equals false.
+
+01:05:18.060 --> 01:05:21.560
+So these are just going to apply a matrix multiply with some fixed weights.
+
+01:05:22.760 --> 01:05:29.860
+And now let me produce a key and Q K and Q by forwarding these modules on X.
+
+01:05:30.960 --> 01:05:31.560
+So the size of this.
+
+01:05:31.760 --> 01:05:32.860
+This will not become
+
+01:05:33.760 --> 01:05:40.160
+B by T by 16 because that is the head size and the same here B by T by 16.
+
+01:05:45.860 --> 01:05:47.060
+So this being the head size.
+
+01:05:47.660 --> 01:05:59.660
+So you see here that when I forward this linear on top of my X all the tokens in all the positions in the B by T arrangement all of them in parallel and independently produce a key and a query.
+
+01:05:59.660 --> 01:06:01.260
+So no communication has happened yet.
+
+01:06:02.660 --> 01:06:03.960
+But the communication comes now.
+
+01:06:04.060 --> 01:06:07.260
+All the queries will dot product with all the keys.
+
+01:06:08.560 --> 01:06:15.860
+So basically what we want is we want way now or the affinities between these to be query multiplying key,
+
+01:06:16.560 --> 01:06:19.160
+but we have to be careful with we can't matrix multiply this.
+
+01:06:19.160 --> 01:06:26.460
+We actually need to transpose K but we have to be also careful because these are when you have the batch dimension.
+
+01:06:26.860 --> 01:06:31.160
+So in particular we want to transpose the last two dimensions.
+
+01:06:31.260 --> 01:06:31.560
+Dimension.
+
+01:06:31.660 --> 01:06:33.360
+Negative one and dimension negative two.
+
+01:06:34.060 --> 01:06:36.260
+So negative two negative one.
+
+01:06:37.560 --> 01:06:43.060
+And so this matrix multiply now will basically do the following B by T by 16.
+
+01:06:45.260 --> 01:06:52.360
+Matrix multiplies B by 16 by T to give us B by T by T.
+
+01:06:54.460 --> 01:06:54.860
+Right?
+
+01:06:56.060 --> 01:06:57.860
+So for every row of B,
+
+01:06:58.160 --> 01:07:01.460
+we're not going to have a T square matrix giving us the affinity.
+
+01:07:01.560 --> 01:07:07.360
+We're going to have a T square matrix giving us the affinities and these are now the way so they're not zeros.
+
+01:07:07.560 --> 01:07:11.360
+They are now coming from this dot product between the keys in the queries.
+
+01:07:11.560 --> 01:07:21.360
+So this can now run I can I can run this and the weighted aggregation now is a function in a data abandoned manner between the keys and queries of these notes.
+
+01:07:21.560 --> 01:07:27.160
+So just inspecting what happened here the way takes on this form.
+
+01:07:27.360 --> 01:07:31.160
+And you see that before way was just a constant.
+
+01:07:31.160 --> 01:07:33.060
+There's no way to all the batch elements.
+
+01:07:33.260 --> 01:07:41.660
+But now every single batch elements will have different sort of way because every single batch element contains different tokens at different positions.
+
+01:07:41.860 --> 01:07:43.360
+And so this is not data dependent.
+
+01:07:44.160 --> 01:07:47.060
+So when we look at just the zero row,
+
+01:07:47.260 --> 01:07:48.460
+for example in the input,
+
+01:07:49.060 --> 01:07:50.860
+these are the weights that came out.
+
+01:07:51.260 --> 01:07:53.460
+And so you can see now that they're not just exactly uniform.
+
+01:07:55.260 --> 01:07:57.460
+And in particular as an example here for the last row,
+
+01:07:57.860 --> 01:08:01.060
+this was the eighth token and the eighth token knows what content.
+
+01:08:01.160 --> 01:08:03.460
+It has and it knows at what position it's in.
+
+01:08:04.160 --> 01:08:08.260
+And now the eight token based on that creates a query.
+
+01:08:08.560 --> 01:08:09.960
+Hey, I'm looking for this kind of stuff.
+
+01:08:11.060 --> 01:08:11.660
+I'm a vowel.
+
+01:08:11.860 --> 01:08:12.660
+I'm on the eighth position.
+
+01:08:12.860 --> 01:08:15.360
+I'm looking for any consonants at positions up to four.
+
+01:08:16.460 --> 01:08:24.460
+And then all the nodes get to emit keys and maybe one of the channels could be I am a I am a consonant and I am in a position up to four.
+
+01:08:25.160 --> 01:08:28.860
+And that key would have a high number in that specific channel.
+
+01:08:29.360 --> 01:08:30.960
+And that's how the query and the key when they
+
+01:08:31.060 --> 01:08:31.660
+dark product,
+
+01:08:31.660 --> 01:08:33.760
+they can find each other and create a high affinity.
+
+01:08:34.760 --> 01:08:35.860
+And when they have a high affinity,
+
+01:08:35.860 --> 01:08:41.060
+like say this token was pretty interesting to to this eighth token.
+
+01:08:42.360 --> 01:08:43.560
+When they have a high affinity,
+
+01:08:43.860 --> 01:08:45.060
+then through the softmax,
+
+01:08:45.260 --> 01:08:48.660
+I will end up aggregating a lot of its information into my position.
+
+01:08:49.260 --> 01:08:51.160
+And so I'll get to learn a lot about it.
+
+01:08:52.660 --> 01:08:57.460
+Now just this was looking at way after this has already happened.
+
+01:08:59.360 --> 01:09:00.860
+Let me erase this operation as well.
+
+01:09:00.960 --> 01:09:05.760
+So let me erase the masking and the softmax just to show you the under the hood internals and how that works.
+
+01:09:06.560 --> 01:09:10.560
+So without the masking and the softmax way comes out like this,
+
+01:09:10.560 --> 01:09:10.860
+right?
+
+01:09:10.860 --> 01:09:12.560
+This is the outputs of the dark products.
+
+01:09:13.760 --> 01:09:16.360
+And these are the raw outputs and they take on values from negative,
+
+01:09:16.560 --> 01:09:16.960
+you know,
+
+01:09:17.060 --> 01:09:18.460
+two to positive two Etc.
+
+01:09:19.760 --> 01:09:23.660
+So that's the raw interactions and raw Affinities between all the nodes.
+
+01:09:24.360 --> 01:09:26.560
+But now if I'm a if I'm a fifth node,
+
+01:09:26.660 --> 01:09:30.860
+I will not want to aggregate anything from the sixth node seventh node and the eighth node.
+
+01:09:31.360 --> 01:09:34.460
+So actually we use the upper triangular masking.
+
+01:09:34.960 --> 01:09:36.560
+So those are not allowed to communicate.
+
+01:09:38.360 --> 01:09:41.860
+And now we actually want to have a nice distribution.
+
+01:09:42.460 --> 01:09:45.660
+So we don't want to aggregate negative point one one of this note.
+
+01:09:45.660 --> 01:09:46.260
+That's crazy.
+
+01:09:46.660 --> 01:09:48.460
+So instead we exponentiate and normalize.
+
+01:09:49.060 --> 01:09:50.860
+And now we get a nice distribution that sums to one.
+
+01:09:51.660 --> 01:09:53.660
+And this is telling us now in the data dependent manner,
+
+01:09:53.660 --> 01:09:57.560
+how much of information to aggregate from any of these tokens in the past.
+
+01:09:59.560 --> 01:10:00.860
+So that's way.
+
+01:10:01.260 --> 01:10:02.260
+And it's not zeros anymore,
+
+01:10:02.260 --> 01:10:04.460
+but but it's calculated in this way.
+
+01:10:05.060 --> 01:10:05.160
+Now,
+
+01:10:05.160 --> 01:10:09.760
+there's one more part to a single self-attention head.
+
+01:10:10.260 --> 01:10:11.960
+And that is that when we do the aggregation,
+
+01:10:11.960 --> 01:10:13.860
+we don't actually aggregate the tokens.
+
+01:10:13.860 --> 01:10:14.360
+Exactly.
+
+01:10:14.860 --> 01:10:15.760
+We aggregate,
+
+01:10:15.760 --> 01:10:19.160
+we produce one more value here and we call that the value.
+
+01:10:21.160 --> 01:10:23.060
+So in the same way that we produced key and query,
+
+01:10:23.060 --> 01:10:24.860
+we're also going to create a value.
+
+01:10:26.060 --> 01:10:30.160
+And then here we don't aggregate.
+
+01:10:31.260 --> 01:10:33.860
+X we calculate a V,
+
+01:10:33.860 --> 01:10:38.560
+which is just achieved by propagating this linear on top of X again.
+
+01:10:39.060 --> 01:10:42.760
+And then we output way multiplied by V.
+
+01:10:43.160 --> 01:10:48.660
+So V is the elements that we aggregate or the vector that we aggregate instead of the raw X.
+
+01:10:49.860 --> 01:10:50.960
+And now of course,
+
+01:10:50.960 --> 01:10:56.860
+this will make it so that the output here of the single head will be 16 dimensional because that is the head size.
+
+01:10:58.360 --> 01:11:00.360
+So you can think of X as kind of like private information.
+
+01:11:00.360 --> 01:11:00.860
+So you can think of X as kind of like private information.
+
+01:11:00.860 --> 01:11:01.660
+To this token,
+
+01:11:01.660 --> 01:11:03.460
+if you if you think about it that way.
+
+01:11:03.660 --> 01:11:05.660
+So X is kind of private to this token.
+
+01:11:05.860 --> 01:11:12.560
+So I'm a fifth token at some and I have some identity and my information is kept in vector X.
+
+01:11:13.160 --> 01:11:15.360
+And now for the purposes of the single head,
+
+01:11:15.560 --> 01:11:17.060
+here's what I'm interested in.
+
+01:11:17.460 --> 01:11:18.960
+Here's what I have.
+
+01:11:19.560 --> 01:11:21.260
+And if you find me interesting,
+
+01:11:21.260 --> 01:11:22.760
+here's what I will communicate to you.
+
+01:11:23.160 --> 01:11:24.460
+And that's stored in V.
+
+01:11:25.060 --> 01:11:30.660
+And so V is the thing that gets aggregated for the purposes of this single head between the different nodes.
+
+01:11:31.660 --> 01:11:35.260
+And that's basically the self-attention mechanism.
+
+01:11:35.260 --> 01:11:37.360
+This is this is what it does.
+
+01:11:38.160 --> 01:11:41.260
+There are a few notes that I would make like to make about attention.
+
+01:11:41.760 --> 01:11:44.860
+Number one attention is a communication mechanism.
+
+01:11:45.260 --> 01:11:47.660
+You can really think about it as a communication mechanism
+
+01:11:47.960 --> 01:11:50.560
+where you have a number of nodes in a directed graph
+
+01:11:50.960 --> 01:11:53.560
+where basically you have edges pointing between nodes like this.
+
+01:11:54.760 --> 01:11:58.060
+And what happens is every node has some vector of information
+
+01:11:58.460 --> 01:12:00.260
+and it gets to aggregate information
+
+01:12:00.260 --> 01:12:03.760
+via a weighted sum from all of the nodes that point to it.
+
+01:12:04.760 --> 01:12:06.560
+And this is done in a data dependent manner.
+
+01:12:06.560 --> 01:12:10.260
+So depending on whatever data is actually stored at each node at any point in time.
+
+01:12:11.160 --> 01:12:11.760
+Now,
+
+01:12:12.660 --> 01:12:13.960
+our graph doesn't look like this.
+
+01:12:13.960 --> 01:12:15.460
+Our graph has a different structure.
+
+01:12:15.760 --> 01:12:20.260
+We have eight nodes because the block size is eight and there's always eight tokens.
+
+01:12:21.160 --> 01:12:24.260
+And the first node is only pointed to by itself.
+
+01:12:24.660 --> 01:12:27.560
+The second node is pointed to by the first node and itself
+
+01:12:27.860 --> 01:12:29.560
+all the way up to the eighth node,
+
+01:12:29.660 --> 01:12:30.060
+which is pointed to by itself.
+
+01:12:30.060 --> 01:12:32.860
+Pointed to by all the previous nodes and itself.
+
+01:12:33.860 --> 01:12:37.860
+And so that's the structure that are directed graph has or happens happens to have
+
+01:12:37.860 --> 01:12:40.560
+an autoregressive sort of scenario like language modeling.
+
+01:12:41.260 --> 01:12:44.360
+But in principle attention can be applied to any arbitrary directed graph
+
+01:12:44.360 --> 01:12:46.560
+and it's just a communication mechanism between the nodes.
+
+01:12:47.260 --> 01:12:50.460
+The second note is that notice that there is no notion of space.
+
+01:12:50.760 --> 01:12:55.060
+So attention simply acts over like a set of vectors in this graph.
+
+01:12:55.460 --> 01:12:59.160
+And so by default these nodes have no idea where they are positioned in the space.
+
+01:12:59.360 --> 01:12:59.960
+And that's why we need to
+
+01:13:00.160 --> 01:13:04.860
+encode them positionally and sort of give them some information that is anchors to a specific
+
+01:13:04.860 --> 01:13:08.260
+position so that they sort of know where they are.
+
+01:13:08.660 --> 01:13:12.160
+And this is different than for example from convolution because if you run for example,
+
+01:13:12.160 --> 01:13:17.460
+a convolution operation over some input there is a very specific sort of layout of the information
+
+01:13:17.460 --> 01:13:21.160
+in space and the convolutional filters sort of act in space.
+
+01:13:21.460 --> 01:13:27.360
+And so it's it's not like an attention and attention is just a set of vectors out there in space.
+
+01:13:27.660 --> 01:13:29.860
+They communicate and if you want them to have a
+
+01:13:29.860 --> 01:13:34.660
+notion of space you need to specifically add it which is what we've done when we calculated the
+
+01:13:35.460 --> 01:13:40.160
+relative the positional encode encodings and added that information to the vectors.
+
+01:13:40.360 --> 01:13:44.860
+The next thing that I hope is very clear is that the elements across the batch dimension which are
+
+01:13:44.860 --> 01:13:46.860
+independent examples never talk to each other.
+
+01:13:46.860 --> 01:13:51.460
+They're always processed independently and this is a batch matrix multiply that applies basically a
+
+01:13:51.460 --> 01:13:54.860
+matrix multiplication kind of in parallel across the batch dimension.
+
+01:13:55.360 --> 01:13:59.260
+So maybe it would be more accurate to say that in this analogy of a directed graph.
+
+01:13:59.860 --> 01:14:05.060
+We really have because the batch size is for we really have four separate pools of eight
+
+01:14:05.060 --> 01:14:09.260
+nodes and those eight nodes only talk to each other but in total there's like 32 nodes that are being
+
+01:14:09.260 --> 01:14:14.660
+processed but there's sort of four separate pools of eight you can look at it that way.
+
+01:14:15.460 --> 01:14:21.860
+The next note is that here in the case of language modeling we have this specific structure of
+
+01:14:21.860 --> 01:14:27.860
+directed graph where the future tokens will not communicate to the past tokens but this doesn't
+
+01:14:27.860 --> 01:14:29.760
+necessarily have to be the constraint in the general case.
+
+01:14:30.460 --> 01:14:35.960
+And in fact in many cases you may want to have all of the notes talk to each other fully.
+
+01:14:36.560 --> 01:14:40.660
+So as an example if you're doing sentiment analysis or something like that with a transformer you might
+
+01:14:40.660 --> 01:14:46.060
+have a number of tokens and you may want to have them all talk to each other fully because later you
+
+01:14:46.060 --> 01:14:50.860
+are predicting for example the sentiment of the sentence and so it's okay for these notes to talk to
+
+01:14:50.860 --> 01:14:58.060
+each other and so in those cases you will use an encoder block of self-attention and all it means
+
+01:14:58.060 --> 01:14:59.260
+that it's an encoder block.
+
+01:14:59.360 --> 01:15:03.960
+Is that you will delete this line of code allowing all the notes to completely talk to each other.
+
+01:15:04.560 --> 01:15:10.660
+What we're implementing here is sometimes called a decoder block and it's called a decoder because
+
+01:15:10.660 --> 01:15:17.460
+it is sort of like decoding language and it's got this autoregressive format where you have to mask
+
+01:15:17.460 --> 01:15:23.760
+with the triangular matrix so that notes from the future never talk to the past because they would
+
+01:15:23.760 --> 01:15:24.560
+give away the answer.
+
+01:15:25.360 --> 01:15:29.160
+And so basically in encoder blocks you would delete this allow all the notes to talk to each other.
+
+01:15:29.860 --> 01:15:35.360
+In decoder blocks this will always be present so that you have this triangular structure but both are
+
+01:15:35.360 --> 01:15:36.860
+allowed and attention doesn't care.
+
+01:15:36.860 --> 01:15:39.260
+Attention supports arbitrary connectivity between notes.
+
+01:15:39.860 --> 01:15:44.460
+The next thing I wanted to comment on is you keep me you keep hearing me say attention self-attention
+
+01:15:44.460 --> 01:15:45.060
+etc.
+
+01:15:45.060 --> 01:15:46.960
+There's actually also something called cross attention.
+
+01:15:46.960 --> 01:15:47.760
+What is the difference?
+
+01:15:48.760 --> 01:15:58.160
+So basically the reason this attention is self-attention is because the keys queries and the values are all coming
+
+01:15:58.160 --> 01:15:59.160
+from the same source.
+
+01:15:59.260 --> 01:16:03.860
+From X so the same source X produces keys queries and values.
+
+01:16:03.860 --> 01:16:09.560
+So these nodes are self-attending but in principle attention is much more general than that.
+
+01:16:09.560 --> 01:16:15.660
+So for example in encoder decoder transformers you can have a case where the queries are produced from
+
+01:16:15.660 --> 01:16:22.260
+X but the keys and the values come from a whole separate external source and sometimes from encoder blocks
+
+01:16:22.260 --> 01:16:27.160
+that encode some context that we'd like to condition on and so the keys and the values will actually come
+
+01:16:27.160 --> 01:16:28.660
+from a whole separate source.
+
+01:16:28.660 --> 01:16:30.960
+Those are nodes on the side and here.
+
+01:16:30.960 --> 01:16:34.260
+We're just producing queries and we're reading off information from the side.
+
+01:16:34.960 --> 01:16:39.960
+So cross attention is used when there's a separate source of nodes.
+
+01:16:40.160 --> 01:16:44.560
+We'd like to pull information from into our notes and it's self-attention.
+
+01:16:44.560 --> 01:16:47.260
+If we just have nodes that would like to look at each other and talk to each other.
+
+01:16:48.060 --> 01:16:50.960
+So this attention here happens to be self-attention.
+
+01:16:52.560 --> 01:16:56.160
+But in principle attention is a lot more general.
+
+01:16:56.660 --> 01:16:58.460
+Okay in the last note at this stage is
+
+01:16:58.660 --> 01:17:00.960
+if we come to the attention is all you need paper here.
+
+01:17:00.960 --> 01:17:02.760
+We've already implemented attention.
+
+01:17:02.760 --> 01:17:07.160
+So given query key and value we've multiplied the query on the key.
+
+01:17:07.160 --> 01:17:10.860
+We've soft maxed it and then we are aggregating the values.
+
+01:17:10.860 --> 01:17:16.260
+There's one more thing that we're missing here, which is the dividing by 1 over square root of the head size.
+
+01:17:16.260 --> 01:17:17.860
+The DK here is the head size.
+
+01:17:17.860 --> 01:17:19.260
+Why are they doing this?
+
+01:17:19.260 --> 01:17:20.060
+Why is this important?
+
+01:17:20.060 --> 01:17:26.560
+So they call it a scaled attention and it's kind of like an important normalization to basically have.
+
+01:17:26.560 --> 01:17:28.560
+The problem is.
+
+01:17:28.660 --> 01:17:33.760
+If you have unit Gaussian inputs, so 0 mean unit variance, K and Q are unit Gaussian.
+
+01:17:33.760 --> 01:17:40.160
+And if you just do way naively, then you see that your way actually will be the variance will be on the order of head size,
+
+01:17:40.160 --> 01:17:41.360
+which in our case is 16.
+
+01:17:42.460 --> 01:17:45.460
+But if you multiply by 1 over head size square root,
+
+01:17:45.460 --> 01:17:50.660
+so this is square root and this is 1 over then the variance of way will be 1.
+
+01:17:50.660 --> 01:17:51.660
+So it will be preserved.
+
+01:17:52.960 --> 01:17:54.160
+Now, why is this important?
+
+01:17:54.560 --> 01:17:58.660
+You'll notice that way here will feed into softmax.
+
+01:17:59.660 --> 01:18:04.660
+And so it's really important, especially at initialization that way be fairly diffuse.
+
+01:18:04.660 --> 01:18:11.660
+So in our case here, we sort of lucked out here and way had a fairly diffuse numbers here.
+
+01:18:11.660 --> 01:18:14.460
+So like this.
+
+01:18:14.460 --> 01:18:16.460
+Now, the problem is that because of softmax,
+
+01:18:16.460 --> 01:18:20.160
+if weight takes on very positive and very negative numbers inside it,
+
+01:18:20.160 --> 01:18:24.360
+softmax will actually converge towards one hot vectors.
+
+01:18:24.360 --> 01:18:25.760
+And so I can illustrate that here.
+
+01:18:28.060 --> 01:18:28.360
+Say,
+
+01:18:28.360 --> 01:18:32.060
+we are applying softmax to a tensor of values that are very close to zero.
+
+01:18:32.360 --> 01:18:34.660
+Then we're going to get a diffuse thing out of softmax.
+
+01:18:35.560 --> 01:18:38.360
+But the moment I take the exact same thing and I start sharpening it,
+
+01:18:38.360 --> 01:18:40.760
+making it bigger by multiplying these numbers by 8,
+
+01:18:40.760 --> 01:18:41.460
+for example,
+
+01:18:41.860 --> 01:18:43.860
+you'll see that the softmax will start to sharpen.
+
+01:18:44.260 --> 01:18:46.660
+And in fact, it will sharpen towards the max.
+
+01:18:46.660 --> 01:18:49.560
+So it will sharpen towards whatever number here is the highest.
+
+01:18:50.160 --> 01:18:53.360
+And so basically we don't want these values to be too extreme,
+
+01:18:53.360 --> 01:18:54.560
+especially the initialization.
+
+01:18:54.560 --> 01:18:57.360
+Otherwise softmax will be way too peaky and
+
+01:18:57.360 --> 01:18:57.760
+um,
+
+01:18:57.760 --> 01:19:01.760
+you're basically aggregating information from like a single node.
+
+01:19:01.760 --> 01:19:04.460
+Every node just aggregates information from a single other node.
+
+01:19:04.460 --> 01:19:05.360
+That's not what we want,
+
+01:19:05.360 --> 01:19:06.760
+especially at initialization.
+
+01:19:06.760 --> 01:19:11.260
+And so the scaling is used just to control the variance at initialization.
+
+01:19:11.260 --> 01:19:11.960
+Okay.
+
+01:19:11.960 --> 01:19:13.060
+So having said all that,
+
+01:19:13.060 --> 01:19:16.660
+let's now take our self-attention knowledge and let's take it for a spin.
+
+01:19:16.660 --> 01:19:18.760
+So here in the code,
+
+01:19:18.760 --> 01:19:23.060
+I've created this head module and implements a single head of self-attention.
+
+01:19:23.060 --> 01:19:27.160
+So you give it a head size and then here it creates the key query and evaluate.
+
+01:19:27.160 --> 01:19:28.960
+Linear layers.
+
+01:19:29.360 --> 01:19:31.260
+Typically people don't use biases in these.
+
+01:19:32.360 --> 01:19:35.560
+So those are the linear projections that we're going to apply to all of our nodes.
+
+01:19:36.360 --> 01:19:37.060
+Now here,
+
+01:19:37.060 --> 01:19:38.960
+I'm creating this trill variable.
+
+01:19:39.260 --> 01:19:41.160
+Trill is not a parameter of the module.
+
+01:19:41.160 --> 01:19:43.160
+So in sort of pytorch naming conventions,
+
+01:19:43.560 --> 01:19:44.660
+this is called a buffer.
+
+01:19:44.860 --> 01:19:46.960
+It's not a parameter and you have to call it.
+
+01:19:46.960 --> 01:19:49.260
+You have to assign it to the module using a register buffer.
+
+01:19:49.660 --> 01:19:50.760
+So that creates the trill,
+
+01:19:51.660 --> 01:19:53.660
+the lower triangular matrix.
+
+01:19:54.460 --> 01:19:55.760
+And when we're given the input X,
+
+01:19:55.760 --> 01:19:57.160
+this should look very familiar now.
+
+01:19:57.360 --> 01:19:58.460
+We calculate the keys,
+
+01:19:58.460 --> 01:19:59.260
+the queries,
+
+01:19:59.460 --> 01:20:02.160
+we calculate the attention scores inside way.
+
+01:20:02.960 --> 01:20:03.760
+We normalize it.
+
+01:20:03.760 --> 01:20:05.560
+So we're using scaled attention here.
+
+01:20:06.260 --> 01:20:09.360
+Then we make sure that sure doesn't communicate with the past.
+
+01:20:09.560 --> 01:20:11.260
+So this makes it a decoder block
+
+01:20:12.060 --> 01:20:15.060
+and then softmax and then aggregate the value and output.
+
+01:20:16.560 --> 01:20:17.560
+Then here in the language model,
+
+01:20:17.560 --> 01:20:22.060
+I'm creating a head in the constructor and I'm calling it self-attention head
+
+01:20:22.460 --> 01:20:23.760
+and the head size.
+
+01:20:23.760 --> 01:20:26.960
+I'm going to keep as the same and embed just for now.
+
+01:20:27.160 --> 01:20:32.960
+And then here once we've encoded the information with the token embeddings
+
+01:20:32.960 --> 01:20:34.060
+and the position embeddings,
+
+01:20:34.460 --> 01:20:36.760
+we're simply going to feed it into the self-attention head
+
+01:20:37.160 --> 01:20:42.560
+and then the output of that is going to go into the decoder language modeling
+
+01:20:42.560 --> 01:20:44.160
+head and create the logits.
+
+01:20:44.560 --> 01:20:48.260
+So this is sort of the simplest way to plug in a self-attention component
+
+01:20:49.060 --> 01:20:50.360
+into our network right now.
+
+01:20:51.160 --> 01:20:52.460
+I had to make one more change,
+
+01:20:52.860 --> 01:20:55.960
+which is that here in the generate,
+
+01:20:55.960 --> 01:21:00.360
+we have to make sure that our IDX that we feed into the model
+
+01:21:00.960 --> 01:21:02.660
+because now we're using positional embeddings,
+
+01:21:02.960 --> 01:21:05.760
+we can never have more than block size coming in
+
+01:21:06.160 --> 01:21:08.660
+because if IDX is more than block size,
+
+01:21:08.960 --> 01:21:11.460
+then our position embedding table is going to run out of scope
+
+01:21:11.460 --> 01:21:13.560
+because it only has embeddings for up to block size.
+
+01:21:14.460 --> 01:21:17.660
+And so therefore I added some code here to crop the context
+
+01:21:18.260 --> 01:21:19.960
+that we're going to feed into self
+
+01:21:21.660 --> 01:21:24.660
+so that we never pass in more than block size elements.
+
+01:21:24.660 --> 01:21:27.760
+So those are the changes and let's now train the network.
+
+01:21:28.060 --> 01:21:31.560
+Okay, so I also came up to the script here and I decreased the learning rate
+
+01:21:31.560 --> 01:21:34.960
+because the self-attention can't tolerate very very high learning rates.
+
+01:21:35.560 --> 01:21:37.660
+And then I also increased the number of iterations
+
+01:21:37.660 --> 01:21:40.160
+because the learning rate is lower and then I trained it
+
+01:21:40.160 --> 01:21:42.960
+and previously we were only able to get to up to 2.5
+
+01:21:43.260 --> 01:21:44.860
+and now we are down to 2.4.
+
+01:21:45.260 --> 01:21:49.260
+So we definitely see a little bit of improvement from 2.5 to 2.4 roughly,
+
+01:21:49.860 --> 01:21:51.460
+but the text is still not amazing.
+
+01:21:51.960 --> 01:21:54.460
+So clearly the self-attention head is doing
+
+01:21:54.660 --> 01:21:55.960
+some useful communication,
+
+01:21:56.460 --> 01:21:59.060
+but we still have a long way to go.
+
+01:21:59.360 --> 01:21:59.560
+Okay.
+
+01:21:59.560 --> 01:22:01.860
+So now we've implemented the scale dot product attention.
+
+01:22:02.160 --> 01:22:04.560
+Now next up in the attention is all you need paper.
+
+01:22:05.060 --> 01:22:06.660
+There's something called multi-head attention.
+
+01:22:07.060 --> 01:22:08.460
+And what is multi-head attention?
+
+01:22:08.860 --> 01:22:11.760
+It's just applying multiple attentions in parallel
+
+01:22:11.960 --> 01:22:13.460
+and concatenating the results.
+
+01:22:14.060 --> 01:22:15.960
+So they have a little bit of diagram here.
+
+01:22:16.260 --> 01:22:17.760
+I don't know if this is super clear.
+
+01:22:18.360 --> 01:22:21.060
+It's really just multiple attentions in parallel.
+
+01:22:21.760 --> 01:22:24.260
+So let's implement that fairly straightforward.
+
+01:22:25.360 --> 01:22:26.960
+If we want a multi-head attention,
+
+01:22:27.260 --> 01:22:29.960
+then we want multiple heads of self-attention running in parallel.
+
+01:22:30.860 --> 01:22:34.960
+So in PyTorch we can do this by simply creating multiple heads.
+
+01:22:36.160 --> 01:22:38.960
+So however many heads you want
+
+01:22:39.160 --> 01:22:40.760
+and then what is the head size of each
+
+01:22:41.560 --> 01:22:45.260
+and then we run all of them in parallel into a list
+
+01:22:45.560 --> 01:22:47.760
+and simply concatenate all of the outputs
+
+01:22:48.360 --> 01:22:50.560
+and we're concatenating over the channel dimension.
+
+01:22:51.660 --> 01:22:54.460
+So the way this looks now is we don't have just a single attention
+
+01:22:54.960 --> 01:23:00.560
+that has a head size of 32 because remember an embed is 32.
+
+01:23:01.660 --> 01:23:04.160
+Instead of having one communication channel,
+
+01:23:04.460 --> 01:23:07.860
+we now have four communication channels in parallel
+
+01:23:08.160 --> 01:23:10.460
+and each one of these communication channels typically
+
+01:23:10.960 --> 01:23:14.160
+will be smaller correspondingly.
+
+01:23:14.560 --> 01:23:16.460
+So because we have four communication channels,
+
+01:23:16.760 --> 01:23:18.560
+we want eight-dimensional self-attention.
+
+01:23:19.160 --> 01:23:20.860
+And so from each communication channel,
+
+01:23:20.860 --> 01:23:23.060
+we're getting together eight-dimensional vectors
+
+01:23:23.360 --> 01:23:24.560
+and then we have four of them.
+
+01:23:24.660 --> 01:23:26.760
+And that concatenates to give us 32,
+
+01:23:26.860 --> 01:23:28.260
+which is the original and embed.
+
+01:23:29.160 --> 01:23:32.160
+And so this is kind of similar to if you're familiar with convolutions,
+
+01:23:32.160 --> 01:23:33.860
+this is kind of like a group convolution
+
+01:23:34.460 --> 01:23:37.160
+because basically instead of having one large convolution,
+
+01:23:37.260 --> 01:23:41.560
+we do convolution in groups and that's multi-headed self-attention.
+
+01:23:42.560 --> 01:23:45.360
+And so then here we just use essay heads,
+
+01:23:45.460 --> 01:23:46.860
+self-attention heads instead.
+
+01:23:47.760 --> 01:23:51.060
+Now, I actually ran it and scrolling down,
+
+01:23:52.260 --> 01:23:54.160
+I ran the same thing and then we now get down
+
+01:23:54.660 --> 01:23:58.360
+to 2.28 roughly and the output is still,
+
+01:23:58.360 --> 01:23:59.760
+the generation is still not amazing,
+
+01:23:59.960 --> 01:24:01.760
+but clearly the validation loss is improving
+
+01:24:01.760 --> 01:24:03.960
+because we were at 2.4 just now.
+
+01:24:04.860 --> 01:24:07.160
+And so it helps to have multiple communication channels
+
+01:24:07.160 --> 01:24:10.260
+because obviously these tokens have a lot to talk about.
+
+01:24:10.760 --> 01:24:12.660
+They want to find the consonants, the vowels,
+
+01:24:12.660 --> 01:24:14.960
+they want to find the vowels just from certain positions,
+
+01:24:15.460 --> 01:24:18.060
+they want to find any kinds of different things.
+
+01:24:18.460 --> 01:24:21.460
+And so it helps to create multiple independent channels of communication,
+
+01:24:21.560 --> 01:24:23.360
+gather lots of different types of data
+
+01:24:23.760 --> 01:24:24.360
+and then
+
+01:24:24.660 --> 01:24:25.760
+decode the output.
+
+01:24:26.160 --> 01:24:27.660
+Now going back to the paper for a second,
+
+01:24:27.860 --> 01:24:28.260
+of course,
+
+01:24:28.260 --> 01:24:29.960
+I didn't explain this figure in full detail,
+
+01:24:29.960 --> 01:24:33.160
+but we are starting to see some components of what we've already implemented.
+
+01:24:33.360 --> 01:24:34.660
+We have the positional encodings,
+
+01:24:34.660 --> 01:24:36.160
+the token encodings that add,
+
+01:24:36.560 --> 01:24:39.260
+we have the masked multi-headed attention implemented.
+
+01:24:39.960 --> 01:24:42.060
+Now, here's another multi-headed attention,
+
+01:24:42.060 --> 01:24:44.360
+which is a cross attention to an encoder,
+
+01:24:44.360 --> 01:24:45.260
+which we haven't,
+
+01:24:45.260 --> 01:24:46.860
+we're not going to implement in this case.
+
+01:24:47.160 --> 01:24:48.460
+I'm going to come back to that later.
+
+01:24:49.460 --> 01:24:51.960
+But I want you to notice that there's a feed forward part here
+
+01:24:52.160 --> 01:24:54.560
+and then this is grouped into a block that gets repeated.
+
+01:24:54.860 --> 01:24:55.360
+And again,
+
+01:24:55.960 --> 01:24:59.360
+now the feed forward part here is just a simple multi-layer perceptron.
+
+01:25:01.760 --> 01:25:02.660
+So the multi-headed,
+
+01:25:03.060 --> 01:25:07.460
+so here position wise feed forward networks is just a simple little MLP.
+
+01:25:08.160 --> 01:25:10.360
+So I want to start basically in a similar fashion.
+
+01:25:10.360 --> 01:25:12.760
+Also adding computation into the network
+
+01:25:13.360 --> 01:25:15.560
+and this computation is on the per node level.
+
+01:25:16.060 --> 01:25:16.560
+So
+
+01:25:17.460 --> 01:25:20.860
+I've already implemented it and you can see the diff highlighted on the left here
+
+01:25:20.860 --> 01:25:22.260
+when I've added or changed things.
+
+01:25:22.960 --> 01:25:24.160
+Now before we had the
+
+01:25:24.660 --> 01:25:26.960
+multi-headed self-attention that did the communication,
+
+01:25:27.360 --> 01:25:30.260
+but we went way too fast to calculate the logits.
+
+01:25:30.660 --> 01:25:32.460
+So the tokens looked at each other,
+
+01:25:32.460 --> 01:25:36.760
+but didn't really have a lot of time to think on what they found from the other tokens.
+
+01:25:37.560 --> 01:25:38.160
+And so
+
+01:25:38.760 --> 01:25:41.860
+what I've implemented here is a little feed forward single layer
+
+01:25:42.360 --> 01:25:45.960
+and this little layer is just a linear followed by a relu non-linearity
+
+01:25:46.160 --> 01:25:46.960
+and that's it.
+
+01:25:47.960 --> 01:25:49.560
+So it's just a little layer
+
+01:25:50.160 --> 01:25:51.960
+and then I call it feed forward
+
+01:25:53.560 --> 01:25:54.160
+and embed.
+
+01:25:54.660 --> 01:25:58.560
+And then this feed forward is just called sequentially right after the self-attention.
+
+01:25:58.960 --> 01:26:01.460
+So we self-attend then we feed forward
+
+01:26:01.960 --> 01:26:04.660
+and you'll notice that the feed forward here when it's applying linear.
+
+01:26:04.860 --> 01:26:06.360
+This is on a per token level.
+
+01:26:06.460 --> 01:26:08.260
+All the tokens do this independently.
+
+01:26:08.660 --> 01:26:11.060
+So the self-attention is the communication
+
+01:26:11.460 --> 01:26:15.260
+and then once they've gathered all the data now they need to think on that data individually.
+
+01:26:16.160 --> 01:26:17.660
+And so that's what feed forward is doing
+
+01:26:18.060 --> 01:26:19.560
+and that's why I've added it here.
+
+01:26:20.260 --> 01:26:24.360
+Now when I train this the validation laws actually continues to go down now to 2.24.
+
+01:26:25.260 --> 01:26:26.960
+Which is down from 2.28.
+
+01:26:27.660 --> 01:26:29.360
+The output still look kind of terrible,
+
+01:26:29.660 --> 01:26:31.360
+but at least we've improved the situation.
+
+01:26:32.060 --> 01:26:33.160
+And so as a preview
+
+01:26:34.160 --> 01:26:36.060
+we're going to now start to intersperse
+
+01:26:36.560 --> 01:26:39.360
+the communication with the computation
+
+01:26:39.660 --> 01:26:41.760
+and that's also what the transformer does
+
+01:26:42.160 --> 01:26:45.060
+when it has blocks that communicate and then compute
+
+01:26:45.360 --> 01:26:47.560
+and it groups them and replicates them.
+
+01:26:48.760 --> 01:26:50.760
+Okay, so let me show you what we'd like to do.
+
+01:26:51.360 --> 01:26:52.460
+We'd like to do something like this.
+
+01:26:52.460 --> 01:26:53.260
+We have a block
+
+01:26:53.660 --> 01:26:54.560
+and this block is basically
+
+01:26:54.760 --> 01:26:55.560
+this part here
+
+01:26:56.160 --> 01:26:57.460
+except for the cross attention.
+
+01:26:58.660 --> 01:27:02.160
+Now the block basically intersperses communication and then computation.
+
+01:27:02.660 --> 01:27:05.960
+The computation is done using multi-headed self-attention
+
+01:27:06.560 --> 01:27:09.260
+and then the computation is done using a feed forward network
+
+01:27:09.660 --> 01:27:10.960
+on all the tokens independently.
+
+01:27:12.560 --> 01:27:15.560
+Now what I've added here also is you'll notice
+
+01:27:17.260 --> 01:27:19.560
+this takes the number of embeddings in the embedding dimension
+
+01:27:19.560 --> 01:27:21.060
+and number of heads that we would like
+
+01:27:21.060 --> 01:27:23.560
+which is kind of like group size in group convolution.
+
+01:27:24.060 --> 01:27:26.460
+And I'm saying that number of heads we'd like is four
+
+01:27:26.860 --> 01:27:28.560
+and so because this is 32
+
+01:27:28.960 --> 01:27:30.660
+we calculate that because this is 32
+
+01:27:30.860 --> 01:27:32.260
+the number of heads should be four
+
+01:27:34.060 --> 01:27:35.460
+the head size should be eight
+
+01:27:35.560 --> 01:27:37.760
+so that everything sort of works out channel wise.
+
+01:27:38.960 --> 01:27:40.860
+So this is how the transformer structures
+
+01:27:41.160 --> 01:27:43.560
+sort of the sizes typically.
+
+01:27:44.360 --> 01:27:45.560
+So the head size will become eight
+
+01:27:45.660 --> 01:27:47.360
+and then this is how we want to intersperse them.
+
+01:27:47.860 --> 01:27:50.060
+And then here I'm trying to create blocks
+
+01:27:50.160 --> 01:27:53.360
+which is just a sequential application of block block block.
+
+01:27:53.660 --> 01:27:56.860
+So that we're interspersing communication feed forward many many times
+
+01:27:57.060 --> 01:27:58.860
+and then finally we decode.
+
+01:27:59.460 --> 01:28:01.460
+Now actually try to run this
+
+01:28:01.760 --> 01:28:04.760
+and the problem is this doesn't actually give a very good answer
+
+01:28:05.360 --> 01:28:06.660
+and very good result.
+
+01:28:06.860 --> 01:28:10.660
+And the reason for that is we're starting to actually get like a pretty deep neural net
+
+01:28:11.060 --> 01:28:13.760
+and deep neural nets suffer from optimization issues.
+
+01:28:13.760 --> 01:28:16.460
+And I think that's what we're kind of like slightly starting to run into.
+
+01:28:16.760 --> 01:28:19.560
+So we need one more idea that we can borrow from the
+
+01:28:20.360 --> 01:28:22.560
+transformer paper to resolve those difficulties.
+
+01:28:22.560 --> 01:28:25.660
+Now there are two optimizations that dramatically help
+
+01:28:25.760 --> 01:28:27.060
+with the depth of these networks
+
+01:28:27.360 --> 01:28:29.960
+and make sure that the networks remain optimizable.
+
+01:28:30.260 --> 01:28:31.260
+Let's talk about the first one.
+
+01:28:31.960 --> 01:28:34.560
+The first one in this diagram is you see this arrow here
+
+01:28:35.360 --> 01:28:37.360
+and then this arrow and this arrow.
+
+01:28:37.760 --> 01:28:40.760
+Those are skip connections or sometimes called residual connections.
+
+01:28:41.560 --> 01:28:42.560
+They come from this paper
+
+01:28:43.460 --> 01:28:46.860
+the procedural learning for image recognition from about 2015
+
+01:28:47.760 --> 01:28:49.160
+that introduced the concept.
+
+01:28:49.960 --> 01:28:52.360
+Now these are basically what it means
+
+01:28:52.560 --> 01:28:54.260
+is you transform the data,
+
+01:28:54.460 --> 01:28:56.860
+but then you have a skip connection with addition
+
+01:28:57.460 --> 01:28:58.760
+from the previous features.
+
+01:28:59.360 --> 01:29:00.960
+Now the way I like to visualize it
+
+01:29:01.660 --> 01:29:02.460
+that I prefer
+
+01:29:02.960 --> 01:29:03.760
+is the following.
+
+01:29:04.260 --> 01:29:06.960
+Here the computation happens from the top to bottom
+
+01:29:07.560 --> 01:29:10.460
+and basically you have this residual pathway
+
+01:29:11.060 --> 01:29:13.460
+and you are free to fork off from the residual pathway,
+
+01:29:13.460 --> 01:29:14.660
+perform some computation
+
+01:29:14.960 --> 01:29:17.760
+and then project back to the residual pathway via addition.
+
+01:29:18.560 --> 01:29:19.760
+And so you go from the
+
+01:29:20.560 --> 01:29:22.460
+the inputs to the targets
+
+01:29:22.660 --> 01:29:24.560
+only via plus and plus and plus.
+
+01:29:25.460 --> 01:29:27.760
+And the reason this is useful is because during dot propagation
+
+01:29:27.760 --> 01:29:30.660
+remember from our micrograd video earlier
+
+01:29:31.060 --> 01:29:34.660
+addition distributes gradients equally to both of its branches
+
+01:29:35.260 --> 01:29:36.560
+that fed as the input.
+
+01:29:37.060 --> 01:29:40.960
+And so the supervision or the gradients from the loss
+
+01:29:41.360 --> 01:29:44.460
+basically hop through every addition node
+
+01:29:44.760 --> 01:29:46.260
+all the way to the input
+
+01:29:46.760 --> 01:29:49.960
+and then also fork off into the residual blocks.
+
+01:29:51.260 --> 01:29:52.360
+But basically you have this
+
+01:29:52.360 --> 01:29:55.560
+gradient superhighway that goes directly from the supervision
+
+01:29:55.760 --> 01:29:57.660
+all the way to the input unimpeded.
+
+01:29:58.360 --> 01:30:01.060
+And then these residual blocks are usually initialized in the beginning.
+
+01:30:01.360 --> 01:30:04.360
+So they contribute very very little if anything to the residual pathway.
+
+01:30:04.760 --> 01:30:06.360
+They are initialized that way.
+
+01:30:06.760 --> 01:30:09.760
+So in the beginning they are sort of almost kind of like not there.
+
+01:30:10.160 --> 01:30:13.560
+But then during the optimization they come online over time
+
+01:30:14.160 --> 01:30:15.760
+and they start to contribute
+
+01:30:16.360 --> 01:30:18.060
+but at least at the initialization
+
+01:30:18.260 --> 01:30:20.460
+you can go from directly supervision to the input
+
+01:30:20.960 --> 01:30:22.260
+gradient is unimpeded and just flows.
+
+01:30:22.860 --> 01:30:25.160
+And then the blocks over time kick in.
+
+01:30:25.760 --> 01:30:28.360
+And so that dramatically helps with the optimization.
+
+01:30:28.660 --> 01:30:29.560
+So let's implement this.
+
+01:30:29.860 --> 01:30:31.160
+So coming back to our block here.
+
+01:30:31.560 --> 01:30:32.960
+Basically what we want to do is
+
+01:30:33.560 --> 01:30:35.560
+we want to do x equals x plus
+
+01:30:36.560 --> 01:30:39.560
+self-attention and x equals x plus self.feedforward.
+
+01:30:40.760 --> 01:30:45.460
+So this is x and then we fork off and do some communication and come back
+
+01:30:45.760 --> 01:30:48.160
+and we fork off and we do some computation and come back.
+
+01:30:48.960 --> 01:30:50.360
+So those are residual connections
+
+01:30:50.860 --> 01:30:52.260
+and then swinging back up here.
+
+01:30:52.460 --> 01:30:55.060
+We also have to introduce this projection.
+
+01:30:55.960 --> 01:30:57.060
+So nn.linear
+
+01:30:58.560 --> 01:31:00.860
+and this is going to be from
+
+01:31:01.860 --> 01:31:03.060
+after we concatenate this.
+
+01:31:03.060 --> 01:31:04.460
+This is the size and embed.
+
+01:31:04.960 --> 01:31:07.260
+So this is the output of the self-attention itself.
+
+01:31:07.960 --> 01:31:11.260
+But then we actually want the to apply the projection
+
+01:31:12.260 --> 01:31:13.160
+and that's the result.
+
+01:31:14.360 --> 01:31:17.260
+So the projection is just a linear transformation of the outcome of this layer.
+
+01:31:18.860 --> 01:31:21.160
+So that's the projection back into the residual pathway.
+
+01:31:21.860 --> 01:31:23.160
+And then here in a feedforward,
+
+01:31:23.260 --> 01:31:24.460
+it's going to be the same thing.
+
+01:31:24.960 --> 01:31:27.260
+I could have a self.projection here as well.
+
+01:31:27.560 --> 01:31:28.960
+But let me just simplify it
+
+01:31:29.660 --> 01:31:30.660
+and let me
+
+01:31:32.060 --> 01:31:34.060
+couple it inside the same sequential container.
+
+01:31:34.760 --> 01:31:37.860
+And so this is the projection layer going back into the residual pathway.
+
+01:31:39.160 --> 01:31:40.160
+And so
+
+01:31:40.960 --> 01:31:42.360
+that's well, that's it.
+
+01:31:42.660 --> 01:31:43.560
+So now we can train this.
+
+01:31:43.760 --> 01:31:45.360
+So I implemented one more small change.
+
+01:31:45.960 --> 01:31:48.160
+When you look into the paper again,
+
+01:31:48.360 --> 01:31:50.960
+you see that the dimensionality of input and output
+
+01:31:51.160 --> 01:31:52.460
+is 512 for them.
+
+01:31:52.760 --> 01:31:55.160
+And they're saying that the inner layer here in the feedforward
+
+01:31:55.160 --> 01:31:56.860
+has dimensionality of 2048.
+
+01:31:57.160 --> 01:31:58.660
+So there's a multiplier of 4.
+
+01:31:59.360 --> 01:32:02.060
+And so the inner layer of the feedforward network
+
+01:32:02.760 --> 01:32:04.960
+should be multiplied by 4 in terms of channel sizes.
+
+01:32:05.160 --> 01:32:07.560
+So I came here and I multiplied 4 times embed
+
+01:32:07.860 --> 01:32:09.260
+here for the feedforward
+
+01:32:09.660 --> 01:32:12.660
+and then from 4 times an embed coming back down to an embed
+
+01:32:12.860 --> 01:32:15.060
+when we go back to the projection.
+
+01:32:15.360 --> 01:32:18.460
+So adding a bit of computation here and growing that layer
+
+01:32:18.660 --> 01:32:20.660
+that is in the residual block on the side
+
+01:32:20.660 --> 01:32:22.060
+of the residual pathway.
+
+01:32:23.160 --> 01:32:25.960
+And then I train this and we actually get down all the way to
+
+01:32:26.260 --> 01:32:28.060
+2.08 validation loss.
+
+01:32:28.260 --> 01:32:30.460
+And we also see that network is starting to get big enough
+
+01:32:30.760 --> 01:32:33.060
+that our train loss is getting ahead of validation loss.
+
+01:32:33.060 --> 01:32:35.160
+So we started to see like a little bit of overfitting
+
+01:32:36.160 --> 01:32:36.660
+and
+
+01:32:37.060 --> 01:32:37.360
+our
+
+01:32:37.660 --> 01:32:38.060
+our
+
+01:32:40.060 --> 01:32:41.660
+generations here are still not amazing.
+
+01:32:41.660 --> 01:32:45.860
+But at least you see that we can see like is here this now grief sync
+
+01:32:46.560 --> 01:32:48.660
+like this starts to almost look like English.
+
+01:32:48.960 --> 01:32:49.460
+So
+
+01:32:50.060 --> 01:32:50.160
+yeah,
+
+01:32:50.160 --> 01:32:51.160
+we're starting to really get there.
+
+01:32:51.660 --> 01:32:51.860
+Okay.
+
+01:32:51.860 --> 01:32:54.860
+And the second innovation that is very helpful for optimizing very deep
+
+01:32:54.860 --> 01:32:56.360
+neural networks is right here.
+
+01:32:56.860 --> 01:32:59.060
+So we have this addition now that's the residual part.
+
+01:32:59.260 --> 01:33:01.760
+But this norm is referring to something called layer norm.
+
+01:33:02.460 --> 01:33:04.360
+So layer norm is implemented in pytorch.
+
+01:33:04.360 --> 01:33:07.360
+It's a paper that came out a while back here.
+
+01:33:10.160 --> 01:33:12.260
+And layer norm is very very similar to bash norm.
+
+01:33:12.660 --> 01:33:15.860
+So remember back to our make more series part three.
+
+01:33:16.260 --> 01:33:20.060
+We implemented bash normalization and bash normalization basically just
+
+01:33:20.060 --> 01:33:23.960
+made sure that across the batch dimension.
+
+01:33:24.160 --> 01:33:29.960
+Any individual neuron had unit Gaussian distribution.
+
+01:33:30.260 --> 01:33:34.260
+So it was zero mean and unit standard deviation one standard deviation
+
+01:33:34.460 --> 01:33:34.960
+output.
+
+01:33:35.860 --> 01:33:39.260
+So what I did here is I'm copy pasting the bathroom 1D that we developed
+
+01:33:39.260 --> 01:33:43.960
+in our make more series and see here we can initialize for example this
+
+01:33:43.960 --> 01:33:48.660
+module and we can have a batch of 32 100 dimensional vectors feeding through
+
+01:33:48.660 --> 01:33:49.460
+the bathroom layer.
+
+01:33:50.160 --> 01:33:55.760
+So what this does is it guarantees that when we look at just the 0th column,
+
+01:33:56.360 --> 01:33:59.260
+it's a zero mean one standard deviation.
+
+01:33:59.760 --> 01:34:02.960
+So it's normalizing every single column of this input.
+
+01:34:03.860 --> 01:34:08.060
+Now the rows are not going to be normalized by default because we're just
+
+01:34:08.060 --> 01:34:09.060
+normalizing columns.
+
+01:34:09.660 --> 01:34:11.060
+So let's not implement layer norm.
+
+01:34:11.960 --> 01:34:13.060
+It's very complicated.
+
+01:34:13.160 --> 01:34:14.860
+Look we come here.
+
+01:34:15.060 --> 01:34:19.560
+We change this from 0 to 1 so we don't normalize the columns.
+
+01:34:19.560 --> 01:34:19.960
+We normalize.
+
+01:34:20.160 --> 01:34:23.660
+The rows and now we've implemented layer norm.
+
+01:34:25.060 --> 01:34:28.260
+So now the columns are not going to be normalized.
+
+01:34:29.960 --> 01:34:33.760
+But the rows are going to be normalized for every individual example.
+
+01:34:33.760 --> 01:34:38.460
+It's 100 dimensional vector is normalized in this way and because our
+
+01:34:38.460 --> 01:34:43.360
+computation now does not span across examples, we can delete all of this
+
+01:34:43.360 --> 01:34:48.960
+buffers stuff because we can always apply this operation and don't need to
+
+01:34:48.960 --> 01:34:49.960
+maintain any running buffers.
+
+01:34:50.660 --> 01:34:52.360
+So we don't need the buffers.
+
+01:34:53.360 --> 01:34:57.460
+We don't there's no distinction between training and test time.
+
+01:34:59.460 --> 01:35:01.460
+And we don't need these running buffers.
+
+01:35:01.760 --> 01:35:03.360
+We do keep gamma and beta.
+
+01:35:03.660 --> 01:35:04.860
+We don't need the momentum.
+
+01:35:04.860 --> 01:35:06.560
+We don't care if it's training or not.
+
+01:35:07.360 --> 01:35:13.160
+And this is now a layer norm and it normalizes the ropes instead of the
+
+01:35:13.160 --> 01:35:18.460
+columns and this here is identical to basically this here.
+
+01:35:19.460 --> 01:35:19.960
+So let's.
+
+01:35:19.960 --> 01:35:23.360
+Now implement layer norm in our transformer before I incorporate the
+
+01:35:23.360 --> 01:35:23.760
+layer norm.
+
+01:35:23.760 --> 01:35:27.660
+I just wanted to note that as I said very few details about the transformer
+
+01:35:27.660 --> 01:35:30.460
+have changed in the last five years, but this is actually something that's
+
+01:35:30.460 --> 01:35:32.060
+likely departs from the original paper.
+
+01:35:32.560 --> 01:35:36.360
+You see that the ad and norm is applied after the transformation.
+
+01:35:37.360 --> 01:35:43.560
+But now it is a bit more basically common to apply the layer norm before
+
+01:35:43.560 --> 01:35:44.360
+the transformation.
+
+01:35:44.360 --> 01:35:46.160
+So there's a reshuffling of the layer norms.
+
+01:35:46.960 --> 01:35:49.560
+So this is called the pre norm formulation and that the one that we're
+
+01:35:49.560 --> 01:35:50.660
+going to implement as well.
+
+01:35:50.660 --> 01:35:52.460
+So slight deviation from the original paper.
+
+01:35:53.260 --> 01:35:55.360
+Basically, we need to layer norms layer norm.
+
+01:35:55.360 --> 01:36:01.360
+One is an end dot layer norm and we tell it how many was the embedding
+
+01:36:01.360 --> 01:36:04.360
+dimension and we need the second layer norm.
+
+01:36:05.260 --> 01:36:08.660
+And then here the layer norms are applied immediately on X.
+
+01:36:09.360 --> 01:36:13.760
+So self-taught layer norm one in applied on X and self-taught layer norm
+
+01:36:13.760 --> 01:36:19.460
+two applied on X before it goes into self-attention and feed forward and
+
+01:36:19.560 --> 01:36:22.460
+the size of the layer norm here is an embed so 32.
+
+01:36:23.060 --> 01:36:27.960
+So when the layer norm is normalizing our features it is the normalization
+
+01:36:27.960 --> 01:36:33.860
+here happens the mean and the variance are taken over 32 numbers.
+
+01:36:34.160 --> 01:36:37.760
+So the batch and the time act as batch dimensions both of them.
+
+01:36:38.360 --> 01:36:42.860
+So this is kind of like a per token transformation that just normalizes
+
+01:36:42.860 --> 01:36:48.560
+the features and makes them a unit mean unit Gaussian at initialization.
+
+01:36:48.560 --> 01:36:53.360
+But of course because these layer norms inside it have these gamma and beta
+
+01:36:53.360 --> 01:36:59.360
+trainable parameters the layer normal eventually create outputs that might
+
+01:36:59.360 --> 01:37:03.860
+not be unit Gaussian but the optimization will determine that so for
+
+01:37:03.860 --> 01:37:07.660
+now, this is the this is incorporating the layer norms and let's train them
+
+01:37:07.660 --> 01:37:07.960
+up.
+
+01:37:08.560 --> 01:37:12.660
+Okay, so I let it run and we see that we get down to 2.06 which is better
+
+01:37:12.660 --> 01:37:14.060
+than the previous 2.08.
+
+01:37:14.360 --> 01:37:17.760
+So a slight improvement by adding the layer norms and I'd expect that they
+
+01:37:17.760 --> 01:37:18.260
+help.
+
+01:37:18.260 --> 01:37:20.460
+Even more if we have bigger and deeper network.
+
+01:37:21.060 --> 01:37:21.560
+One more thing.
+
+01:37:21.560 --> 01:37:24.460
+I forgot to add is that there should be a layer norm here.
+
+01:37:24.460 --> 01:37:29.360
+Also typically as at the end of the transformer and right before the final
+
+01:37:29.660 --> 01:37:32.260
+linear layer that decodes into vocabulary.
+
+01:37:32.760 --> 01:37:34.060
+So I added that as well.
+
+01:37:34.760 --> 01:37:37.960
+So at this stage, we actually have a pretty complete transformer coming to
+
+01:37:37.960 --> 01:37:40.860
+the original paper and it's a decoder only transformer.
+
+01:37:40.960 --> 01:37:45.260
+I'll I'll talk about that in a second but at this stage the major pieces
+
+01:37:45.260 --> 01:37:48.160
+are in place so we can try to scale this up and see how well we can push
+
+01:37:48.160 --> 01:37:50.760
+this number now in order to scale up the model.
+
+01:37:50.760 --> 01:37:54.360
+I had to perform some cosmetic changes here to make it nicer.
+
+01:37:54.660 --> 01:37:57.660
+So I introduced this variable called in layer which just specifies how
+
+01:37:57.660 --> 01:37:59.860
+many layers of the blocks.
+
+01:37:59.860 --> 01:38:03.260
+We're going to have I create a bunch of blocks and we have a new variable
+
+01:38:03.260 --> 01:38:04.460
+number of heads as well.
+
+01:38:05.460 --> 01:38:06.960
+I pulled out the layer norm here.
+
+01:38:07.160 --> 01:38:08.560
+And so this is identical.
+
+01:38:09.160 --> 01:38:12.660
+Now one thing that I did briefly change is I added dropout.
+
+01:38:13.160 --> 01:38:17.760
+So dropout is something that you can add right before the residual connection.
+
+01:38:17.760 --> 01:38:21.060
+Back right before the connection back into the residual pathway.
+
+01:38:21.660 --> 01:38:24.160
+So we can drop out that as the last layer here.
+
+01:38:24.760 --> 01:38:28.760
+We can drop out here at the end of the multi-headed extension as well.
+
+01:38:29.460 --> 01:38:35.360
+And we can also drop out here when we calculate the basically affinities
+
+01:38:35.360 --> 01:38:39.260
+and after the softmax we can drop out some of those so we can randomly
+
+01:38:39.260 --> 01:38:41.260
+prevent some of the notes from communicating.
+
+01:38:42.060 --> 01:38:46.860
+And so dropout comes from this paper from 2014 or so.
+
+01:38:46.860 --> 01:38:53.760
+And basically it takes your neural net and it randomly every forward backward
+
+01:38:53.760 --> 01:39:00.860
+pass shuts off some subset of neurons so randomly drops them to zero and
+
+01:39:00.860 --> 01:39:05.460
+trains without them and what this does effectively is because the mask of
+
+01:39:05.460 --> 01:39:08.760
+what being dropped out has changed every single forward backward pass it
+
+01:39:08.760 --> 01:39:14.060
+ends up kind of training an ensemble of sub networks and then at test time
+
+01:39:14.060 --> 01:39:16.760
+everything is fully enabled and kind of all those sub networks.
+
+01:39:16.760 --> 01:39:18.560
+Are merged into a single ensemble.
+
+01:39:18.560 --> 01:39:20.260
+If you can if you want to think about it that way.
+
+01:39:20.960 --> 01:39:23.960
+So I would read the paper to get the full detail for now.
+
+01:39:23.960 --> 01:39:27.360
+We're just going to stay on the level of this is a regularization technique
+
+01:39:27.660 --> 01:39:30.860
+and I added it because I'm about to scale up the model quite a bit and I
+
+01:39:30.860 --> 01:39:32.060
+was concerned about overfitting.
+
+01:39:33.360 --> 01:39:37.460
+So now when we scroll up to the top we'll see that I changed a number of
+
+01:39:37.460 --> 01:39:39.360
+hyper parameters here about our neural net.
+
+01:39:39.760 --> 01:39:42.460
+So I made the batch size be much larger now 64.
+
+01:39:43.160 --> 01:39:45.260
+I changed the block size to be 256.
+
+01:39:45.460 --> 01:39:46.660
+So previously was just eight.
+
+01:39:46.960 --> 01:39:48.160
+Eight characters of context.
+
+01:39:48.260 --> 01:39:52.760
+Now it is 256 characters of context to predict the 257th.
+
+01:39:54.360 --> 01:39:57.160
+I brought down the learning rate a little bit because the neural net is
+
+01:39:57.160 --> 01:39:57.960
+now much bigger.
+
+01:39:57.960 --> 01:39:59.360
+So I brought down the learning rate.
+
+01:40:00.260 --> 01:40:03.460
+The embedding dimension is not 384 and there are six heads.
+
+01:40:03.960 --> 01:40:10.260
+So 384 divide 6 means that every head is 64 dimensional as it as a standard
+
+01:40:11.060 --> 01:40:14.860
+and then there was going to be six layers of that and the dropout will be
+
+01:40:14.860 --> 01:40:16.660
+a point to so every forward backward pass.
+
+01:40:16.960 --> 01:40:22.760
+20% of all these intermediate calculations are disabled and dropped to
+
+01:40:22.760 --> 01:40:26.160
+zero and then I already trained this and I ran it.
+
+01:40:26.160 --> 01:40:28.960
+So drumroll how does it perform?
+
+01:40:29.760 --> 01:40:30.860
+So let me just scroll up here.
+
+01:40:32.760 --> 01:40:37.260
+We get a validation loss of 1.48 which is actually quite a bit of an
+
+01:40:37.260 --> 01:40:40.160
+improvement on what we had before which I think was 2.07.
+
+01:40:40.660 --> 01:40:44.160
+So we went from 2.07 all the way down to 1.48 just by scaling up this
+
+01:40:44.160 --> 01:40:45.860
+neural net with the code that we have.
+
+01:40:46.360 --> 01:40:48.060
+And this of course ran for a lot longer.
+
+01:40:48.060 --> 01:40:52.860
+This may be trained for I want to say about 15 minutes on my A100 GPU.
+
+01:40:52.860 --> 01:40:55.960
+So that's a pretty good GPU and if you don't have a GPU you're not going to
+
+01:40:55.960 --> 01:40:58.460
+be able to reproduce this on a CPU.
+
+01:40:58.460 --> 01:41:02.360
+This would be I would not run this on the CPU or MacBook or something like
+
+01:41:02.360 --> 01:41:02.860
+that.
+
+01:41:02.860 --> 01:41:06.660
+You'll have to break down the number of layers and the embedding dimension
+
+01:41:06.660 --> 01:41:07.260
+and so on.
+
+01:41:08.460 --> 01:41:13.360
+But in about 15 minutes we can get this kind of a result and I'm printing
+
+01:41:14.060 --> 01:41:15.060
+some of the Shakespeare here.
+
+01:41:15.060 --> 01:41:17.860
+But what I did also is I printed 10,000 characters.
+
+01:41:17.860 --> 01:41:19.760
+So a lot more and I wrote them to a file.
+
+01:41:20.560 --> 01:41:21.960
+And so here we see some of the outputs.
+
+01:41:24.260 --> 01:41:27.860
+So it's a lot more recognizable as the input text file.
+
+01:41:28.260 --> 01:41:30.860
+So the input text file just for reference look like this.
+
+01:41:31.760 --> 01:41:37.260
+So there's always like someone speaking in this matter and our predictions
+
+01:41:37.260 --> 01:41:41.560
+now take on that form except of course they're nonsensical when you
+
+01:41:41.560 --> 01:41:42.260
+actually read them.
+
+01:41:42.860 --> 01:41:43.360
+So
+
+01:41:43.360 --> 01:41:46.960
+it is every crimp to be a house.
+
+01:41:46.960 --> 01:41:50.560
+Oh those probation we give heed.
+
+01:41:52.560 --> 01:41:53.160
+You know.
+
+01:41:55.960 --> 01:41:58.060
+Oh ho sent me you mighty Lord.
+
+01:42:00.560 --> 01:42:02.160
+Anyway, so you can read through this.
+
+01:42:02.160 --> 01:42:06.460
+It's nonsensical of course, but this is just a transformer trained on the
+
+01:42:06.460 --> 01:42:10.060
+character level for 1 million characters that come from Shakespeare.
+
+01:42:10.060 --> 01:42:13.160
+So there's sort of like blabbers on in Shakespeare like math.
+
+01:42:13.360 --> 01:42:16.160
+Banner, but it doesn't of course make sense at this scale.
+
+01:42:17.060 --> 01:42:20.560
+But I think I think still a pretty good demonstration of what's possible.
+
+01:42:21.760 --> 01:42:23.160
+So now
+
+01:42:24.560 --> 01:42:28.360
+I think that kind of like concludes the programming section of this video.
+
+01:42:28.560 --> 01:42:32.860
+We basically kind of did a pretty good job and of implementing this
+
+01:42:32.860 --> 01:42:37.160
+transformer, but the picture doesn't exactly match up to what we've done.
+
+01:42:37.360 --> 01:42:39.560
+So what's going on with all these additional parts here?
+
+01:42:40.060 --> 01:42:43.260
+So let me finish explaining this architecture and why it looks so funky.
+
+01:42:44.060 --> 01:42:47.960
+Basically, what's happening here is what we implemented here is a decoder
+
+01:42:47.960 --> 01:42:48.860
+only transformer.
+
+01:42:49.360 --> 01:42:51.160
+So there's no component here.
+
+01:42:51.160 --> 01:42:55.260
+This part is called the encoder and there's no cross attention block here.
+
+01:42:55.760 --> 01:42:58.960
+Our block only has a self attention and the feed forward.
+
+01:42:58.960 --> 01:43:02.560
+So it is missing this third in between piece here.
+
+01:43:02.960 --> 01:43:04.260
+This piece does cross attention.
+
+01:43:04.560 --> 01:43:06.660
+So we don't have it and we don't have the encoder.
+
+01:43:06.760 --> 01:43:11.860
+We just have the decoder and the reason we have a decoder only is because we are
+
+01:43:11.860 --> 01:43:13.060
+just generating text.
+
+01:43:13.060 --> 01:43:16.660
+And it's unconditioned on anything or just we're just blabbering on according
+
+01:43:16.660 --> 01:43:17.560
+to a given data set.
+
+01:43:18.360 --> 01:43:22.660
+What makes it a decoder is that we are using the triangular mask in our
+
+01:43:22.860 --> 01:43:23.460
+transformer.
+
+01:43:23.760 --> 01:43:27.660
+So it has this autoregressive property where we can just go and sample from it.
+
+01:43:28.560 --> 01:43:32.460
+So the fact that it's using the triangulate triangular mask to mask out the
+
+01:43:32.460 --> 01:43:35.960
+attention makes it a decoder and it can be used for language modeling.
+
+01:43:36.660 --> 01:43:41.060
+Now, the reason that the original paper had an encoder decoder architecture is
+
+01:43:41.060 --> 01:43:42.760
+because it is a machine translation paper.
+
+01:43:43.160 --> 01:43:46.260
+So it is concerned with a different setting in particular.
+
+01:43:46.860 --> 01:43:53.260
+It expects some tokens that encode say for example French and then it is expected to
+
+01:43:53.260 --> 01:43:55.260
+decode the translation in English.
+
+01:43:55.860 --> 01:43:58.960
+So so you typically these here are special tokens.
+
+01:43:59.360 --> 01:44:04.360
+So you are expected to read in this and condition on it and then you start off the
+
+01:44:04.360 --> 01:44:06.460
+generation with a special token called start.
+
+01:44:06.760 --> 01:44:12.860
+So this is a special new token that you introduce and always place in the beginning and then
+
+01:44:12.860 --> 01:44:12.960
+the.
+
+01:44:13.160 --> 01:44:18.760
+Network is expected to output neural networks are awesome and then a special end token to
+
+01:44:18.760 --> 01:44:19.660
+finish the generation.
+
+01:44:21.060 --> 01:44:26.260
+So this part here will be decoded exactly as we have we've done it neural networks are
+
+01:44:26.260 --> 01:44:32.360
+awesome will be identical to what we did but unlike what we did they want to condition the
+
+01:44:32.360 --> 01:44:35.560
+generation on some additional information.
+
+01:44:35.660 --> 01:44:39.160
+And in that case this additional information is the French sentence that they should be
+
+01:44:39.160 --> 01:44:39.660
+translating.
+
+01:44:40.660 --> 01:44:42.860
+So what they do now is they.
+
+01:44:42.960 --> 01:44:47.260
+Bring the encoder now the encoder reads this part here.
+
+01:44:47.760 --> 01:44:53.260
+So we're all going to take the part of French and we're going to create tokens from it exactly as
+
+01:44:53.260 --> 01:44:58.060
+we've seen in our video and we're going to put a transformer on it, but there's going to be no
+
+01:44:58.060 --> 01:44:59.460
+triangular mask.
+
+01:44:59.560 --> 01:45:03.360
+And so all the tokens are allowed to talk to each other as much as they want and they're just
+
+01:45:03.360 --> 01:45:11.160
+encoding whatever the content of this French sentence once they've encoded it they've they
+
+01:45:11.160 --> 01:45:12.760
+basically come out in the top here.
+
+01:45:13.360 --> 01:45:18.260
+And then what happens here is in our decoder which does the language modeling.
+
+01:45:18.660 --> 01:45:24.560
+There's an additional connection here to the outputs of the encoder and that is brought in
+
+01:45:24.560 --> 01:45:26.460
+through a cross attention.
+
+01:45:27.060 --> 01:45:31.660
+So the queries are still generated from X but now the keys and the values are coming from the
+
+01:45:31.660 --> 01:45:37.260
+side the keys and the values are coming from the top generated by the nodes that came outside
+
+01:45:37.260 --> 01:45:42.760
+of the decode the encoder and those tops the keys and the values there the top of it.
+
+01:45:43.360 --> 01:45:48.660
+Feed in on the side into every single block of the decoder and so that's why there's an additional
+
+01:45:48.660 --> 01:45:54.860
+cross attention and really what is doing is it's conditioning the decoding not just on the past of
+
+01:45:54.860 --> 01:46:05.060
+this current decoding but also on having seen the full fully encoded French prompt sort of and so
+
+01:46:05.060 --> 01:46:08.960
+it's an encoder decoder model, which is why we have those two transformers and additional block
+
+01:46:09.260 --> 01:46:09.860
+and so on.
+
+01:46:10.160 --> 01:46:12.660
+So we did not do this because we have no we have nothing to do.
+
+01:46:12.660 --> 01:46:13.460
+Nothing to encode.
+
+01:46:13.460 --> 01:46:14.460
+There's no conditioning.
+
+01:46:14.460 --> 01:46:18.960
+We just have a text file and we just want to imitate it and that's why we are using a decoder only
+
+01:46:18.960 --> 01:46:21.660
+transformer exactly as done in GPT.
+
+01:46:22.860 --> 01:46:23.060
+Okay.
+
+01:46:23.060 --> 01:46:28.960
+So now I wanted to do a very brief walkthrough of nano GPT, which you can find in my GitHub and nano
+
+01:46:28.960 --> 01:46:31.060
+GPT is basically two files of interest.
+
+01:46:31.260 --> 01:46:36.860
+There's train.pi and model.pi train.pi is all the boilerplate code for training the network.
+
+01:46:37.060 --> 01:46:41.060
+It is basically all the stuff that we had here is the training loop.
+
+01:46:41.960 --> 01:46:42.460
+It's just that.
+
+01:46:42.460 --> 01:46:46.660
+It's a lot more complicated because we're saving and loading checkpoints and pre-trained weights
+
+01:46:46.660 --> 01:46:51.660
+and we are decaying the learning rate and compiling the model and using distributed training across
+
+01:46:51.660 --> 01:46:53.260
+multiple nodes or GPUs.
+
+01:46:53.760 --> 01:46:57.060
+So the training that Pi gets a little bit more hairy, complicated.
+
+01:46:57.460 --> 01:47:03.660
+There's more options Etc, but the model that I should look very very similar to what we've done
+
+01:47:03.660 --> 01:47:04.060
+here.
+
+01:47:04.260 --> 01:47:06.460
+In fact, the model is almost identical.
+
+01:47:07.260 --> 01:47:12.360
+So first here we have the causal self-attention block and all of this should look very very
+
+01:47:12.360 --> 01:47:12.460
+very similar.
+
+01:47:12.460 --> 01:47:17.980
+recognizable to you we're producing queries keys values we're doing dot products we're masking
+
+01:47:17.980 --> 01:47:25.260
+applying softmax optionally dropping out and here we are pooling the values what is different here
+
+01:47:25.260 --> 01:47:32.100
+is that in our code i have separated out the multi-headed attention into just a single
+
+01:47:32.100 --> 01:47:38.100
+individual head and then here i have multiple heads and i explicitly concatenate them whereas
+
+01:47:38.100 --> 01:47:43.180
+here all of it is implemented in a batched manner inside a single causal self-attention
+
+01:47:43.180 --> 01:47:48.120
+and so we don't just have a b and a t and a c dimension we also end up with a fourth dimension
+
+01:47:48.120 --> 01:47:53.320
+which is the heads and so it just gets a lot more sort of hairy because we have four-dimensional
+
+01:47:53.320 --> 01:47:59.360
+array tensors now but it is equivalent mathematically so the exact same thing is
+
+01:47:59.360 --> 01:48:03.740
+happening as what we have it's just it's a bit more efficient because all the heads are now
+
+01:48:03.740 --> 01:48:08.000
+treated as a batch dimension as well then we have the multi-layered perceptron
+
+01:48:08.000 --> 01:48:08.080
+and we have the multi-layered perceptron and we have the multi-layered perceptron
+
+01:48:08.100 --> 01:48:13.560
+it's using the gelu non-linearity which is defined here except instead of relu and this
+
+01:48:13.560 --> 01:48:16.520
+is done just because openly i used it and i want to be able to load their checkpoints
+
+01:48:16.520 --> 01:48:22.560
+the blocks of the transformer are identical the communicate and the compute phase as we saw
+
+01:48:22.560 --> 01:48:27.180
+and then the gpt will be identical we have the position encodings token encodings
+
+01:48:27.180 --> 01:48:33.600
+the blocks the layer norm at the end the final linear layer and this should look all very
+
+01:48:33.600 --> 01:48:38.000
+recognizable and there's a bit more here because i'm loading checkpoints and stuff like that
+
+01:48:38.000 --> 01:48:42.160
+i'm separating out the parameters into those that should be weight decayed and those that
+
+01:48:42.160 --> 01:48:48.240
+shouldn't but the generate function should also be very very similar so a few details are different
+
+01:48:48.240 --> 01:48:53.160
+but you should definitely be able to look at this file and be able to understand a lot of the pieces
+
+01:48:53.160 --> 01:48:58.440
+now so let's now bring things back to chat gpt what would it look like if we wanted to train
+
+01:48:58.440 --> 01:49:03.680
+chat gpt ourselves and how does it relate to what we learned today well to train the chat gpt there
+
+01:49:03.680 --> 01:49:07.980
+are roughly two stages first is the pre-training stage and then the fine-tuning stage and then the
+
+01:49:08.000 --> 01:49:13.920
+pre-training stage in the pre-training stage we are training on a large chunk of internet and just
+
+01:49:13.920 --> 01:49:20.400
+trying to get a first decoder only transformer to babble text so it's very very similar to what
+
+01:49:20.400 --> 01:49:27.920
+we've done ourselves except we've done like a tiny little baby pre-training step and so in our case
+
+01:49:29.360 --> 01:49:33.440
+this is how you print a number of parameters i printed it and it's about 10 million
+
+01:49:33.440 --> 01:49:37.120
+so this transformer that i created here to create a little shakespeare
+
+01:49:38.000 --> 01:49:45.140
+transformer was about 10 million parameters our data set is roughly 1 million characters so
+
+01:49:45.140 --> 01:49:49.900
+roughly 1 million tokens but you have to remember that openai uses different vocabulary they're not
+
+01:49:49.900 --> 01:49:55.480
+on the character level they use these subword chunks of words and so they have a vocabulary
+
+01:49:55.480 --> 01:50:02.640
+of 50 000 roughly elements and so their sequences are a bit more condensed so our data set the
+
+01:50:02.640 --> 01:50:07.840
+shakespeare data set would be probably around 300 000 tokens in the openai vocabulary roughly
+
+01:50:08.480 --> 01:50:15.520
+so we trained about 10 million parameter model on roughly 300 000 tokens now when you go to the gpt3 paper
+
+01:50:16.960 --> 01:50:22.400
+and you look at the transformers that they trained they trained a number of transformers
+
+01:50:22.400 --> 01:50:28.640
+of different sizes but the biggest transformer here has 175 billion parameters uh so ours is
+
+01:50:28.640 --> 01:50:35.040
+again 10 million they used this number of layers in the transformer this is the n embed this is
+
+01:50:35.040 --> 01:50:37.620
+the number of heads and this is the head size
+
+01:50:38.000 --> 01:50:45.440
+and then this is the batch size so ours was 65 and the learning rate is similar
+
+01:50:45.440 --> 01:50:50.600
+now when they train this transformer they trained on 300 billion tokens so
+
+01:50:50.600 --> 01:50:56.320
+again remember ours is about 300,000 so this is about a million fold increase
+
+01:50:56.320 --> 01:50:59.580
+and this number would not be even that large by today's standards you'd be
+
+01:50:59.580 --> 01:51:05.660
+going up 1 trillion and above so they are training a significantly larger
+
+01:51:05.660 --> 01:51:12.020
+model on a good chunk of the internet and that is the pre-training stage but
+
+01:51:12.020 --> 01:51:15.380
+otherwise these hyperparameters should be fairly recognizable to you and the
+
+01:51:15.380 --> 01:51:18.420
+architecture is actually like nearly identical to what we implemented
+
+01:51:18.420 --> 01:51:22.460
+ourselves but of course it's a massive infrastructure challenge to train this
+
+01:51:22.460 --> 01:51:27.140
+you're talking about typically thousands of GPUs having to you know talk to each
+
+01:51:27.140 --> 01:51:31.880
+other to train models of this size so that's just a pre-training stage now
+
+01:51:31.880 --> 01:51:35.540
+after you complete the pre-training stage you don't get something that
+
+01:51:35.540 --> 01:51:35.640
+you don't get something that you don't get something that you don't get
+
+01:51:35.640 --> 01:51:40.240
+a response to your questions with answers and it's not helpful and etc you
+
+01:51:40.240 --> 01:51:45.640
+get a document completer right so it babbles but it doesn't babble Shakespeare
+
+01:51:45.640 --> 01:51:49.560
+it babbles internet it will create arbitrary news articles and documents
+
+01:51:49.560 --> 01:51:52.080
+and it will try to complete documents because that's what it's trained for
+
+01:51:52.080 --> 01:51:55.740
+it's trying to complete the sequence so when you give it a question it would
+
+01:51:55.740 --> 01:51:59.520
+just potentially just give you more questions it would follow with more
+
+01:51:59.520 --> 01:52:04.240
+questions it will do whatever it looks like the some closed document would do
+
+01:52:04.240 --> 01:52:05.520
+in the training data
+
+01:52:05.520 --> 01:52:08.840
+on the internet and so who knows you're getting kind of like undefined behavior
+
+01:52:08.840 --> 01:52:13.320
+it might basically answer with two questions with other questions it might
+
+01:52:13.320 --> 01:52:16.980
+ignore your question it might just try to complete some news article it's
+
+01:52:16.980 --> 01:52:22.020
+totally unaligned as we say so the second fine-tuning stage is to actually
+
+01:52:22.020 --> 01:52:28.280
+align it to be an assistant and this is the second stage and so this chat GPT
+
+01:52:28.280 --> 01:52:32.480
+blog post from opening I talks a little bit about how this stage is achieved we
+
+01:52:32.480 --> 01:52:34.920
+basically
+
+01:52:35.520 --> 01:52:39.540
+roughly three steps to it to this stage so what they do here is they start to
+
+01:52:39.540 --> 01:52:43.260
+collect training data that looks specifically like what an assistant
+
+01:52:43.260 --> 01:52:46.560
+would do so there are documents that have the format where the question is on
+
+01:52:46.560 --> 01:52:50.700
+top and then an answer is below and they have a large number of these but
+
+01:52:50.700 --> 01:52:53.760
+probably not on the order of the internet this is probably on the order
+
+01:52:53.760 --> 01:53:00.600
+of maybe thousands of examples and so they they then fine-tune the model to
+
+01:53:00.600 --> 01:53:05.220
+basically only focus on documents that look like that and so you're starting to
+
+01:53:05.220 --> 01:53:08.720
+slowly align it so it's going to expect a question at the top and it's going to
+
+01:53:08.720 --> 01:53:13.980
+expect to complete the answer and these very very large models are very sample
+
+01:53:13.980 --> 01:53:18.120
+efficient during their fine-tuning so this actually somehow works but that's
+
+01:53:18.120 --> 01:53:21.780
+just step one that's just fine-tuning so then they actually have more steps where
+
+01:53:21.780 --> 01:53:26.340
+okay the second step is you let the model respond and then different raters
+
+01:53:26.340 --> 01:53:30.540
+look at the different responses and rank them for their preferences to which one
+
+01:53:30.540 --> 01:53:35.000
+is better than the other they use that to train a reward model so they can predict a
+
+01:53:35.000 --> 01:53:42.040
+basically using a different network, how much of any candidate response would be desirable.
+
+01:53:42.720 --> 01:53:47.900
+And then once they have a reward model, they run PPO, which is a form of policy gradient
+
+01:53:47.900 --> 01:53:55.640
+reinforcement learning optimizer, to fine-tune this sampling policy so that the answers that
+
+01:53:55.640 --> 01:54:02.700
+the chat GPT now generates are expected to score a high reward according to the reward model.
+
+01:54:02.700 --> 01:54:08.160
+And so basically there's a whole aligning stage here, or fine-tuning stage. It's got multiple
+
+01:54:08.160 --> 01:54:13.900
+steps in between there as well, and it takes the model from being a document completer to a
+
+01:54:13.900 --> 01:54:19.520
+question answerer, and that's like a whole separate stage. A lot of this data is not
+
+01:54:19.520 --> 01:54:25.120
+available publicly. It is internal to OpenAI, and it's much harder to replicate this stage.
+
+01:54:26.320 --> 01:54:32.180
+And so that's roughly what would give you a chat GPT. And NanoGPT focuses on the pre-training stage.
+
+01:54:32.180 --> 01:54:32.580
+Okay.
+
+01:54:32.700 --> 01:54:38.920
+And that's everything that I wanted to cover today. So we trained, to summarize, a decoder-only
+
+01:54:38.920 --> 01:54:45.460
+transformer following this famous paper, Attention is All You Need, from 2017. And so that's
+
+01:54:45.460 --> 01:54:53.420
+basically a GPT. We trained it on tiny Shakespeare and got sensible results. All of the training
+
+01:54:53.420 --> 01:55:02.140
+code is roughly 200 lines of code. I will be releasing this code base. So also it comes with
+
+01:55:02.140 --> 01:55:02.420
+all the...
+
+01:55:02.700 --> 01:55:08.780
+Git log commits along the way, as we built it up. In addition to this code, I'm going to release
+
+01:55:08.780 --> 01:55:14.540
+the notebook, of course, the Google Colab. And I hope that gave you a sense for how you can train
+
+01:55:16.140 --> 01:55:21.100
+these models, like, say, GPT-3, that will be architecturally basically identical to what we
+
+01:55:21.100 --> 01:55:25.580
+have, but they are somewhere between 10,000 and 1 million times bigger, depending on how you count.
+
+01:55:26.620 --> 01:55:32.540
+And so that's all I have for now. We did not talk about any of the fine-tuning stages. That would,
+
+01:55:32.540 --> 01:55:36.460
+typically, go on top of this. So if you're interested in something that's not just language
+
+01:55:36.460 --> 01:55:41.580
+modeling, but you actually want to, you know, say, perform tasks, or you want them to be aligned in
+
+01:55:41.580 --> 01:55:47.180
+a specific way, or you want to detect sentiment or anything like that, basically, any time you
+
+01:55:47.180 --> 01:55:51.340
+don't want something that's just a document completer, you have to complete further stages
+
+01:55:51.340 --> 01:55:56.380
+of fine-tuning, which we did not cover. And that could be simple, supervised fine-tuning,
+
+01:55:56.380 --> 01:56:00.780
+or it can be something more fancy, like we see in ChatGPT, where we actually train a reward model,
+
+01:56:00.780 --> 01:56:02.540
+and then do rounds of PPO to...
+
+01:56:02.540 --> 01:56:07.340
+align it with respect to the reward model. So there's a lot more that can be done on top of it.
+
+01:56:07.340 --> 01:56:12.620
+I think for now, we're starting to get to about two hours, Mark. So I'm going to kind of finish
+
+01:56:12.620 --> 01:56:19.660
+here. I hope you enjoyed the lecture. And yeah, go forth and transform. See you later.
+

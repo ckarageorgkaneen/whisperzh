@@ -1,0 +1,1774 @@
+start	end	text
+0	5360	Hi everyone. So by now you have probably heard of ChatGPT. It has taken the world and the AI
+5360	11700	community by storm, and it is a system that allows you to interact with an AI and give it text-based
+11700	17080	tasks. So for example, we can ask ChatGPT to write us a small haiku about how important it is that
+17080	20720	people understand AI, and then they can use it to improve the world and make it more prosperous.
+21420	27080	So when we run this, AI knowledge brings prosperity for all to see, embrace its power.
+27080	33300	Okay, not bad. And so you could see that ChatGPT went from left to right and generated all these
+33300	39100	words sort of sequentially. Now, I asked it already the exact same prompt a little bit earlier,
+39300	44660	and it generated a slightly different outcome. AI's power to grow, ignorance holds us back,
+44920	50820	learn, prosperity waits. So pretty good in both cases and slightly different. So you can see that
+50820	55520	ChatGPT is a probabilistic system, and for any one prompt, it can give us multiple answers,
+55660	57020	sort of replying.
+57080	62060	Now, this is just one example of a prompt. People have come up with many, many examples,
+62520	68220	and there are entire websites that index interactions with ChatGPT. And so many of
+68220	73640	them are quite humorous. Explain HTML to me like I'm a dog, write release notes for chess too,
+74580	79900	write a note about Elon Musk buying a Twitter, and so on. So as an example,
+80460	83180	please write a breaking news article about a leaf falling from a tree,
+83180	86320	and a shocking turn of events.
+87080	90340	The leaf falling from a tree in the local park. Witnesses report that the leaf, which was
+90340	95040	previously attached to a branch of a tree, detached itself and fell to the ground. Very
+95040	100000	dramatic. So you can see that this is a pretty remarkable system, and it is what we call a
+100000	107560	language model, because it models the sequence of words or characters or tokens more generally,
+107980	113260	and it knows how certain words follow each other in English language. And so from its perspective,
+113260	116520	what it is doing is it is completing the sequence.
+117080	122040	So I give it the start of a sequence, and it completes the sequence with the outcome.
+122040	127400	And so it's a language model in that sense. Now, I would like to focus on the under the hood of
+128360	132920	under the hood components of what makes ChatGPT work. So what is the neural network under the
+132920	139080	hood that models the sequence of these words? And that comes from this paper called Attention
+139080	146200	is All You Need. In 2017, a landmark paper, a landmark paper in AI that produced and proposed
+146200	146900	the Transformer and the Translator. And this paper is called the Transformer and the Translator. And
+146900	147060	this paper is called the Transformer and the Translator. And this paper is called the Transformer
+147080	154280	Architecture. So GPT is short for generatively, generatively pre trained transformer. So
+154280	158360	transformer is the neural net that actually does all the heavy lifting under the hood.
+158360	164440	It comes from this paper in 2017. Now, if you read this paper, this reads like a pretty random
+164440	168120	machine translation paper. And that's because I think the authors didn't fully anticipate the
+168120	172680	impact that the transformer would have on the field. And this architecture that they produced
+172680	176900	in the context of machine translation, in their case, actually ended up taking over
+176900	183860	the rest of AI in the next five years after. And so this architecture with minor changes was copy
+183860	191060	pasted into a huge amount of applications in AI in more recent years. And that includes at the core
+191060	196340	of ChatGPT. Now, we are not going to, what I'd like to do now is I'd like to build out
+196340	201220	something like ChatGPT. But we're not going to be able to, of course, reproduce ChatGPT.
+201220	204580	This is a very serious production grade system. It is trained on
+204580	211540	a good chunk of internet. And then there's a lot of pre training and fine tuning stages to it.
+211540	217380	And so it's very complicated. What I'd like to focus on is just to train a transformer based
+217380	222820	language model. And in our case, it's going to be a character level language model. I still think
+222820	227620	that is a very educational with respect to how these systems work. So I don't want to train on
+227620	232740	the chunk of internet, we need a smaller data set. In this case, I propose that we work with
+232740	234560	my favorite toy data set. It's called ChatGPT. And I'm going to show you how that works. I'm going to
+234580	237120	show you what it looks like. So first, I'm going to create a little tiny Shakespeare. And what it
+237120	241920	is is basically it's a concatenation of all of the works of Shakespeare in my understanding. And so
+241920	247960	this is all of Shakespeare in a single file. This file is about one megabyte. And it's just all of
+247960	253920	Shakespeare. And what we are going to do now is we're going to basically model how these characters
+253920	260440	follow each other. So for example, given a chunk of these characters like this, given some context
+260440	264560	of characters in the past, the transformer neural network will look at the model of the character.
+264580	268900	characters that i've highlighted and it's going to predict that g is likely to come next in the
+268900	274020	sequence and it's going to do that because we're going to train that transformer on shakespeare
+274020	280180	and it's just going to try to produce character sequences that look like this and in that process
+280180	285220	is going to model all the patterns inside this data so once we've trained the system i just
+285220	290900	like to give you a preview we can generate infinite shakespeare and of course it's a fake
+290900	299300	thing that looks kind of like shakespeare um apologies for there's some jank that i'm not
+299300	306820	able to resolve in in here but um you can see how this is going character by character and it's kind
+306820	314020	of like predicting shakespeare-like language so verily my lord the sights have left the again
+314020	320500	the king coming with my curses with precious pale and then tronio says something else etc
+320900	325380	and this is just coming out of the transformer in a very similar manner as it would come out in
+325380	332180	chat gpt in our case character by character in chat gpt it's coming out on the token by token
+332180	336820	level and tokens are these sort of like little subword pieces so they're not word level they're
+336820	344820	kind of like word chunk level um and now i've already written this entire code uh to train
+344820	350580	these transformers um and it is in a github repository that you can find and it's called
+350900	357380	nano gpt so nano gpt is a repository that you can find on my github and it's a repository for
+357380	362900	training transformers um on any given text and what i think is interesting about it because
+362900	367620	there's many ways to train transformers but this is a very simple implementation so it's just two
+367620	374260	files of 300 lines of code each one file defines the gpt model the transformer and one file trains
+374260	379620	it on some given text dataset and here i'm showing that if you train it on a open web text dataset
+380900	390180	web pages then i reproduce the the performance of gpt2 so gpt2 is an early version of openai's gpt
+391140	396740	from 2017 if i recall correctly and i've only so far reproduced the the smallest 124 million
+396740	401540	parameter model but basically this is just proving that the code base is correctly arranged and i'm
+401540	408420	able to load the neural network weights that openai has released later so you can take a look
+408420	410420	at the finished code here in nano gpt
+410900	416180	what i would like to do in this lecture is i would like to basically write this repository
+416180	421780	from scratch so we're going to begin with an empty file and we're going to define a transformer piece
+421780	427620	by piece we're going to train it on the tiny shakespeare dataset and we'll see how we can then
+428260	433460	generate infinite shakespeare and of course this can copy paste to any arbitrary text dataset
+433460	437780	that you like but my goal really here is to just make you understand and appreciate
+438660	440500	how under the hood chat gpt works
+441220	449060	and really all that's required is a proficiency in python and some basic understanding of calculus
+449060	454660	and statistics and it would help if you also see my previous videos on the same youtube channel
+454660	462820	in particular my make more series where i define smaller and simpler neural network language models
+462820	467700	so multi-layered perceptrons and so on it really introduces the language modeling framework
+467700	470740	and then here in this video we're going to focus on the transformer
+470900	473940	so let's look at the general structure of the neural network itself
+474820	480340	okay so i created a new google collab jupiter notebook here and this will allow me to later
+480340	484900	easily share this code that we're going to develop together with you so you can follow along so this
+484900	490420	will be in a video description later now here i've just done some preliminaries i downloaded
+490420	495060	the dataset the tiny shakespeare dataset at this url and you can see that it's about a one megabyte
+495060	499860	file then here i open the input.txt file and just read in all the text of the string
+499860	502900	and you can see that we are working with one million characters roughly
+503860	507860	and the first 1000 characters if we just print them out are basically what you would expect
+507860	512980	this is the first 1000 characters of the tiny shakespeare dataset roughly up to here
+514100	519620	so so far so good next we're going to take this text and the text is a sequence of characters
+519620	525780	in python so when i call the set constructor on it i'm just going to get the set of all the
+525780	527780	characters that occur in this text
+529860	533940	and then i'm just going to set the set of all the characters that occur in this text
+533940	538260	and then i'm going to I'm going to sort that to create a list of those characters instead of just
+538260	544020	a set so that i have an ordering an arbitrary ordering and then i sort that so basically we
+544020	548740	get just all the characters that occur in the entire data set and they're sorted now the number
+548740	553940	of them is going to be our vocabulary size these are the possible elements of our sequences and
+553940	559620	we see that when i print here the characters there's 65 of them in total there's a space character and then all kinds of special characters
+559860	565460	lowercase letters so that's our vocabulary and that's the sort of like possible characters that
+565460	572500	the model can see or emit okay so next we would like to develop some strategy to tokenize the
+572500	579140	input text now when people say tokenize they mean convert the raw text as a string to some
+579140	584660	sequence of integers according to some notebook according to some vocabulary of possible elements
+585380	589380	so as an example here we are going to be building a character level language model
+589380	592660	so we're simply going to be translating individual characters into integers
+593380	598100	so let me show you a chunk of code that sort of does that for us so we're building both the
+598100	604100	encoder and the decoder and let me just talk through what's happening here when we encode
+604100	610660	an arbitrary text like hi there we're going to receive a list of integers that represents that
+610660	618740	string so for example 46 47 etc and then we also have the reverse mapping so we can take this list
+618740	619360	and decode it into a string so we can take this list and decode it into a string so we can take
+619360	623840	this list and decode it to get back the exact same string so it's really just like a translation
+623840	628800	to integers and back for arbitrary string and for us it is done on a character level
+630000	633840	now the way this was achieved is we just iterate over all the characters here
+633840	638000	and create a lookup table from the character to the integer and vice versa
+638000	642400	and then to encode some string we simply translate all the characters individually
+642400	649360	and to decode it back we use the reverse mapping concatenate all of it now this is only one of many
+649360	654640	possible encodings or many possible tokenizers and it's a very simple one but there's many
+654640	659600	other schemas that people have come up with in practice so for example Google uses SENTENCEPIECE
+660800	666720	so SENTENCEPIECE will also encode text into integers but in a different schema
+666720	673600	and using a different vocabulary and SENTENCEPIECE is a sub-word sort of tokenizer and what that
+673600	679120	means is that you're not encoding entire words but you're not also encoding individual characters
+679120	684960	it's a subword unit level and that's usually what's adopted in practice. For example also
+684960	689920	OpenAI has this library called tiktoken that uses a byte pair encoding tokenizer
+690960	697600	and that's what GPT uses and you can also just encode words into like hello world into lists
+697600	703040	of integers. So as an example I'm using the tiktoken library here I'm getting the encoding
+703040	710080	for GPT-2 or that was used for GPT-2. Instead of just having 65 possible characters or tokens
+710080	717040	they have 50 000 tokens and so when they encode the exact same string high there we only get a
+717040	725840	list of three integers but those integers are not between 0 and 64 they are between 0 and 50 256.
+726720	732800	So basically you can trade off the codebook size and the sequence lengths so you can have a very
+732800	733000	long string and you can have a very long string and you can have a very long string and you can
+733000	733020	have a very long string and you can have a very long string and you can have a very long string and
+733020	733260	you can have a very long string and you can have a very long string and you can have a very long
+733260	737340	sequences of integers with very small vocabularies or you can have short
+739180	745980	sequences of integers with very large vocabularies and so typically people use in practice these
+745980	751100	subword encodings but I'd like to keep our tokenizer very simple so we're using character
+751100	756460	level tokenizer and that means that we have very small codebooks we have very simple encode and
+756460	762980	decode functions but we do get very long sequences as a result but that's the level at which we're
+762980	767140	going to stick with this lecture because it's the simplest thing okay so now that we have an encoder
+767140	772420	and a decoder effectively a tokenizer we can tokenize the entire training set of Shakespeare
+772980	777220	so here's a chunk of code that does that and I'm going to start to use the pytorch library
+777220	782660	and specifically the torch.tensor from the pytorch library so we're going to take all of the text
+782660	789140	in tiny Shakespeare encode it and then wrap it into a torch.tensor to get the data tensor so
+789140	792900	here's what the data tensor looks like when I look at just the first one thousand character
+792980	797540	or the one thousand elements of it so we see that we have a massive sequence of integers
+798100	803540	and this sequence of integers here is basically an identical translation of the first 1000 characters
+803540	810580	here so I believe for example that zero is a new line character and maybe one is a space I'm not
+810580	816180	100 sure but from now on the entire data set of text is re-represented as just it's just stretched
+816180	822420	out as a single very large sequence of integers let me do one more thing before we move on here
+822980	828580	we're going to separate out our data set into a train and a validation split so in particular
+828580	833380	we're going to take the first 90 of the data set and consider that to be the training data
+833380	838740	for the transformer and we're going to withhold the last 10 at the end of it to be the validation
+838740	843380	data and this will help us understand to what extent our model is overfitting so we're going
+843380	848020	to basically hide and keep the validation data on the side because we don't want just a perfect
+848020	852980	memorization of this exact Shakespeare we want a neural network that sort of creates Shakespeare's
+852980	860260	like text and so it should be fairly likely for it to produce the actual like stowed away
+861380	867780	true Shakespeare text and so we're going to use this to get a sense of the overfitting okay so now
+867780	872100	we would like to start plugging these text sequences or integer sequences into the
+872100	877780	transformer so that it can train and learn those patterns now the important thing to realize is
+877780	882020	we're never going to actually feed entire text into transformer all at once that would be
+882980	888020	very expensive and prohibitive so when we actually train a transformer on a lot of these data sets
+888020	893060	we only work with chunks of the data set and when we train the transformer we basically sample random
+893060	898420	little chunks out of the training set and train them just chunks at a time and these chunks have
+898420	905460	basically some kind of a length and some maximum length now the maximum length typically at least
+905460	911220	in the code i usually write is called block size you can you can find it under different names
+911220	912820	like context length or something like that
+913300	917860	let's start with the block size of just eight and let me look at the first train data characters
+918500	922340	the first block size plus one characters i'll explain why plus one in a second
+923700	929620	so this is the first nine characters in the sequence in the training set now what i'd like
+929620	934740	to point out is that when you sample a chunk of data like this so say these nine characters out
+934740	941060	of the training set this actually has multiple examples packed into it and that's because all
+941060	942740	of these characters follow each other
+942980	949060	and so what this thing is going to say when we plug it into a transformer is we're going to
+949060	952900	actually simultaneously train it to make a prediction at every one of these positions
+953700	960020	now in the in a chunk of nine characters there's actually eight individual examples packed in there
+960500	968340	so there's the example that when 18 when in the context of 18 47 likely comes next in a context of
+968340	972260	18 and 47 56 comes next in the context of 1847
+972980	976880	47, 56, 57 can come next, and so on.
+977280	979180	So that's the eight individual examples.
+979640	981260	Let me actually spell it out with code.
+982480	984160	So here's a chunk of code to illustrate.
+985080	986920	X are the inputs to the transformer.
+987180	989240	It will just be the first block size characters.
+990100	993960	Y will be the next block size characters.
+993960	995340	So it's offset by one.
+996200	1000460	And that's because Y are the targets for each position in the input.
+1000460	1004120	And then here I'm iterating over all the block size of eight.
+1004920	1009880	And the context is always all the characters in X up to T and including T.
+1010580	1015500	And the target is always the T character, but in the targets array Y.
+1016180	1016960	So let me just run this.
+1018140	1020600	And basically it spells out what I said in words.
+1021200	1024900	These are the eight examples hidden in a chunk of nine characters
+1024900	1028820	that we sampled from the training set.
+1029680	1030440	I want to make sure that I'm not missing anything.
+1030440	1031120	Let me just mention one more thing.
+1031700	1036340	We train on all the eight examples here with context between one
+1036340	1038220	all the way up to context of block size.
+1038740	1041160	And we train on that not just for computational reasons
+1041160	1043700	because we happen to have the sequence already or something like that.
+1043740	1045160	It's not just done for efficiency.
+1045660	1051500	It's also done to make the transformer network be used to seeing contexts
+1051500	1055140	all the way from as little as one all the way to block size.
+1055700	1058900	And we'd like the transformer to be used to seeing everything in between.
+1058900	1060320	And that's going to be useful.
+1060440	1063020	Later during inference, because while we're sampling,
+1063380	1067300	we can start to set a sampling generation with as little as one character of context.
+1067680	1069880	And the transformer knows how to predict the next character
+1070160	1072200	with all the way up to just context of one.
+1072740	1075100	And so then it can predict everything up to block size.
+1075440	1079500	And after block size, we have to start truncating because the transformer will never
+1080200	1083660	receive more than block size inputs when it's predicting the next character.
+1084780	1089300	Okay, so we've looked at the time dimension of the tensors that are going to be feeding into the transformer.
+1089300	1092120	There's one more dimension to care about, and that is the batch dimension.
+1092820	1098960	And so as we're sampling these chunks of text, we're going to be actually every time we're going to feed them into a transformer,
+1099320	1104060	we're going to have many batches of multiple chunks of text that are all like stacked up in a single tensor.
+1104660	1112500	And that's just done for efficiency just so that we can keep the GPUs busy because they are very good at parallel processing of data.
+1113060	1116600	And so we just want to process multiple chunks all at the same time.
+1116900	1118940	But those chunks are processed completely independently.
+1118940	1119280	They don't take up too much space.
+1119280	1120900	They don't talk to each other and so on.
+1121560	1124720	So let me basically just generalize this and introduce a batch dimension.
+1125060	1125960	Here's a chunk of code.
+1127340	1129560	Let me just run it and then I'm going to explain what it does.
+1131800	1145380	So here, because we're going to start sampling random locations in the data sets to pull chunks from, I am setting the seed so that in the random number generator, so that the numbers I see here are going to be the same numbers you see later if you try to reproduce this.
+1146460	1148860	Now, the batch size here is how many independent sequences we are producing.
+1149280	1152300	We're processing every forward backward pass of the transformer.
+1153780	1157800	The block size, as I explained, is the maximum context length to make those predictions.
+1158440	1160500	So let's say batch size four, block size eight.
+1160920	1164160	And then here's how we get batch for any arbitrary split.
+1164820	1168720	If the split is a training split, then we're going to look at train data, otherwise at val data.
+1170040	1172140	That gives us the data array.
+1172860	1178620	And then when I generate random positions to grab a chunk out of, I actually grab, I actually generate random data.
+1178620	1179140	I actually generate random positions to grab a chunk out of.
+1179140	1179240	I actually generate random positions to grab a chunk out of.
+1179240	1179260	I actually generate random positions to grab a chunk out of.
+1179280	1182960	assumeonline, will generate batch size number of random offsets.
+1183200	1188080	So because this is four, we are, i, x is going to be a four numbers that are randomly generated between 0 and len of data minus block size.
+1188080	1192060	are randomly generated between 0 and len of data minus block size.
+1193460	1194840	So it's just random offsets into the training set.
+1195620	1203520	And then x' as I explained are the first block size characters, starting at i.
+1203920	1206140	The y' are the offset by 1 of that.
+1207280	1207960	So just add plus 1.
+1208040	1208640	And then we're going to get roughly how many random fields are generated.
+1208640	1209220	So just add plus 1.
+1209220	1216340	get those chunks for every one of integers i in ix and use a torch.stack to take all those
+1217540	1223780	one-dimensional tensors as we saw here and we're going to stack them up as rows
+1224900	1230660	and so they all become a row in a four by eight tensor so here's where i'm printing them
+1230660	1239600	when i sample a batch xb and yb the inputs the transformer now are the input x is the four by
+1239600	1247920	eight tensor four rows of eight columns and each one of these is a chunk of the training set
+1247920	1255100	and then the targets here are in the associated array y and they will come in to the transformer
+1255100	1260660	all the way at the end to create the loss function so they will give us the
+1260660	1267220	correct answer for every single position inside x and then these are the four independent rows
+1268900	1276500	so spelled out as we did before this 4x8 array contains a total of 32 examples
+1277060	1280100	and they're completely independent as far as the transformer is concerned
+1282020	1290580	so when the input is 24 the target is 43 or rather 43 here in the y array when the input is 2443
+1290660	1299220	the target is 58. when the input is 2443 58 the target is 5 etc or like when it is a 52581 the
+1299220	1306580	target is 58 right so you can sort of see this spelled out these are the 32 independent examples
+1306580	1312740	packed in to a single batch of the input x and then the desired targets are in y
+1313780	1320580	and so now this integer tensor of x is going to feed into the transformer
+1321300	1325860	and that transformer is going to simultaneously process all these examples and then look up the
+1325860	1332260	correct integers to predict in every one of these positions in the tensor y okay so now
+1332260	1336660	that we have our batch of input that we'd like to feed into a transformer let's start basically
+1336660	1341060	feeding this into neural networks now we're going to start off with the simplest possible
+1341060	1344660	neural network which in the case of language modeling in my opinion is the bigram language
+1344660	1350100	model and we've covered the bigram language model in my make more series in a lot of depth and so
+1350100	1354980	here i'm going to sort of go faster and let's just implement the pytorch module directly that
+1354980	1360740	implements the bigram language model so i'm importing the pytorch nn module
+1362180	1367060	for reproducibility and then here i'm constructing a bigram language model which is a subclass of
+1367060	1372740	nn module and then i'm calling it and i'm passing in the inputs and the targets
+1373700	1378420	and i'm just printing now when the inputs and targets come here you see that i'm just taking the
+1378420	1380020	index the inputs and targets and then i'm just printing the inputs and targets and then i'm just
+1380020	1384420	printing the inputs x here which i rename to idx and i'm just passing them into this token
+1384420	1390580	embedding table so what's going on here is that here in the constructor we are creating a token
+1390580	1397940	embedding table and it is of size vocab size by vocab size and we're using an endot embedding
+1397940	1403300	which is a very thin wrapper around basically a tensor of shape vocab size by vocab size
+1404020	1410020	and what's happening here is that when we pass idx here every single integer in our input is going to
+1410020	1415380	refer to this embedding table and is going to pluck out a row of that embedding table corresponding
+1415380	1422740	to its index so 24 here will go to the embedding table and we'll pluck out the 24th row and then 43
+1422740	1428420	will go here and pluck out the 43rd row etc and then pytorch is going to arrange all of this into
+1428420	1438500	a batch by time by channel tensor in this case batch is 4 time is 8 and c which is the channels
+1440740	1444900	and so we're just going to pluck out all those rows arrange them in a b by t by c
+1445700	1449540	and now we're going to interpret this as the logits which are basically the scores
+1450100	1454260	for the next character in a sequence and so what's happening here is
+1454260	1459300	we are predicting what comes next based on just the individual identity of a single token
+1459940	1464740	and you can do that because um i mean currently the tokens are not talking to each other and
+1464740	1469940	they're not seeing any context except for they're just seeing themselves so i'm a i'm a token number
+1470020	1475220	five and then i can actually make pretty decent predictions about what comes next just by knowing
+1475220	1482580	that i'm token 5 because some characters know um follow other characters in typical scenarios
+1482580	1487300	so we saw a lot of this in a lot more depth in the make more series and here if i just run this
+1488020	1494420	then we currently get the predictions the scores the logits for every one of the four by eight
+1494420	1498740	positions now that we've made predictions about what comes next we'd like to evaluate the loss
+1498740	1500000	function and so in this case we want to make predictions about how would the loss function Te intentions are impact the sc noises you would get this this existence and then we oriented out we would get the loss function and so at
+1500020	1505680	make more series we saw that a good way to measure a loss or like a quality of the predictions is to
+1505680	1510420	use the negative log likelihood loss which is also implemented in PyTorch under the name cross
+1510420	1517800	entropy. So what we'd like to do here is loss is the cross entropy on the predictions and the
+1517800	1523260	targets and so this measures the quality of the logits with respect to the targets. In other words
+1523260	1528960	we have the identity of the next character so how well are we predicting the next character based
+1528960	1536880	on the logits and intuitively the correct dimension of logits depending on whatever
+1536880	1541040	the target is should have a very high number and all the other dimensions should be very low number
+1541040	1546920	right. Now the issue is that this won't actually this is what we want we want to basically output
+1546920	1556400	the logits and the loss this is what we want but unfortunately this won't actually run we get an
+1556400	1558540	error message but intuitively we want to
+1558540	1558940	you
+1558940	1565640	measure this. Now when we go to the PyTorch cross entropy documentation here
+1565640	1571760	we're trying to call the cross entropy in its functional form so that means we don't have to
+1571760	1577500	create like a module for it but here when we go to the documentation you have to look into the
+1577500	1583140	details of how PyTorch expects these inputs and basically the issue here is PyTorch expects
+1583140	1587820	if you have multi-dimensional input which we do because we have a b by t by c tensor
+1587820	1588520	then it actually expects a multi-dimensional input which we do because we have a b by t by c tensor
+1588520	1595220	then it actually really wants the channels to be the second dimension here so if you
+1596620	1604620	so basically it wants a b by c by t instead of a b by t by c and so just the details of how PyTorch
+1604620	1611380	treats these kinds of inputs and so we don't actually want to deal with that so what we're
+1611380	1615520	going to do instead is we need to basically reshape our logits. So here's what I like to do I
+1615520	1618420	like to take basically give names to the dimensions
+1618420	1622660	So logits.shape is B by T by C and unpack those numbers.
+1622660	1627240	And then let's say that logits equals logits.view.
+1627240	1630780	And we want it to be a B times C, B times T by C.
+1630780	1634000	So just a two-dimensional array, right?
+1634000	1636120	So we're going to take all the,
+1636120	1639840	we're going to take all of these positions here
+1639840	1641480	and we're going to stretch them out
+1641480	1643780	in a one-dimensional sequence
+1643780	1646840	and preserve the channel dimension as the second dimension.
+1646840	1649460	So we're just kind of like stretching out the array
+1649460	1650840	so it's two-dimensional.
+1650840	1652880	And in that case, it's going to better conform
+1652880	1656380	to what PyTorch sort of expects in its dimensions.
+1656380	1658600	Now we have to do the same to targets
+1658600	1663600	because currently targets are of shape B by T
+1664720	1666980	and we want it to be just B times T.
+1666980	1668620	So one-dimensional.
+1668620	1671860	Now, alternatively, you could always still just do minus one
+1671860	1674080	because PyTorch will guess what this should be
+1674080	1675380	if you want to lay it out.
+1675380	1676500	But let me just be explicit
+1676500	1676820	and say if you can see it.
+1676820	1678200	If you can see it, it's going to be B times T.
+1678200	1679720	Once we reshape this,
+1679720	1682900	it will match the cross-entropy case
+1682900	1685200	and then we should be able to evaluate our loss.
+1687100	1691000	Okay, so that right now, and we can do loss.
+1691000	1694620	And so currently we see that the loss is 4.87.
+1694620	1699100	Now, because we have 65 possible vocabulary elements,
+1699100	1701680	we can actually guess at what the loss should be.
+1701680	1703200	And in particular,
+1703200	1705920	we covered negative log likelihood in a lot of detail.
+1705920	1706480	We are expecting,
+1706480	1711480	we're expecting log or lon of one over 65
+1712380	1713940	and negative of that.
+1713940	1717520	So we're expecting the loss to be about 4.17,
+1717520	1719260	but we're getting 4.87.
+1719260	1721200	And so that's telling us that the initial predictions
+1721200	1723060	are not super diffuse.
+1723060	1724760	They've got a little bit of entropy.
+1724760	1726160	And so we're guessing wrong.
+1727200	1732200	So yes, but actually we are able to evaluate the loss.
+1732800	1735780	Okay, so now that we can evaluate the quality of the model
+1735780	1737180	on some data,
+1737180	1739300	we'd like to also be able to generate from the model.
+1739300	1741200	So let's do the generation.
+1741200	1743040	Now I'm going to go again a little bit faster here
+1743040	1746680	because I covered all this already in the previous videos.
+1746680	1750240	So here's a generate function for the model.
+1752420	1753800	So we take some,
+1753800	1757460	we take the same kind of input IDX here.
+1757460	1762460	And basically this is the current context of some characters
+1763240	1765180	in a batch, in some batch.
+1765780	1767480	So it's also B by T.
+1767480	1770820	And the job of generate is to basically take this B by T
+1770820	1773640	and extend it to be B by T plus one, plus two, plus three.
+1773640	1774700	And so it's just basically,
+1774700	1777540	it continues the generation in all the batch dimensions
+1777540	1779320	in the time dimension.
+1779320	1780500	So that's its job.
+1780500	1783080	And it will do that for max new tokens.
+1783080	1784500	So you can see here on the bottom,
+1784500	1785920	there's going to be some stuff here,
+1785920	1786820	but on the bottom,
+1786820	1789760	whatever is predicted is concatenated
+1789760	1793080	on top of the previous IDX along the first dimension,
+1793080	1795700	which is the time dimension to create a B by T plus one.
+1795780	1798280	So that becomes a new IDX.
+1798280	1800500	So the job of generate is to take a B by T
+1800500	1803720	and make it a B by T plus one, plus two, plus three,
+1803720	1805820	as many as we want max new tokens.
+1805820	1808320	So this is the generation from the model.
+1808320	1810900	Now inside the generation, what are we doing?
+1810900	1812740	We're taking the current indices.
+1812740	1814420	We're getting the predictions.
+1814420	1818080	So we get those are in the logits.
+1818080	1820020	And then the loss here is going to be ignored
+1820020	1822240	because we're not using that.
+1822240	1825460	And we have no targets that are sort of ground truth targets
+1825460	1827360	that we're going to be comparing with.
+1828620	1830020	Then once we get the logits,
+1830020	1832600	we are only focusing on the last step.
+1832600	1834940	So instead of a B by T by C,
+1834940	1837640	we're going to pluck out the negative one,
+1837640	1840160	the last element in the time dimension,
+1840160	1842680	because those are the predictions for what comes next.
+1842680	1844100	So that gives us the logits,
+1844100	1847600	which we then convert to probabilities via softmax.
+1847600	1848960	And then we use torch.multinomial
+1848960	1850760	to sample from those probabilities.
+1850760	1853900	And we ask PyTorch to give us one sample.
+1853900	1855000	And so IDX next,
+1855000	1856980	we'll become a B by one,
+1856980	1860100	because in each one of the batch dimensions,
+1860100	1862420	we're going to have a single prediction for what comes next.
+1862420	1864500	So this numSamples equals one,
+1864500	1866600	will make this be a one.
+1866600	1869100	And then we're going to take those integers
+1869100	1870820	that come from the sampling process
+1870820	1873340	according to the probability distribution given here.
+1873340	1875340	And those integers got just concatenated
+1875340	1879020	on top of the current sort of like running stream of integers.
+1879020	1881620	And this gives us a B by T plus one.
+1881620	1883160	And then we can return that.
+1883160	1884160	Now, one thing here is,
+1884160	1890320	here is you see how i'm calling self of idx which will end up going to the forward function
+1890960	1896560	i'm not providing any targets so currently this would give an error because targets is uh is uh
+1896560	1902240	sort of like not given so target has to be optional so targets is none by default and
+1902240	1909200	then if targets is none then there's no loss to create so it's just loss is none but else
+1909200	1916320	all of this happens and we can create a loss so this will make it so um if we have the targets
+1916320	1922160	we provide them and get a loss if we have no targets we'll just get the logits so this here
+1922160	1931760	will generate from the model and let's take that for a ride now oops so i have another code chunk
+1931760	1936640	here which will generate for the model from the model and okay this is kind of crazy so maybe let
+1936640	1938400	me let me break this down
+1939200	1940960	so these are the idx right
+1944720	1948720	i'm creating a batch will be just one time will be just one
+1949600	1955520	so i'm creating a little one by one tensor and it's holding a zero and the d type the data type
+1955520	1962720	is uh integer so zero is going to be how we kick off the generation and remember that zero is uh
+1962720	1967360	is the element standing for a new line character so it's kind of like a reasonable thing to
+1967360	1968960	to feed in as the very first character
+1969200	1976000	sequence to be the new line um so it's going to be idx which we're going to feed in here
+1976000	1980800	then we're going to ask for 100 tokens and then end that generate will continue that
+1981680	1987840	now because uh generate works on the level of batches we then have to index into the
+1987840	1996800	zero throw to basically unplug the um the single batch dimension that exists and then that gives us
+1996800	1997600	a um
+1997600	2004320	time steps is just a one-dimensional array of all the indices which we will convert to simple python
+2004320	2012720	list from pytorch tensor so that that can feed into our decode function and convert those integers
+2012720	2020080	into text so let me bring this back and we're generating 100 tokens let's run and uh here's
+2020080	2024560	the generation that we achieved so obviously it's garbage and the reason it's garbage is because
+2024560	2027120	this is a totally random model so next up we're going to want to do is we're going to want to do a
+2027120	2030880	we're going to want to train this model now one more thing i wanted to point out here is
+2032080	2036400	this function is written to be general but it's kind of like ridiculous right now because
+2037920	2042720	we're feeding in all this we're building out this context and we're concatenating it all
+2042720	2048480	and we're always feeding it all into the model but that's kind of ridiculous because this is
+2048480	2054240	just a simple bigram model so to make for example this prediction about k we only needed this w
+2054240	2057040	but actually what we fed into the model is we fed the entire sequence
+2057520	2063440	and then we only looked at the very last piece and predicted k so the only reason i'm writing
+2063440	2068320	it in this way is because right now this is a bigram model but i'd like to keep this function
+2068320	2076000	fixed and i'd like it to work later when our characters actually basically look further in
+2076000	2081040	the history and so right now the history is not used so this looks silly but eventually
+2081040	2086720	the history will be used and so that's why we want to do it this way so just a quick comment on that
+2087520	2093600	so now we see that this is random so let's train the model so it becomes a bit less random okay
+2093600	2098480	let's now train the model so first what i'm going to do is i'm going to create a pytorch optimization
+2098480	2106240	object so here we are using the optimizer adam w now in the make more series we've only ever used
+2106240	2111440	stochastic gradient descent the simplest possible optimizer which you can get using the sgd instead
+2111440	2115440	but i want to use adam which is a much more advanced and popular optimizer and it works
+2115440	2116000	extremely well for a lot of other optimizers but i want to use adam which is a much more advanced and popular optimizer and it works extremely well
+2117680	2123040	typical good setting for the learning rate is roughly 3e negative 4 but for very very small
+2123040	2126720	networks like it's the case here you can get away with much much higher learning rates
+2126720	2133280	1-3 or even higher probably but let me create the optimizer object which will basically take
+2133280	2140480	the gradients and update the parameters using the gradients and then here our batch size up above
+2140480	2145360	was only 4 so let me actually use something bigger let's say 32 and then for some number of steps
+2147120	2153600	we're sampling a new batch of data we're evaluating the loss we're zeroing out all the gradients from
+2153600	2158240	the previous step getting the gradients for all the parameters and then using those gradients to
+2158240	2164240	update our parameters so typical training loop as we saw in the make more series so let me now
+2164240	2169200	run this for say 100 iterations and let's see what kind of loss is we're going to get
+2171440	2176720	so we started around 4.7 and now we're getting down to like 4.6
+2177040	2183680	so the optimization is definitely happening but let's sort of try to increase the number
+2183680	2188320	of iterations and only print at the end because we probably will not train for longer
+2190240	2192240	okay so we're down to 3.6 roughly
+2195520	2196480	roughly down to three
+2201440	2203040	this is the most janky optimization
+2207680	2212720	if we do that and clean those up we get six hours of telly in in mobile
+2214320	2216080	okay it's working let's just do 10 000
+2217520	2220640	and then from here we want to copy this
+2221760	2224640	and hopefully we're going to get something reasonable and of course it's not going to
+2224640	2228320	be shakespeare from a bigger model but at least we see that the loss is improving
+2228880	2231680	and hopefully we're expecting something a bit more reasonable
+2232960	2235600	so we're down in about 2.5-ish let's see what we get
+2235600	2236240	okay
+2236240	2238220	Let me just increase the number of tokens.
+2239160	2243740	Okay, so we see that we're starting to get something at least like reasonable-ish.
+2246540	2250280	Certainly not Shakespeare, but the model is making progress.
+2250640	2252640	So that is the simplest possible model.
+2253860	2261360	So now what I'd like to do is, obviously, this is a very simple model because the tokens are not talking to each other.
+2261360	2268260	So given the previous context of whatever was generated, we're only looking at the very last character to make the predictions about what comes next.
+2268880	2277140	So now these tokens have to start talking to each other and figuring out what is in the context so that they can make better predictions for what comes next.
+2277520	2279840	And this is how we're going to kick off the transformer.
+2280500	2284880	Okay, so next, I took the code that we developed in this Jupyter notebook and I converted it to be a script.
+2285340	2291320	And I'm doing this because I just want to simplify our intermediate work, which is just the final product that we have.
+2291360	2296520	At this point, so in the top here, I put all the hyperparameters that we've defined.
+2296760	2299520	I introduced a few and I'm going to speak to that in a little bit.
+2300120	2314880	Otherwise, a lot of this should be recognizable, reproducibility, read data, get the encoder and decoder, create the train and test splits, use the kind of like data loader that gets a batch of the inputs and targets.
+2315840	2317960	This is new, and I'll talk about it in a second.
+2319020	2321000	Now, this is the bigram language model that we developed.
+2321720	2324900	And it can forward and give us a logits and loss and it can generate.
+2326800	2329980	And then here we are creating the optimizer and this is the training loop.
+2331960	2334040	So everything here should look pretty familiar.
+2334160	2336080	Now, some of the small things that I added.
+2336200	2340280	Number one, I added the ability to run on a GPU if you have it.
+2340760	2346600	So if you have a GPU, then you can, this will use CUDA instead of just CPU and everything will be a lot more faster.
+2347220	2351340	Now, when device becomes CUDA, then we need to make sure that when we load the data.
+2351460	2352960	We move it to device.
+2353960	2358460	When we create the model, we want to move the model parameters to device.
+2358960	2366960	So as an example, here we have the in an embedding table and it's got a dot weight inside it, which stores the sort of lookup table.
+2367160	2373160	So that would be moved to the GPU so that all the calculations here happen on the GPU and they can be a lot faster.
+2373960	2379460	And then finally here, when I'm creating the context that feeds into generate, I have to make sure that I create on the device.
+2380360	2381260	Number two, when I enter.
+2381460	2385960	Introduced is the fact that here in the training loop.
+2387660	2392960	Here, I was just printing the loss dot item inside the training loop.
+2393160	2397960	But this is a very noisy measurement of the current loss because every batch will be more or less lucky.
+2398660	2411160	And so what I want to do usually is I have an estimate loss function and the estimate loss basically then goes up here and it averages up.
+2411160	2413060	The loss over multiple batches.
+2413560	2422160	So in particular, we're going to iterate eval, either times and we're going to basically get our loss and then we're going to get the average loss for both splits.
+2422560	2424160	And so this will be a lot less noisy.
+2425060	2430760	So here when we call the estimate loss, we're going to report the pretty accurate train and validation loss.
+2431960	2434560	Now when we come back up, you'll notice a few things here.
+2434760	2438260	I'm setting the model to evaluation phase and down here.
+2438260	2440260	I'm resetting it back to training phase.
+2440260	2456060	Now right now for our model as is, this doesn't actually do anything because the only thing inside this model is this nn.embedding and this network would behave the same in both evaluation mode and training mode.
+2456460	2457660	We have no dropout layers.
+2457660	2459160	We have no batch drum layers, etc.
+2459660	2468460	But it is a good practice to think through what mode your neural network is in because some layers will have different behavior at inference time or training time.
+2468460	2479360	And there's also this context manager, torch.nograd, and this is just telling PyTorch that everything that happens inside this function, we will not call .backward on.
+2480060	2488160	And so PyTorch can be a lot more efficient with its memory use because it doesn't have to store all the intermediate variables because we're never going to call backward.
+2488660	2491560	And so it can be a lot more efficient in that way.
+2491860	2496560	So also a good practice to tell PyTorch when we don't intend to do backpropagation.
+2497660	2498160	So,
+2498460	2498960	right now,
+2498960	2504560	this script is about 120 lines of code of and that's kind of our starter code.
+2505360	2508360	I'm calling it bigram.py and I'm going to release it later.
+2508960	2513860	Now running this script gives us output in the terminal and it looks something like this.
+2514860	2519560	It basically, as I ran this code, it was giving me the train loss and val loss.
+2519760	2523960	And we see that we convert to somewhere around 2.5 with the bigram model.
+2524460	2526960	And then here's the sample that we produced at the end.
+2528460	2533060	And so we have everything packaged up in the script and we're in a good position now to iterate on this.
+2533460	2533660	Okay,
+2533660	2540460	so we are almost ready to start writing our very first self-attention block for processing these tokens.
+2541160	2541660	Now,
+2542260	2543360	before we actually get there,
+2543560	2553960	I want to get you used to a mathematical trick that is used in the self-attention inside a transformer and is really just like at the heart of an efficient implementation of self-attention.
+2554660	2558160	And so I want to work with this toy example to just get you used to this operation.
+2558460	2564160	And then it's going to make it much more clear once we actually get to it in the script again.
+2565460	2570460	So let's create a B by T by C where B, T and C are just 4, 8 and 2 in this toy example.
+2571260	2579660	And these are basically channels and we have batches and we have the time component and we have some information at each point in the sequence.
+2579960	2580560	So C.
+2582060	2585660	Now what we would like to do is we would like these tokens.
+2585760	2588360	So we have up to eight tokens here in a batch.
+2588660	2592660	And these eight tokens are currently not talking to each other and we would like them to talk to each other.
+2592660	2593660	We'd like to couple them.
+2594860	2596260	And in particular,
+2596660	2599460	we don't we want to couple them in this very specific way.
+2599960	2600960	So the token,
+2600960	2601360	for example,
+2601360	2602560	at the fifth location,
+2603060	2610460	it should not communicate with tokens in the sixth seventh and eighth location because those are future tokens in the sequence.
+2611060	2615560	The token on the fifth location should only talk to the one in the fourth third second and first.
+2616060	2618460	So it's only so information only flows.
+2618560	2625260	From previous context to the current time step and we cannot get any information from the future because we are about to try to predict the future.
+2626460	2630560	So what is the easiest way for tokens to communicate?
+2630960	2633860	Okay, the easiest way I would say is okay.
+2633860	2645860	If we are up to if we're a fifth token and I'd like to communicate with my past the simplest way we can do that is to just do a weight is to just do an average of all the of all the preceding elements.
+2646160	2646760	So for example,
+2646760	2647660	if I'm the fifth token,
+2647760	2653260	I would like to take the channels that make up that are information at my step,
+2653660	2657460	but then also the channels from the fourth step third step second step in the first step.
+2657660	2664960	I'd like to average those up and then that would become sort of like a feature vector that summarizes me in the context of my history.
+2665660	2665860	Now,
+2665860	2666160	of course,
+2666160	2670260	just doing a sum or like an average is an extremely weak form of interaction.
+2670260	2672460	Like this communication is extremely lossy.
+2672660	2676160	We've lost a ton of information about spatial arrangements of all those tokens,
+2676960	2677560	but that's okay.
+2677660	2678160	For now,
+2678160	2680260	we'll see how we can bring that information back later.
+2681060	2681360	For now,
+2681360	2688760	what we would like to do is for every single batch element independently for every teeth token in that sequence.
+2689160	2696560	We'd like to now calculate the average of all the vectors in all the previous tokens and also at this token.
+2697460	2698460	So let's write that out.
+2699960	2702960	I have a small snippet here and instead of just fumbling around,
+2703560	2705160	let me just copy paste it and talk to it.
+2706560	2707460	So in other words,
+2708160	2718960	we're going to create X and B O W is short for bag of words because bag of words is is kind of like a term that people use when you are just averaging up things.
+2718960	2720360	So this is just a bag of words.
+2720660	2720960	Basically,
+2720960	2726260	there's a word stored on every one of these eight locations and we're doing a bag of words for just averaging.
+2727460	2728260	So in the beginning,
+2728260	2731960	we're going to say that it's just initialized at zero and then I'm doing a for loop here.
+2731960	2733260	So we're not being efficient yet.
+2733260	2733960	That's coming.
+2734560	2734960	But for now,
+2734960	2737460	we're just iterating over all the batch dimensions independently.
+2738060	2739460	Iterating over time
+2740160	2745860	and then the previous tokens are at this batch dimension
+2746360	2749360	and then everything up to and including the teeth token.
+2749860	2750260	Okay.
+2750960	2753060	So when we slice out X in this way,
+2753560	2755660	Xprev becomes of shape,
+2756860	2760960	how many T elements there were in the past and then of course C.
+2760960	2764260	So all the two-dimensional information from these little tokens.
+2765260	2767460	So that's the previous sort of chunk of
+2767560	2771260	tokens from my current sequence.
+2771960	2775560	And then I'm just doing the average or the mean over the zero dimension.
+2775560	2781660	So I'm averaging out the time here and I'm just going to get a little C one-dimensional vector,
+2781660	2784360	which I'm going to store in X bag of words.
+2785160	2791560	So I can run this and this is not going to be very informative because let's see.
+2791560	2792560	So this is X of zero.
+2792560	2796660	So this is the zeroth batch element and then expo at zero.
+2797160	2797660	Now,
+2798560	2799460	you see how the
+2799960	2801260	at the first location here,
+2801660	2803360	you see that the two are equal
+2803860	2806860	and that's because it's we're just doing an average of this one token.
+2807660	2810660	But here this one is now an average of these two.
+2811860	2814860	And now this one is an average of these three.
+2815960	2816560	And so on.
+2817860	2822460	So and this last one is the average of all of these elements.
+2822460	2826360	So vertical average just averaging up all the tokens now gives this outcome.
+2826660	2827160	Here.
+2828360	2829760	So this is all well and good,
+2830160	2831560	but this is very inefficient.
+2831960	2832160	Now.
+2832160	2836660	The trick is that we can be very very efficient about doing this using matrix multiplication.
+2837360	2839060	So that's the mathematical trick.
+2839060	2840160	And let me show you what I mean.
+2840560	2842160	Let's work with the toy example here.
+2843060	2844260	You run it and I'll explain.
+2845460	2847560	I have a simple matrix here.
+2847560	2854160	That is three by three of all ones a matrix B of just random numbers and it's a three by two and a matrix C,
+2854160	2856560	which will be three by three multiply three by two.
+2856860	2858560	Which will give out a three by two.
+2859460	2860560	So here we're just using
+2861860	2862860	matrix multiplication.
+2863460	2865260	So a multiply B gives us C.
+2867060	2871860	Okay, so how are these numbers in C achieved?
+2871860	2872160	Right?
+2872160	2879460	So this number in the top left is the first row of a dot product with the first column of B.
+2880160	2886460	And since all the row of a right now is all just once then the dot product here with with this column of
+2886460	2886560	B.
+2886860	2889860	Is just going to do a sum of these of this column.
+2890060	2892460	So two plus six plus six is 14.
+2893460	2897060	The element here in the output of C is also the first column here.
+2897060	2901060	The first row of a multiplied now with the second column of B.
+2901460	2903860	So seven plus four plus plus five is 16.
+2904760	2906260	Now you see that there's repeating elements here.
+2906260	2911460	So this 14 again is because this row is again all once and it's multiplying the first column of B.
+2911460	2914760	So we get 14 and this one is and so on.
+2914760	2916560	So this last number here is the.
+2916660	2919360	The last row dot product last column.
+2920460	2922660	Now the trick here is the following.
+2923360	2933860	This is just a boring number of is just a boring array of all once but torch has this function called trill which is short for a triangular.
+2935360	2941860	Something like that and you can wrap it in torch that once and it will just return the lower triangular portion of this.
+2942660	2943060	Okay.
+2944760	2946460	So now it will basically zero out.
+2946660	2947460	Of these guys here.
+2947560	2949460	So we just get the lower triangular part.
+2949760	2951960	Well, what happens if we do that?
+2955160	2958160	So now we'll have a like this and be like this.
+2958160	2959660	And now what are we getting here and see?
+2960360	2961560	Well, what is this number?
+2961860	2966860	Well, this is the first row times the first column and because this is zeros.
+2968960	2970660	These elements here are now ignored.
+2970660	2976160	So we just get a two and then this number here is the first row times the second column.
+2976660	2979660	And because these are zeros they get ignored and it's just seven.
+2980160	2981460	The seven multiplies this one.
+2982460	2985260	But look what happened here because this is one and then zeros.
+2985560	2990860	We what ended up happening is we're just plucking out the row of this row of B and that's what we got.
+2992160	2994760	Now here we have one one zero.
+2995360	3002660	So here one one zero dot product with these two columns will now give us two plus six which is eight and seven plus four which is 11.
+3003360	3006160	And because this is one one one we ended up with.
+3006660	3007860	The addition of all of them.
+3008860	3011860	And so basically depending on how many ones and zeros we have here.
+3012260	3020260	We are basically doing a sum currently of the variable number of these rows and that gets deposited into C.
+3021760	3032760	So currently we're doing sums because these are ones but we can also do average right and you can start to see how we could do average of the rows of B sort of an incremental fashion.
+3033560	3036360	Because we don't have to we can basically normalize.
+3036360	3039660	These rows so that they sum to one and then we're going to get an average.
+3040360	3047060	So if we took a and then we did a equals a divide a torch dot sum in the.
+3048660	3050460	Of a in the.
+3051360	3051760	One.
+3052860	3055860	Dimension and then let's keep them is true.
+3056460	3058260	So therefore the broadcasting will work out.
+3058860	3063460	So if I rerun this you see now that these rows now sum to one.
+3063760	3066160	So this row is one this row is point five point five zero.
+3066860	3068360	And here we get one thirds.
+3068960	3071760	And now when we do a multiply be what are we getting.
+3072560	3074860	Here we are just getting the first row first row.
+3075760	3079160	Here now we are getting the average of the first two rows.
+3081060	3085160	Okay so two and six average is four and four and seven averages five point five.
+3086060	3090760	And on the bottom here we are now getting the average of these three rows.
+3091560	3095560	So the average of all of elements of B are now deposited here.
+3096460	3105060	And so you can see that by manipulating these elements of this multiplying matrix and then multiplying it with any given matrix.
+3105360	3109860	We can do these averages in this incremental fashion because we just get.
+3111460	3114060	And we can manipulate that based on the elements of a.
+3114660	3121460	Okay so that's very convenient so let's swing back up here and see how we can vectorize this and make it much more efficient using what we've learned.
+3122360	3123060	So in particular.
+3124660	3126160	We are going to produce an array.
+3126860	3129360	But here I'm going to call it way short for weights.
+3130160	3131060	But this is our a.
+3132660	3139460	And this is how much of every row we want to average up and it's going to be an average because you can see that these rows sum to one.
+3141060	3145360	So this is our a and then our B in this example of course is.
+3146160	3146560	X.
+3147860	3150960	So it's going to happen here now is that we are going to have an expo to.
+3152760	3155660	And this expo to is going to be way.
+3156460	3157160	Multiplying.
+3158060	3158560	Rx.
+3159860	3167160	So let's think this through way is T by T and this is matrix multiplying in PyTorch a B by T by C.
+3168660	3169460	And it's giving us.
+3171060	3171560	What shape.
+3172160	3180260	So PyTorch will come here and it will see that these shapes are not the same so it will create a bash dimension here and this is a batch matrix multiply.
+3181460	3184860	And so it will apply this matrix multiplication in all the batch elements.
+3185460	3185960	In parallel.
+3186460	3194160	And individually and then for each batch element there will be a T by T multiplying T by C exactly as we had below.
+3196660	3197860	So this will now create.
+3198760	3200060	B by T by C.
+3201360	3205160	And expo to will now become identical to expo.
+3206360	3206960	So.
+3208960	3210960	We can see that torched out all close.
+3211860	3215560	Of expo and expo to should be true now.
+3217360	3221960	So this kind of like misses us that these are in fact the same.
+3222760	3225960	So expo and expo to if I just print them.
+3228260	3229960	Okay, we're not going to be able to.
+3230460	3232960	Okay, we're not going to be able to just stare it down but.
+3235160	3238960	Well, let me try expo basically just at the 0th element and expo to at the 0th element.
+3238960	3244160	So just the first batch and we should see that this and that should be identical which they are.
+3245360	3245760	Right.
+3245860	3246860	So what happened here.
+3247260	3260560	The trick is we were able to use batch matrix multiply to do this aggregation really and it's a weighted aggregation and the weights are specified in this T by T array.
+3261460	3271360	And we're basically doing weighted sums and these weighted sums are according to the weights inside here that take on sort of this triangular form.
+3272160	3275660	And so that means that a token at the teeth dimension will only get.
+3275860	3280360	Sort of information from the tokens preceding it.
+3280660	3281860	So that's exactly what we want.
+3282260	3284760	And finally, I would like to rewrite it in one more way.
+3285460	3287160	And we're going to see why that's useful.
+3288060	3293760	So this is the third version and it's also identical to the first and second, but let me talk through it.
+3293760	3294860	It uses softmax.
+3295660	3304860	So trill here is this Matrix lower triangular once way begins as all zero.
+3305860	3313560	Okay, so if I just print way in the beginning, it's all zero then I used masked fill.
+3314260	3318260	So what this is doing is wait that masked fill it's all zeros.
+3318260	3324760	And I'm saying for all the elements where trill is equals equals zero make them be negative Infinity.
+3325460	3329160	So all the elements where trill is zero will become negative Infinity now.
+3330260	3331160	So this is what we get.
+3332260	3334960	And then the final line here is softmax.
+3336760	3344860	So if I take a softmax along every single so dim is negative one so long every single row if I do a softmax, what is that going to do?
+3347060	3353160	Well softmax is is also like a normalization operation, right?
+3354160	3356860	And so spoiler alert you get the exact same Matrix.
+3358560	3362160	Let me bring back the softmax and recall that in softmax.
+3362160	3364560	We're going to exponentiate every single one of these.
+3365760	3367460	And then we're going to divide by the sum.
+3368260	3376460	And so if we exponentiate every single element here, we're going to get a one and here we're going to get basically zero zero zero zero everywhere else.
+3377060	3380260	And then when we normalize we just get one here.
+3380260	3387460	We're going to get one one and then zeros and then softmax will again divide and this will give us 0.5 0.5 and so on.
+3388160	3392460	And so this is also the same way to produce this mask.
+3393360	3395260	Now the reason that this is a bit more interesting.
+3395360	3407660	And the reason we're going to end up using it in self-attention is that these weights here begin with zero and you can think of this as like an interaction strength or like an affinity.
+3408260	3423760	So basically it's telling us how much of each token from the past do we want to aggregate and average up and then this line is saying tokens from the past cannot communicate by setting them to negative Infinity.
+3423860	3425060	We're saying that we will not.
+3425260	3427060	Aggregate anything from those tokens.
+3428360	3433760	And so basically this then goes through softmax and through the weighted and this is the aggregation through matrix multiplication.
+3435060	3438060	And so what this is now is you can think of these as
+3438860	3448960	the zeros are currently just set by us to be zero but quick preview is that these affinities between the tokens are not going to be just constant at zero.
+3449260	3450960	They're going to be data dependent.
+3451260	3455160	These tokens are going to start looking at each other and some tokens will find other tokens.
+3455360	3464160	More or less interesting and depending on what their values are, they're going to find each other interesting to different amounts and I'm going to call those affinities.
+3464160	3468460	I think and then here we are saying the future cannot communicate with the past.
+3468960	3470060	We're going to clamp them.
+3471160	3477860	And then when we normalize and some we're going to aggregate sort of their values depending on how interesting they find each other.
+3478460	3484760	And so that's the preview for self-attention and basically long story short from this entire section is that.
+3485360	3495060	You can do weighted aggregations of your past elements by having by using matrix multiplication of a lower triangular fashion.
+3495760	3502960	And then the elements here in the lower triangular part are telling you how much of each element fuses into this position.
+3503660	3506760	So we're going to use this trick now to develop the self-attention block.
+3507260	3509460	So first let's get some quick preliminaries out of the way.
+3510760	3514960	First the thing I'm kind of bothered by is that you see how we're passing in vocab size into the constructor.
+3515360	3519560	You don't need to do that because vocab size is already defined up top as a global variable.
+3519560	3521360	So there's no need to pass this stuff around.
+3522860	3526060	Next what I want to do is I don't want to actually create.
+3526360	3532260	I want to create like a level of indirection here where we don't directly go to the embedding for the logits.
+3532460	3536960	But instead we go through this intermediate phase because we're going to start making that bigger.
+3537560	3543360	So let me introduce a new variable and embed it short for number of embedding dimensions.
+3543960	3544760	So an embed.
+3545360	3548360	Here will be say 32.
+3549060	3551260	That was a suggestion from GitHub copilot by the way.
+3551960	3554160	It also suggested 32 which is a good number.
+3555460	3558860	So this is an embedding table and only 32 dimensional embeddings.
+3559960	3562660	So then here this is not going to give us logits directly.
+3563160	3565360	Instead this is going to give us token embeddings.
+3565960	3566860	That's what I'm going to call it.
+3567260	3571060	And then to go from the token embeddings to the logits we're going to need a linear layer.
+3571560	3575160	So self.lmhead let's call it short for language modeling head.
+3575960	3578760	Is an in linear from an embed up to vocab size.
+3579660	3580860	And then we swing over here.
+3580960	3584660	We're actually going to get the logits by exactly what the copilot says.
+3585760	3590260	Now we have to be careful here because this C and this C are not equal.
+3591360	3593760	This is an embed C and this is vocab size.
+3594760	3597260	So let's just say that an embed is equal to C.
+3598660	3602860	And then this just creates one spurious layer of indirection through a linear layer.
+3603360	3605060	But this should basically run.
+3605260	3616360	So we see that this runs and this currently looks kind of spurious.
+3616360	3618160	But we're going to build on top of this.
+3618860	3620260	Now next up so far.
+3620260	3627460	We've taken these indices and we've encoded them based on the identity of the tokens inside IDX.
+3628160	3634260	The next thing that people very often do is that we're not just encoding the identity of these tokens, but also their position.
+3634760	3637860	So we're going to have a second position embedding table here.
+3638260	3643460	So solve that position embedding table is an embedding of block size by an embed.
+3643960	3648360	And so each position from zero to block size minus one will also get its own embedding vector.
+3649460	3653760	And then here first, let me decode B by T from IDX dot shape.
+3655360	3659160	And then here we're also going to have a plus embedding, which is the positional embedding.
+3659260	3661060	And these are this is torr dash arrange.
+3661560	3664060	So this will be basically just integers from zero to zero.
+3664260	3665160	To T minus one.
+3666160	3671060	And all of those integers from zero to T minus one get embedded through the table to create a T by C.
+3672360	3680760	And then here this gets renamed to just say X and X will be the addition of the token embeddings with the positional embeddings.
+3681960	3683860	And here the broadcasting note will work out.
+3683860	3685960	So B by T by C plus T by C.
+3686460	3691560	This gets right aligned and new dimension of one gets added and it gets broadcasted across batch.
+3692760	3694160	So at this point X.
+3694260	3698860	Holds not just the token identities, but the positions at which these tokens occur.
+3699660	3703360	And this is currently not that useful because of course, we just have a simple migraine model.
+3703460	3709160	So it doesn't matter if you're in the fifth position, the second position or wherever it's all translation invariant at this stage.
+3709660	3711460	So this information currently wouldn't help.
+3712060	3715660	But as we work on the self-attention block, we'll see that this starts to matter.
+3719860	3721960	Okay, so now we get the crux of self-attention.
+3722260	3724160	So this is probably the most important part of this video.
+3724360	3725360	To understand.
+3726460	3730560	We're going to implement a small self-attention for a single individual head as they're called.
+3731160	3732960	So we start off with where we were.
+3733160	3734560	So all of this code is familiar.
+3735360	3740060	So right now I'm working with an example where I change the number of channels from 2 to 32.
+3740060	3748160	So we have a 4 by 8 arrangement of tokens and each token and the information at each token is currently 32 dimensional.
+3748260	3750060	But we just are working with random numbers.
+3751360	3752960	Now we saw here that
+3752960	3762260	The code as we had it before does a simple weight simple average of all the past tokens and the current token.
+3762460	3766660	So it's just the previous information and current information is just being mixed together in an average.
+3767360	3769260	And that's what this code currently achieves.
+3769560	3777260	And it does so by creating this lower triangular structure, which allows us to mask out this weight matrix that we create.
+3777760	3781660	So we mask it out and then we normalize it and currently
+3781660	3789760	When we initialize the affinities between all the different sort of tokens or nodes, I'm going to use those terms interchangeably.
+3790660	3799660	So when we initialize the affinities between all the different tokens to be zero, then we see that way gives us this structure where every single row has these
+3801160	3802060	Uniform numbers.
+3802460	3808660	And so that's what that's what then in this matrix multiply makes it so that we're doing a simple average.
+3809660	3810160	Now,
+3810860	3811560	We don't actually want.
+3811860	3812660	This to be
+3813360	3814260	All uniform
+3814660	3821260	Because different tokens will find different other tokens more or less interesting and we want that to be data dependent.
+3821460	3830060	So for example, if I'm a vowel then maybe I'm looking for consonants in my past and maybe I want to know what those consonants are and I want that information to flow to me.
+3831160	3835960	And so I want to now gather information from the past, but I want to do it in a data dependent way.
+3836260	3838160	And this is the problem that self-attention solves.
+3838960	3840860	Now the way self-attention solves this
+3841060	3841560	Is the following.
+3842260	3847760	Every single node or every single token at each position will emit two vectors.
+3848460	3851860	It will emit a query and it will emit a key.
+3853360	3857360	Now the query vector roughly speaking is what am I looking for?
+3858260	3861160	And the key vector roughly speaking is what do I contain?
+3862560	3871460	And then the way we get affinities between these tokens now in a sequence is we basically just do a dot product between the keys and the query.
+3872260	3881260	So my query dot products with all the keys of all the other tokens and that dot product now becomes way.
+3882260	3896260	And so if the key and the query are sort of aligned, they will interact to a very high amount and then I will get to learn more about that specific token as opposed to any other token in the sequence.
+3896460	3897460	So let's implement this now.
+3901660	3903060	We're going to implement a single
+3904660	3906760	what's called head of self-attention.
+3908060	3909260	So this is just one head.
+3909660	3912760	There's a hyper parameter involved with these heads, which is the head size.
+3913460	3918060	And then here I'm initializing linear modules and I'm using bias equals false.
+3918060	3921560	So these are just going to apply a matrix multiply with some fixed weights.
+3922760	3929860	And now let me produce a key and Q K and Q by forwarding these modules on X.
+3930960	3931560	So the size of this.
+3931760	3932860	This will not become
+3933760	3940160	B by T by 16 because that is the head size and the same here B by T by 16.
+3945860	3947060	So this being the head size.
+3947660	3959660	So you see here that when I forward this linear on top of my X all the tokens in all the positions in the B by T arrangement all of them in parallel and independently produce a key and a query.
+3959660	3961260	So no communication has happened yet.
+3962660	3963960	But the communication comes now.
+3964060	3967260	All the queries will dot product with all the keys.
+3968560	3975860	So basically what we want is we want way now or the affinities between these to be query multiplying key,
+3976560	3979160	but we have to be careful with we can't matrix multiply this.
+3979160	3986460	We actually need to transpose K but we have to be also careful because these are when you have the batch dimension.
+3986860	3991160	So in particular we want to transpose the last two dimensions.
+3991260	3991560	Dimension.
+3991660	3993360	Negative one and dimension negative two.
+3994060	3996260	So negative two negative one.
+3997560	4003060	And so this matrix multiply now will basically do the following B by T by 16.
+4005260	4012360	Matrix multiplies B by 16 by T to give us B by T by T.
+4014460	4014860	Right?
+4016060	4017860	So for every row of B,
+4018160	4021460	we're not going to have a T square matrix giving us the affinity.
+4021560	4027360	We're going to have a T square matrix giving us the affinities and these are now the way so they're not zeros.
+4027560	4031360	They are now coming from this dot product between the keys in the queries.
+4031560	4041360	So this can now run I can I can run this and the weighted aggregation now is a function in a data abandoned manner between the keys and queries of these notes.
+4041560	4047160	So just inspecting what happened here the way takes on this form.
+4047360	4051160	And you see that before way was just a constant.
+4051160	4053060	There's no way to all the batch elements.
+4053260	4061660	But now every single batch elements will have different sort of way because every single batch element contains different tokens at different positions.
+4061860	4063360	And so this is not data dependent.
+4064160	4067060	So when we look at just the zero row,
+4067260	4068460	for example in the input,
+4069060	4070860	these are the weights that came out.
+4071260	4073460	And so you can see now that they're not just exactly uniform.
+4075260	4077460	And in particular as an example here for the last row,
+4077860	4081060	this was the eighth token and the eighth token knows what content.
+4081160	4083460	It has and it knows at what position it's in.
+4084160	4088260	And now the eight token based on that creates a query.
+4088560	4089960	Hey, I'm looking for this kind of stuff.
+4091060	4091660	I'm a vowel.
+4091860	4092660	I'm on the eighth position.
+4092860	4095360	I'm looking for any consonants at positions up to four.
+4096460	4104460	And then all the nodes get to emit keys and maybe one of the channels could be I am a I am a consonant and I am in a position up to four.
+4105160	4108860	And that key would have a high number in that specific channel.
+4109360	4110960	And that's how the query and the key when they
+4111060	4111660	dark product,
+4111660	4113760	they can find each other and create a high affinity.
+4114760	4115860	And when they have a high affinity,
+4115860	4121060	like say this token was pretty interesting to to this eighth token.
+4122360	4123560	When they have a high affinity,
+4123860	4125060	then through the softmax,
+4125260	4128660	I will end up aggregating a lot of its information into my position.
+4129260	4131160	And so I'll get to learn a lot about it.
+4132660	4137460	Now just this was looking at way after this has already happened.
+4139360	4140860	Let me erase this operation as well.
+4140960	4145760	So let me erase the masking and the softmax just to show you the under the hood internals and how that works.
+4146560	4150560	So without the masking and the softmax way comes out like this,
+4150560	4150860	right?
+4150860	4152560	This is the outputs of the dark products.
+4153760	4156360	And these are the raw outputs and they take on values from negative,
+4156560	4156960	you know,
+4157060	4158460	two to positive two Etc.
+4159760	4163660	So that's the raw interactions and raw Affinities between all the nodes.
+4164360	4166560	But now if I'm a if I'm a fifth node,
+4166660	4170860	I will not want to aggregate anything from the sixth node seventh node and the eighth node.
+4171360	4174460	So actually we use the upper triangular masking.
+4174960	4176560	So those are not allowed to communicate.
+4178360	4181860	And now we actually want to have a nice distribution.
+4182460	4185660	So we don't want to aggregate negative point one one of this note.
+4185660	4186260	That's crazy.
+4186660	4188460	So instead we exponentiate and normalize.
+4189060	4190860	And now we get a nice distribution that sums to one.
+4191660	4193660	And this is telling us now in the data dependent manner,
+4193660	4197560	how much of information to aggregate from any of these tokens in the past.
+4199560	4200860	So that's way.
+4201260	4202260	And it's not zeros anymore,
+4202260	4204460	but but it's calculated in this way.
+4205060	4205160	Now,
+4205160	4209760	there's one more part to a single self-attention head.
+4210260	4211960	And that is that when we do the aggregation,
+4211960	4213860	we don't actually aggregate the tokens.
+4213860	4214360	Exactly.
+4214860	4215760	We aggregate,
+4215760	4219160	we produce one more value here and we call that the value.
+4221160	4223060	So in the same way that we produced key and query,
+4223060	4224860	we're also going to create a value.
+4226060	4230160	And then here we don't aggregate.
+4231260	4233860	X we calculate a V,
+4233860	4238560	which is just achieved by propagating this linear on top of X again.
+4239060	4242760	And then we output way multiplied by V.
+4243160	4248660	So V is the elements that we aggregate or the vector that we aggregate instead of the raw X.
+4249860	4250960	And now of course,
+4250960	4256860	this will make it so that the output here of the single head will be 16 dimensional because that is the head size.
+4258360	4260360	So you can think of X as kind of like private information.
+4260360	4260860	So you can think of X as kind of like private information.
+4260860	4261660	To this token,
+4261660	4263460	if you if you think about it that way.
+4263660	4265660	So X is kind of private to this token.
+4265860	4272560	So I'm a fifth token at some and I have some identity and my information is kept in vector X.
+4273160	4275360	And now for the purposes of the single head,
+4275560	4277060	here's what I'm interested in.
+4277460	4278960	Here's what I have.
+4279560	4281260	And if you find me interesting,
+4281260	4282760	here's what I will communicate to you.
+4283160	4284460	And that's stored in V.
+4285060	4290660	And so V is the thing that gets aggregated for the purposes of this single head between the different nodes.
+4291660	4295260	And that's basically the self-attention mechanism.
+4295260	4297360	This is this is what it does.
+4298160	4301260	There are a few notes that I would make like to make about attention.
+4301760	4304860	Number one attention is a communication mechanism.
+4305260	4307660	You can really think about it as a communication mechanism
+4307960	4310560	where you have a number of nodes in a directed graph
+4310960	4313560	where basically you have edges pointing between nodes like this.
+4314760	4318060	And what happens is every node has some vector of information
+4318460	4320260	and it gets to aggregate information
+4320260	4323760	via a weighted sum from all of the nodes that point to it.
+4324760	4326560	And this is done in a data dependent manner.
+4326560	4330260	So depending on whatever data is actually stored at each node at any point in time.
+4331160	4331760	Now,
+4332660	4333960	our graph doesn't look like this.
+4333960	4335460	Our graph has a different structure.
+4335760	4340260	We have eight nodes because the block size is eight and there's always eight tokens.
+4341160	4344260	And the first node is only pointed to by itself.
+4344660	4347560	The second node is pointed to by the first node and itself
+4347860	4349560	all the way up to the eighth node,
+4349660	4350060	which is pointed to by itself.
+4350060	4352860	Pointed to by all the previous nodes and itself.
+4353860	4357860	And so that's the structure that are directed graph has or happens happens to have
+4357860	4360560	an autoregressive sort of scenario like language modeling.
+4361260	4364360	But in principle attention can be applied to any arbitrary directed graph
+4364360	4366560	and it's just a communication mechanism between the nodes.
+4367260	4370460	The second note is that notice that there is no notion of space.
+4370760	4375060	So attention simply acts over like a set of vectors in this graph.
+4375460	4379160	And so by default these nodes have no idea where they are positioned in the space.
+4379360	4379960	And that's why we need to
+4380160	4384860	encode them positionally and sort of give them some information that is anchors to a specific
+4384860	4388260	position so that they sort of know where they are.
+4388660	4392160	And this is different than for example from convolution because if you run for example,
+4392160	4397460	a convolution operation over some input there is a very specific sort of layout of the information
+4397460	4401160	in space and the convolutional filters sort of act in space.
+4401460	4407360	And so it's it's not like an attention and attention is just a set of vectors out there in space.
+4407660	4409860	They communicate and if you want them to have a
+4409860	4414660	notion of space you need to specifically add it which is what we've done when we calculated the
+4415460	4420160	relative the positional encode encodings and added that information to the vectors.
+4420360	4424860	The next thing that I hope is very clear is that the elements across the batch dimension which are
+4424860	4426860	independent examples never talk to each other.
+4426860	4431460	They're always processed independently and this is a batch matrix multiply that applies basically a
+4431460	4434860	matrix multiplication kind of in parallel across the batch dimension.
+4435360	4439260	So maybe it would be more accurate to say that in this analogy of a directed graph.
+4439860	4445060	We really have because the batch size is for we really have four separate pools of eight
+4445060	4449260	nodes and those eight nodes only talk to each other but in total there's like 32 nodes that are being
+4449260	4454660	processed but there's sort of four separate pools of eight you can look at it that way.
+4455460	4461860	The next note is that here in the case of language modeling we have this specific structure of
+4461860	4467860	directed graph where the future tokens will not communicate to the past tokens but this doesn't
+4467860	4469760	necessarily have to be the constraint in the general case.
+4470460	4475960	And in fact in many cases you may want to have all of the notes talk to each other fully.
+4476560	4480660	So as an example if you're doing sentiment analysis or something like that with a transformer you might
+4480660	4486060	have a number of tokens and you may want to have them all talk to each other fully because later you
+4486060	4490860	are predicting for example the sentiment of the sentence and so it's okay for these notes to talk to
+4490860	4498060	each other and so in those cases you will use an encoder block of self-attention and all it means
+4498060	4499260	that it's an encoder block.
+4499360	4503960	Is that you will delete this line of code allowing all the notes to completely talk to each other.
+4504560	4510660	What we're implementing here is sometimes called a decoder block and it's called a decoder because
+4510660	4517460	it is sort of like decoding language and it's got this autoregressive format where you have to mask
+4517460	4523760	with the triangular matrix so that notes from the future never talk to the past because they would
+4523760	4524560	give away the answer.
+4525360	4529160	And so basically in encoder blocks you would delete this allow all the notes to talk to each other.
+4529860	4535360	In decoder blocks this will always be present so that you have this triangular structure but both are
+4535360	4536860	allowed and attention doesn't care.
+4536860	4539260	Attention supports arbitrary connectivity between notes.
+4539860	4544460	The next thing I wanted to comment on is you keep me you keep hearing me say attention self-attention
+4544460	4545060	etc.
+4545060	4546960	There's actually also something called cross attention.
+4546960	4547760	What is the difference?
+4548760	4558160	So basically the reason this attention is self-attention is because the keys queries and the values are all coming
+4558160	4559160	from the same source.
+4559260	4563860	From X so the same source X produces keys queries and values.
+4563860	4569560	So these nodes are self-attending but in principle attention is much more general than that.
+4569560	4575660	So for example in encoder decoder transformers you can have a case where the queries are produced from
+4575660	4582260	X but the keys and the values come from a whole separate external source and sometimes from encoder blocks
+4582260	4587160	that encode some context that we'd like to condition on and so the keys and the values will actually come
+4587160	4588660	from a whole separate source.
+4588660	4590960	Those are nodes on the side and here.
+4590960	4594260	We're just producing queries and we're reading off information from the side.
+4594960	4599960	So cross attention is used when there's a separate source of nodes.
+4600160	4604560	We'd like to pull information from into our notes and it's self-attention.
+4604560	4607260	If we just have nodes that would like to look at each other and talk to each other.
+4608060	4610960	So this attention here happens to be self-attention.
+4612560	4616160	But in principle attention is a lot more general.
+4616660	4618460	Okay in the last note at this stage is
+4618660	4620960	if we come to the attention is all you need paper here.
+4620960	4622760	We've already implemented attention.
+4622760	4627160	So given query key and value we've multiplied the query on the key.
+4627160	4630860	We've soft maxed it and then we are aggregating the values.
+4630860	4636260	There's one more thing that we're missing here, which is the dividing by 1 over square root of the head size.
+4636260	4637860	The DK here is the head size.
+4637860	4639260	Why are they doing this?
+4639260	4640060	Why is this important?
+4640060	4646560	So they call it a scaled attention and it's kind of like an important normalization to basically have.
+4646560	4648560	The problem is.
+4648660	4653760	If you have unit Gaussian inputs, so 0 mean unit variance, K and Q are unit Gaussian.
+4653760	4660160	And if you just do way naively, then you see that your way actually will be the variance will be on the order of head size,
+4660160	4661360	which in our case is 16.
+4662460	4665460	But if you multiply by 1 over head size square root,
+4665460	4670660	so this is square root and this is 1 over then the variance of way will be 1.
+4670660	4671660	So it will be preserved.
+4672960	4674160	Now, why is this important?
+4674560	4678660	You'll notice that way here will feed into softmax.
+4679660	4684660	And so it's really important, especially at initialization that way be fairly diffuse.
+4684660	4691660	So in our case here, we sort of lucked out here and way had a fairly diffuse numbers here.
+4691660	4694460	So like this.
+4694460	4696460	Now, the problem is that because of softmax,
+4696460	4700160	if weight takes on very positive and very negative numbers inside it,
+4700160	4704360	softmax will actually converge towards one hot vectors.
+4704360	4705760	And so I can illustrate that here.
+4708060	4708360	Say,
+4708360	4712060	we are applying softmax to a tensor of values that are very close to zero.
+4712360	4714660	Then we're going to get a diffuse thing out of softmax.
+4715560	4718360	But the moment I take the exact same thing and I start sharpening it,
+4718360	4720760	making it bigger by multiplying these numbers by 8,
+4720760	4721460	for example,
+4721860	4723860	you'll see that the softmax will start to sharpen.
+4724260	4726660	And in fact, it will sharpen towards the max.
+4726660	4729560	So it will sharpen towards whatever number here is the highest.
+4730160	4733360	And so basically we don't want these values to be too extreme,
+4733360	4734560	especially the initialization.
+4734560	4737360	Otherwise softmax will be way too peaky and
+4737360	4737760	um,
+4737760	4741760	you're basically aggregating information from like a single node.
+4741760	4744460	Every node just aggregates information from a single other node.
+4744460	4745360	That's not what we want,
+4745360	4746760	especially at initialization.
+4746760	4751260	And so the scaling is used just to control the variance at initialization.
+4751260	4751960	Okay.
+4751960	4753060	So having said all that,
+4753060	4756660	let's now take our self-attention knowledge and let's take it for a spin.
+4756660	4758760	So here in the code,
+4758760	4763060	I've created this head module and implements a single head of self-attention.
+4763060	4767160	So you give it a head size and then here it creates the key query and evaluate.
+4767160	4768960	Linear layers.
+4769360	4771260	Typically people don't use biases in these.
+4772360	4775560	So those are the linear projections that we're going to apply to all of our nodes.
+4776360	4777060	Now here,
+4777060	4778960	I'm creating this trill variable.
+4779260	4781160	Trill is not a parameter of the module.
+4781160	4783160	So in sort of pytorch naming conventions,
+4783560	4784660	this is called a buffer.
+4784860	4786960	It's not a parameter and you have to call it.
+4786960	4789260	You have to assign it to the module using a register buffer.
+4789660	4790760	So that creates the trill,
+4791660	4793660	the lower triangular matrix.
+4794460	4795760	And when we're given the input X,
+4795760	4797160	this should look very familiar now.
+4797360	4798460	We calculate the keys,
+4798460	4799260	the queries,
+4799460	4802160	we calculate the attention scores inside way.
+4802960	4803760	We normalize it.
+4803760	4805560	So we're using scaled attention here.
+4806260	4809360	Then we make sure that sure doesn't communicate with the past.
+4809560	4811260	So this makes it a decoder block
+4812060	4815060	and then softmax and then aggregate the value and output.
+4816560	4817560	Then here in the language model,
+4817560	4822060	I'm creating a head in the constructor and I'm calling it self-attention head
+4822460	4823760	and the head size.
+4823760	4826960	I'm going to keep as the same and embed just for now.
+4827160	4832960	And then here once we've encoded the information with the token embeddings
+4832960	4834060	and the position embeddings,
+4834460	4836760	we're simply going to feed it into the self-attention head
+4837160	4842560	and then the output of that is going to go into the decoder language modeling
+4842560	4844160	head and create the logits.
+4844560	4848260	So this is sort of the simplest way to plug in a self-attention component
+4849060	4850360	into our network right now.
+4851160	4852460	I had to make one more change,
+4852860	4855960	which is that here in the generate,
+4855960	4860360	we have to make sure that our IDX that we feed into the model
+4860960	4862660	because now we're using positional embeddings,
+4862960	4865760	we can never have more than block size coming in
+4866160	4868660	because if IDX is more than block size,
+4868960	4871460	then our position embedding table is going to run out of scope
+4871460	4873560	because it only has embeddings for up to block size.
+4874460	4877660	And so therefore I added some code here to crop the context
+4878260	4879960	that we're going to feed into self
+4881660	4884660	so that we never pass in more than block size elements.
+4884660	4887760	So those are the changes and let's now train the network.
+4888060	4891560	Okay, so I also came up to the script here and I decreased the learning rate
+4891560	4894960	because the self-attention can't tolerate very very high learning rates.
+4895560	4897660	And then I also increased the number of iterations
+4897660	4900160	because the learning rate is lower and then I trained it
+4900160	4902960	and previously we were only able to get to up to 2.5
+4903260	4904860	and now we are down to 2.4.
+4905260	4909260	So we definitely see a little bit of improvement from 2.5 to 2.4 roughly,
+4909860	4911460	but the text is still not amazing.
+4911960	4914460	So clearly the self-attention head is doing
+4914660	4915960	some useful communication,
+4916460	4919060	but we still have a long way to go.
+4919360	4919560	Okay.
+4919560	4921860	So now we've implemented the scale dot product attention.
+4922160	4924560	Now next up in the attention is all you need paper.
+4925060	4926660	There's something called multi-head attention.
+4927060	4928460	And what is multi-head attention?
+4928860	4931760	It's just applying multiple attentions in parallel
+4931960	4933460	and concatenating the results.
+4934060	4935960	So they have a little bit of diagram here.
+4936260	4937760	I don't know if this is super clear.
+4938360	4941060	It's really just multiple attentions in parallel.
+4941760	4944260	So let's implement that fairly straightforward.
+4945360	4946960	If we want a multi-head attention,
+4947260	4949960	then we want multiple heads of self-attention running in parallel.
+4950860	4954960	So in PyTorch we can do this by simply creating multiple heads.
+4956160	4958960	So however many heads you want
+4959160	4960760	and then what is the head size of each
+4961560	4965260	and then we run all of them in parallel into a list
+4965560	4967760	and simply concatenate all of the outputs
+4968360	4970560	and we're concatenating over the channel dimension.
+4971660	4974460	So the way this looks now is we don't have just a single attention
+4974960	4980560	that has a head size of 32 because remember an embed is 32.
+4981660	4984160	Instead of having one communication channel,
+4984460	4987860	we now have four communication channels in parallel
+4988160	4990460	and each one of these communication channels typically
+4990960	4994160	will be smaller correspondingly.
+4994560	4996460	So because we have four communication channels,
+4996760	4998560	we want eight-dimensional self-attention.
+4999160	5000860	And so from each communication channel,
+5000860	5003060	we're getting together eight-dimensional vectors
+5003360	5004560	and then we have four of them.
+5004660	5006760	And that concatenates to give us 32,
+5006860	5008260	which is the original and embed.
+5009160	5012160	And so this is kind of similar to if you're familiar with convolutions,
+5012160	5013860	this is kind of like a group convolution
+5014460	5017160	because basically instead of having one large convolution,
+5017260	5021560	we do convolution in groups and that's multi-headed self-attention.
+5022560	5025360	And so then here we just use essay heads,
+5025460	5026860	self-attention heads instead.
+5027760	5031060	Now, I actually ran it and scrolling down,
+5032260	5034160	I ran the same thing and then we now get down
+5034660	5038360	to 2.28 roughly and the output is still,
+5038360	5039760	the generation is still not amazing,
+5039960	5041760	but clearly the validation loss is improving
+5041760	5043960	because we were at 2.4 just now.
+5044860	5047160	And so it helps to have multiple communication channels
+5047160	5050260	because obviously these tokens have a lot to talk about.
+5050760	5052660	They want to find the consonants, the vowels,
+5052660	5054960	they want to find the vowels just from certain positions,
+5055460	5058060	they want to find any kinds of different things.
+5058460	5061460	And so it helps to create multiple independent channels of communication,
+5061560	5063360	gather lots of different types of data
+5063760	5064360	and then
+5064660	5065760	decode the output.
+5066160	5067660	Now going back to the paper for a second,
+5067860	5068260	of course,
+5068260	5069960	I didn't explain this figure in full detail,
+5069960	5073160	but we are starting to see some components of what we've already implemented.
+5073360	5074660	We have the positional encodings,
+5074660	5076160	the token encodings that add,
+5076560	5079260	we have the masked multi-headed attention implemented.
+5079960	5082060	Now, here's another multi-headed attention,
+5082060	5084360	which is a cross attention to an encoder,
+5084360	5085260	which we haven't,
+5085260	5086860	we're not going to implement in this case.
+5087160	5088460	I'm going to come back to that later.
+5089460	5091960	But I want you to notice that there's a feed forward part here
+5092160	5094560	and then this is grouped into a block that gets repeated.
+5094860	5095360	And again,
+5095960	5099360	now the feed forward part here is just a simple multi-layer perceptron.
+5101760	5102660	So the multi-headed,
+5103060	5107460	so here position wise feed forward networks is just a simple little MLP.
+5108160	5110360	So I want to start basically in a similar fashion.
+5110360	5112760	Also adding computation into the network
+5113360	5115560	and this computation is on the per node level.
+5116060	5116560	So
+5117460	5120860	I've already implemented it and you can see the diff highlighted on the left here
+5120860	5122260	when I've added or changed things.
+5122960	5124160	Now before we had the
+5124660	5126960	multi-headed self-attention that did the communication,
+5127360	5130260	but we went way too fast to calculate the logits.
+5130660	5132460	So the tokens looked at each other,
+5132460	5136760	but didn't really have a lot of time to think on what they found from the other tokens.
+5137560	5138160	And so
+5138760	5141860	what I've implemented here is a little feed forward single layer
+5142360	5145960	and this little layer is just a linear followed by a relu non-linearity
+5146160	5146960	and that's it.
+5147960	5149560	So it's just a little layer
+5150160	5151960	and then I call it feed forward
+5153560	5154160	and embed.
+5154660	5158560	And then this feed forward is just called sequentially right after the self-attention.
+5158960	5161460	So we self-attend then we feed forward
+5161960	5164660	and you'll notice that the feed forward here when it's applying linear.
+5164860	5166360	This is on a per token level.
+5166460	5168260	All the tokens do this independently.
+5168660	5171060	So the self-attention is the communication
+5171460	5175260	and then once they've gathered all the data now they need to think on that data individually.
+5176160	5177660	And so that's what feed forward is doing
+5178060	5179560	and that's why I've added it here.
+5180260	5184360	Now when I train this the validation laws actually continues to go down now to 2.24.
+5185260	5186960	Which is down from 2.28.
+5187660	5189360	The output still look kind of terrible,
+5189660	5191360	but at least we've improved the situation.
+5192060	5193160	And so as a preview
+5194160	5196060	we're going to now start to intersperse
+5196560	5199360	the communication with the computation
+5199660	5201760	and that's also what the transformer does
+5202160	5205060	when it has blocks that communicate and then compute
+5205360	5207560	and it groups them and replicates them.
+5208760	5210760	Okay, so let me show you what we'd like to do.
+5211360	5212460	We'd like to do something like this.
+5212460	5213260	We have a block
+5213660	5214560	and this block is basically
+5214760	5215560	this part here
+5216160	5217460	except for the cross attention.
+5218660	5222160	Now the block basically intersperses communication and then computation.
+5222660	5225960	The computation is done using multi-headed self-attention
+5226560	5229260	and then the computation is done using a feed forward network
+5229660	5230960	on all the tokens independently.
+5232560	5235560	Now what I've added here also is you'll notice
+5237260	5239560	this takes the number of embeddings in the embedding dimension
+5239560	5241060	and number of heads that we would like
+5241060	5243560	which is kind of like group size in group convolution.
+5244060	5246460	And I'm saying that number of heads we'd like is four
+5246860	5248560	and so because this is 32
+5248960	5250660	we calculate that because this is 32
+5250860	5252260	the number of heads should be four
+5254060	5255460	the head size should be eight
+5255560	5257760	so that everything sort of works out channel wise.
+5258960	5260860	So this is how the transformer structures
+5261160	5263560	sort of the sizes typically.
+5264360	5265560	So the head size will become eight
+5265660	5267360	and then this is how we want to intersperse them.
+5267860	5270060	And then here I'm trying to create blocks
+5270160	5273360	which is just a sequential application of block block block.
+5273660	5276860	So that we're interspersing communication feed forward many many times
+5277060	5278860	and then finally we decode.
+5279460	5281460	Now actually try to run this
+5281760	5284760	and the problem is this doesn't actually give a very good answer
+5285360	5286660	and very good result.
+5286860	5290660	And the reason for that is we're starting to actually get like a pretty deep neural net
+5291060	5293760	and deep neural nets suffer from optimization issues.
+5293760	5296460	And I think that's what we're kind of like slightly starting to run into.
+5296760	5299560	So we need one more idea that we can borrow from the
+5300360	5302560	transformer paper to resolve those difficulties.
+5302560	5305660	Now there are two optimizations that dramatically help
+5305760	5307060	with the depth of these networks
+5307360	5309960	and make sure that the networks remain optimizable.
+5310260	5311260	Let's talk about the first one.
+5311960	5314560	The first one in this diagram is you see this arrow here
+5315360	5317360	and then this arrow and this arrow.
+5317760	5320760	Those are skip connections or sometimes called residual connections.
+5321560	5322560	They come from this paper
+5323460	5326860	the procedural learning for image recognition from about 2015
+5327760	5329160	that introduced the concept.
+5329960	5332360	Now these are basically what it means
+5332560	5334260	is you transform the data,
+5334460	5336860	but then you have a skip connection with addition
+5337460	5338760	from the previous features.
+5339360	5340960	Now the way I like to visualize it
+5341660	5342460	that I prefer
+5342960	5343760	is the following.
+5344260	5346960	Here the computation happens from the top to bottom
+5347560	5350460	and basically you have this residual pathway
+5351060	5353460	and you are free to fork off from the residual pathway,
+5353460	5354660	perform some computation
+5354960	5357760	and then project back to the residual pathway via addition.
+5358560	5359760	And so you go from the
+5360560	5362460	the inputs to the targets
+5362660	5364560	only via plus and plus and plus.
+5365460	5367760	And the reason this is useful is because during dot propagation
+5367760	5370660	remember from our micrograd video earlier
+5371060	5374660	addition distributes gradients equally to both of its branches
+5375260	5376560	that fed as the input.
+5377060	5380960	And so the supervision or the gradients from the loss
+5381360	5384460	basically hop through every addition node
+5384760	5386260	all the way to the input
+5386760	5389960	and then also fork off into the residual blocks.
+5391260	5392360	But basically you have this
+5392360	5395560	gradient superhighway that goes directly from the supervision
+5395760	5397660	all the way to the input unimpeded.
+5398360	5401060	And then these residual blocks are usually initialized in the beginning.
+5401360	5404360	So they contribute very very little if anything to the residual pathway.
+5404760	5406360	They are initialized that way.
+5406760	5409760	So in the beginning they are sort of almost kind of like not there.
+5410160	5413560	But then during the optimization they come online over time
+5414160	5415760	and they start to contribute
+5416360	5418060	but at least at the initialization
+5418260	5420460	you can go from directly supervision to the input
+5420960	5422260	gradient is unimpeded and just flows.
+5422860	5425160	And then the blocks over time kick in.
+5425760	5428360	And so that dramatically helps with the optimization.
+5428660	5429560	So let's implement this.
+5429860	5431160	So coming back to our block here.
+5431560	5432960	Basically what we want to do is
+5433560	5435560	we want to do x equals x plus
+5436560	5439560	self-attention and x equals x plus self.feedforward.
+5440760	5445460	So this is x and then we fork off and do some communication and come back
+5445760	5448160	and we fork off and we do some computation and come back.
+5448960	5450360	So those are residual connections
+5450860	5452260	and then swinging back up here.
+5452460	5455060	We also have to introduce this projection.
+5455960	5457060	So nn.linear
+5458560	5460860	and this is going to be from
+5461860	5463060	after we concatenate this.
+5463060	5464460	This is the size and embed.
+5464960	5467260	So this is the output of the self-attention itself.
+5467960	5471260	But then we actually want the to apply the projection
+5472260	5473160	and that's the result.
+5474360	5477260	So the projection is just a linear transformation of the outcome of this layer.
+5478860	5481160	So that's the projection back into the residual pathway.
+5481860	5483160	And then here in a feedforward,
+5483260	5484460	it's going to be the same thing.
+5484960	5487260	I could have a self.projection here as well.
+5487560	5488960	But let me just simplify it
+5489660	5490660	and let me
+5492060	5494060	couple it inside the same sequential container.
+5494760	5497860	And so this is the projection layer going back into the residual pathway.
+5499160	5500160	And so
+5500960	5502360	that's well, that's it.
+5502660	5503560	So now we can train this.
+5503760	5505360	So I implemented one more small change.
+5505960	5508160	When you look into the paper again,
+5508360	5510960	you see that the dimensionality of input and output
+5511160	5512460	is 512 for them.
+5512760	5515160	And they're saying that the inner layer here in the feedforward
+5515160	5516860	has dimensionality of 2048.
+5517160	5518660	So there's a multiplier of 4.
+5519360	5522060	And so the inner layer of the feedforward network
+5522760	5524960	should be multiplied by 4 in terms of channel sizes.
+5525160	5527560	So I came here and I multiplied 4 times embed
+5527860	5529260	here for the feedforward
+5529660	5532660	and then from 4 times an embed coming back down to an embed
+5532860	5535060	when we go back to the projection.
+5535360	5538460	So adding a bit of computation here and growing that layer
+5538660	5540660	that is in the residual block on the side
+5540660	5542060	of the residual pathway.
+5543160	5545960	And then I train this and we actually get down all the way to
+5546260	5548060	2.08 validation loss.
+5548260	5550460	And we also see that network is starting to get big enough
+5550760	5553060	that our train loss is getting ahead of validation loss.
+5553060	5555160	So we started to see like a little bit of overfitting
+5556160	5556660	and
+5557060	5557360	our
+5557660	5558060	our
+5560060	5561660	generations here are still not amazing.
+5561660	5565860	But at least you see that we can see like is here this now grief sync
+5566560	5568660	like this starts to almost look like English.
+5568960	5569460	So
+5570060	5570160	yeah,
+5570160	5571160	we're starting to really get there.
+5571660	5571860	Okay.
+5571860	5574860	And the second innovation that is very helpful for optimizing very deep
+5574860	5576360	neural networks is right here.
+5576860	5579060	So we have this addition now that's the residual part.
+5579260	5581760	But this norm is referring to something called layer norm.
+5582460	5584360	So layer norm is implemented in pytorch.
+5584360	5587360	It's a paper that came out a while back here.
+5590160	5592260	And layer norm is very very similar to bash norm.
+5592660	5595860	So remember back to our make more series part three.
+5596260	5600060	We implemented bash normalization and bash normalization basically just
+5600060	5603960	made sure that across the batch dimension.
+5604160	5609960	Any individual neuron had unit Gaussian distribution.
+5610260	5614260	So it was zero mean and unit standard deviation one standard deviation
+5614460	5614960	output.
+5615860	5619260	So what I did here is I'm copy pasting the bathroom 1D that we developed
+5619260	5623960	in our make more series and see here we can initialize for example this
+5623960	5628660	module and we can have a batch of 32 100 dimensional vectors feeding through
+5628660	5629460	the bathroom layer.
+5630160	5635760	So what this does is it guarantees that when we look at just the 0th column,
+5636360	5639260	it's a zero mean one standard deviation.
+5639760	5642960	So it's normalizing every single column of this input.
+5643860	5648060	Now the rows are not going to be normalized by default because we're just
+5648060	5649060	normalizing columns.
+5649660	5651060	So let's not implement layer norm.
+5651960	5653060	It's very complicated.
+5653160	5654860	Look we come here.
+5655060	5659560	We change this from 0 to 1 so we don't normalize the columns.
+5659560	5659960	We normalize.
+5660160	5663660	The rows and now we've implemented layer norm.
+5665060	5668260	So now the columns are not going to be normalized.
+5669960	5673760	But the rows are going to be normalized for every individual example.
+5673760	5678460	It's 100 dimensional vector is normalized in this way and because our
+5678460	5683360	computation now does not span across examples, we can delete all of this
+5683360	5688960	buffers stuff because we can always apply this operation and don't need to
+5688960	5689960	maintain any running buffers.
+5690660	5692360	So we don't need the buffers.
+5693360	5697460	We don't there's no distinction between training and test time.
+5699460	5701460	And we don't need these running buffers.
+5701760	5703360	We do keep gamma and beta.
+5703660	5704860	We don't need the momentum.
+5704860	5706560	We don't care if it's training or not.
+5707360	5713160	And this is now a layer norm and it normalizes the ropes instead of the
+5713160	5718460	columns and this here is identical to basically this here.
+5719460	5719960	So let's.
+5719960	5723360	Now implement layer norm in our transformer before I incorporate the
+5723360	5723760	layer norm.
+5723760	5727660	I just wanted to note that as I said very few details about the transformer
+5727660	5730460	have changed in the last five years, but this is actually something that's
+5730460	5732060	likely departs from the original paper.
+5732560	5736360	You see that the ad and norm is applied after the transformation.
+5737360	5743560	But now it is a bit more basically common to apply the layer norm before
+5743560	5744360	the transformation.
+5744360	5746160	So there's a reshuffling of the layer norms.
+5746960	5749560	So this is called the pre norm formulation and that the one that we're
+5749560	5750660	going to implement as well.
+5750660	5752460	So slight deviation from the original paper.
+5753260	5755360	Basically, we need to layer norms layer norm.
+5755360	5761360	One is an end dot layer norm and we tell it how many was the embedding
+5761360	5764360	dimension and we need the second layer norm.
+5765260	5768660	And then here the layer norms are applied immediately on X.
+5769360	5773760	So self-taught layer norm one in applied on X and self-taught layer norm
+5773760	5779460	two applied on X before it goes into self-attention and feed forward and
+5779560	5782460	the size of the layer norm here is an embed so 32.
+5783060	5787960	So when the layer norm is normalizing our features it is the normalization
+5787960	5793860	here happens the mean and the variance are taken over 32 numbers.
+5794160	5797760	So the batch and the time act as batch dimensions both of them.
+5798360	5802860	So this is kind of like a per token transformation that just normalizes
+5802860	5808560	the features and makes them a unit mean unit Gaussian at initialization.
+5808560	5813360	But of course because these layer norms inside it have these gamma and beta
+5813360	5819360	trainable parameters the layer normal eventually create outputs that might
+5819360	5823860	not be unit Gaussian but the optimization will determine that so for
+5823860	5827660	now, this is the this is incorporating the layer norms and let's train them
+5827660	5827960	up.
+5828560	5832660	Okay, so I let it run and we see that we get down to 2.06 which is better
+5832660	5834060	than the previous 2.08.
+5834360	5837760	So a slight improvement by adding the layer norms and I'd expect that they
+5837760	5838260	help.
+5838260	5840460	Even more if we have bigger and deeper network.
+5841060	5841560	One more thing.
+5841560	5844460	I forgot to add is that there should be a layer norm here.
+5844460	5849360	Also typically as at the end of the transformer and right before the final
+5849660	5852260	linear layer that decodes into vocabulary.
+5852760	5854060	So I added that as well.
+5854760	5857960	So at this stage, we actually have a pretty complete transformer coming to
+5857960	5860860	the original paper and it's a decoder only transformer.
+5860960	5865260	I'll I'll talk about that in a second but at this stage the major pieces
+5865260	5868160	are in place so we can try to scale this up and see how well we can push
+5868160	5870760	this number now in order to scale up the model.
+5870760	5874360	I had to perform some cosmetic changes here to make it nicer.
+5874660	5877660	So I introduced this variable called in layer which just specifies how
+5877660	5879860	many layers of the blocks.
+5879860	5883260	We're going to have I create a bunch of blocks and we have a new variable
+5883260	5884460	number of heads as well.
+5885460	5886960	I pulled out the layer norm here.
+5887160	5888560	And so this is identical.
+5889160	5892660	Now one thing that I did briefly change is I added dropout.
+5893160	5897760	So dropout is something that you can add right before the residual connection.
+5897760	5901060	Back right before the connection back into the residual pathway.
+5901660	5904160	So we can drop out that as the last layer here.
+5904760	5908760	We can drop out here at the end of the multi-headed extension as well.
+5909460	5915360	And we can also drop out here when we calculate the basically affinities
+5915360	5919260	and after the softmax we can drop out some of those so we can randomly
+5919260	5921260	prevent some of the notes from communicating.
+5922060	5926860	And so dropout comes from this paper from 2014 or so.
+5926860	5933760	And basically it takes your neural net and it randomly every forward backward
+5933760	5940860	pass shuts off some subset of neurons so randomly drops them to zero and
+5940860	5945460	trains without them and what this does effectively is because the mask of
+5945460	5948760	what being dropped out has changed every single forward backward pass it
+5948760	5954060	ends up kind of training an ensemble of sub networks and then at test time
+5954060	5956760	everything is fully enabled and kind of all those sub networks.
+5956760	5958560	Are merged into a single ensemble.
+5958560	5960260	If you can if you want to think about it that way.
+5960960	5963960	So I would read the paper to get the full detail for now.
+5963960	5967360	We're just going to stay on the level of this is a regularization technique
+5967660	5970860	and I added it because I'm about to scale up the model quite a bit and I
+5970860	5972060	was concerned about overfitting.
+5973360	5977460	So now when we scroll up to the top we'll see that I changed a number of
+5977460	5979360	hyper parameters here about our neural net.
+5979760	5982460	So I made the batch size be much larger now 64.
+5983160	5985260	I changed the block size to be 256.
+5985460	5986660	So previously was just eight.
+5986960	5988160	Eight characters of context.
+5988260	5992760	Now it is 256 characters of context to predict the 257th.
+5994360	5997160	I brought down the learning rate a little bit because the neural net is
+5997160	5997960	now much bigger.
+5997960	5999360	So I brought down the learning rate.
+6000260	6003460	The embedding dimension is not 384 and there are six heads.
+6003960	6010260	So 384 divide 6 means that every head is 64 dimensional as it as a standard
+6011060	6014860	and then there was going to be six layers of that and the dropout will be
+6014860	6016660	a point to so every forward backward pass.
+6016960	6022760	20% of all these intermediate calculations are disabled and dropped to
+6022760	6026160	zero and then I already trained this and I ran it.
+6026160	6028960	So drumroll how does it perform?
+6029760	6030860	So let me just scroll up here.
+6032760	6037260	We get a validation loss of 1.48 which is actually quite a bit of an
+6037260	6040160	improvement on what we had before which I think was 2.07.
+6040660	6044160	So we went from 2.07 all the way down to 1.48 just by scaling up this
+6044160	6045860	neural net with the code that we have.
+6046360	6048060	And this of course ran for a lot longer.
+6048060	6052860	This may be trained for I want to say about 15 minutes on my A100 GPU.
+6052860	6055960	So that's a pretty good GPU and if you don't have a GPU you're not going to
+6055960	6058460	be able to reproduce this on a CPU.
+6058460	6062360	This would be I would not run this on the CPU or MacBook or something like
+6062360	6062860	that.
+6062860	6066660	You'll have to break down the number of layers and the embedding dimension
+6066660	6067260	and so on.
+6068460	6073360	But in about 15 minutes we can get this kind of a result and I'm printing
+6074060	6075060	some of the Shakespeare here.
+6075060	6077860	But what I did also is I printed 10,000 characters.
+6077860	6079760	So a lot more and I wrote them to a file.
+6080560	6081960	And so here we see some of the outputs.
+6084260	6087860	So it's a lot more recognizable as the input text file.
+6088260	6090860	So the input text file just for reference look like this.
+6091760	6097260	So there's always like someone speaking in this matter and our predictions
+6097260	6101560	now take on that form except of course they're nonsensical when you
+6101560	6102260	actually read them.
+6102860	6103360	So
+6103360	6106960	it is every crimp to be a house.
+6106960	6110560	Oh those probation we give heed.
+6112560	6113160	You know.
+6115960	6118060	Oh ho sent me you mighty Lord.
+6120560	6122160	Anyway, so you can read through this.
+6122160	6126460	It's nonsensical of course, but this is just a transformer trained on the
+6126460	6130060	character level for 1 million characters that come from Shakespeare.
+6130060	6133160	So there's sort of like blabbers on in Shakespeare like math.
+6133360	6136160	Banner, but it doesn't of course make sense at this scale.
+6137060	6140560	But I think I think still a pretty good demonstration of what's possible.
+6141760	6143160	So now
+6144560	6148360	I think that kind of like concludes the programming section of this video.
+6148560	6152860	We basically kind of did a pretty good job and of implementing this
+6152860	6157160	transformer, but the picture doesn't exactly match up to what we've done.
+6157360	6159560	So what's going on with all these additional parts here?
+6160060	6163260	So let me finish explaining this architecture and why it looks so funky.
+6164060	6167960	Basically, what's happening here is what we implemented here is a decoder
+6167960	6168860	only transformer.
+6169360	6171160	So there's no component here.
+6171160	6175260	This part is called the encoder and there's no cross attention block here.
+6175760	6178960	Our block only has a self attention and the feed forward.
+6178960	6182560	So it is missing this third in between piece here.
+6182960	6184260	This piece does cross attention.
+6184560	6186660	So we don't have it and we don't have the encoder.
+6186760	6191860	We just have the decoder and the reason we have a decoder only is because we are
+6191860	6193060	just generating text.
+6193060	6196660	And it's unconditioned on anything or just we're just blabbering on according
+6196660	6197560	to a given data set.
+6198360	6202660	What makes it a decoder is that we are using the triangular mask in our
+6202860	6203460	transformer.
+6203760	6207660	So it has this autoregressive property where we can just go and sample from it.
+6208560	6212460	So the fact that it's using the triangulate triangular mask to mask out the
+6212460	6215960	attention makes it a decoder and it can be used for language modeling.
+6216660	6221060	Now, the reason that the original paper had an encoder decoder architecture is
+6221060	6222760	because it is a machine translation paper.
+6223160	6226260	So it is concerned with a different setting in particular.
+6226860	6233260	It expects some tokens that encode say for example French and then it is expected to
+6233260	6235260	decode the translation in English.
+6235860	6238960	So so you typically these here are special tokens.
+6239360	6244360	So you are expected to read in this and condition on it and then you start off the
+6244360	6246460	generation with a special token called start.
+6246760	6252860	So this is a special new token that you introduce and always place in the beginning and then
+6252860	6252960	the.
+6253160	6258760	Network is expected to output neural networks are awesome and then a special end token to
+6258760	6259660	finish the generation.
+6261060	6266260	So this part here will be decoded exactly as we have we've done it neural networks are
+6266260	6272360	awesome will be identical to what we did but unlike what we did they want to condition the
+6272360	6275560	generation on some additional information.
+6275660	6279160	And in that case this additional information is the French sentence that they should be
+6279160	6279660	translating.
+6280660	6282860	So what they do now is they.
+6282960	6287260	Bring the encoder now the encoder reads this part here.
+6287760	6293260	So we're all going to take the part of French and we're going to create tokens from it exactly as
+6293260	6298060	we've seen in our video and we're going to put a transformer on it, but there's going to be no
+6298060	6299460	triangular mask.
+6299560	6303360	And so all the tokens are allowed to talk to each other as much as they want and they're just
+6303360	6311160	encoding whatever the content of this French sentence once they've encoded it they've they
+6311160	6312760	basically come out in the top here.
+6313360	6318260	And then what happens here is in our decoder which does the language modeling.
+6318660	6324560	There's an additional connection here to the outputs of the encoder and that is brought in
+6324560	6326460	through a cross attention.
+6327060	6331660	So the queries are still generated from X but now the keys and the values are coming from the
+6331660	6337260	side the keys and the values are coming from the top generated by the nodes that came outside
+6337260	6342760	of the decode the encoder and those tops the keys and the values there the top of it.
+6343360	6348660	Feed in on the side into every single block of the decoder and so that's why there's an additional
+6348660	6354860	cross attention and really what is doing is it's conditioning the decoding not just on the past of
+6354860	6365060	this current decoding but also on having seen the full fully encoded French prompt sort of and so
+6365060	6368960	it's an encoder decoder model, which is why we have those two transformers and additional block
+6369260	6369860	and so on.
+6370160	6372660	So we did not do this because we have no we have nothing to do.
+6372660	6373460	Nothing to encode.
+6373460	6374460	There's no conditioning.
+6374460	6378960	We just have a text file and we just want to imitate it and that's why we are using a decoder only
+6378960	6381660	transformer exactly as done in GPT.
+6382860	6383060	Okay.
+6383060	6388960	So now I wanted to do a very brief walkthrough of nano GPT, which you can find in my GitHub and nano
+6388960	6391060	GPT is basically two files of interest.
+6391260	6396860	There's train.pi and model.pi train.pi is all the boilerplate code for training the network.
+6397060	6401060	It is basically all the stuff that we had here is the training loop.
+6401960	6402460	It's just that.
+6402460	6406660	It's a lot more complicated because we're saving and loading checkpoints and pre-trained weights
+6406660	6411660	and we are decaying the learning rate and compiling the model and using distributed training across
+6411660	6413260	multiple nodes or GPUs.
+6413760	6417060	So the training that Pi gets a little bit more hairy, complicated.
+6417460	6423660	There's more options Etc, but the model that I should look very very similar to what we've done
+6423660	6424060	here.
+6424260	6426460	In fact, the model is almost identical.
+6427260	6432360	So first here we have the causal self-attention block and all of this should look very very
+6432360	6432460	very similar.
+6432460	6437980	recognizable to you we're producing queries keys values we're doing dot products we're masking
+6437980	6445260	applying softmax optionally dropping out and here we are pooling the values what is different here
+6445260	6452100	is that in our code i have separated out the multi-headed attention into just a single
+6452100	6458100	individual head and then here i have multiple heads and i explicitly concatenate them whereas
+6458100	6463180	here all of it is implemented in a batched manner inside a single causal self-attention
+6463180	6468120	and so we don't just have a b and a t and a c dimension we also end up with a fourth dimension
+6468120	6473320	which is the heads and so it just gets a lot more sort of hairy because we have four-dimensional
+6473320	6479360	array tensors now but it is equivalent mathematically so the exact same thing is
+6479360	6483740	happening as what we have it's just it's a bit more efficient because all the heads are now
+6483740	6488000	treated as a batch dimension as well then we have the multi-layered perceptron
+6488000	6488080	and we have the multi-layered perceptron and we have the multi-layered perceptron
+6488100	6493560	it's using the gelu non-linearity which is defined here except instead of relu and this
+6493560	6496520	is done just because openly i used it and i want to be able to load their checkpoints
+6496520	6502560	the blocks of the transformer are identical the communicate and the compute phase as we saw
+6502560	6507180	and then the gpt will be identical we have the position encodings token encodings
+6507180	6513600	the blocks the layer norm at the end the final linear layer and this should look all very
+6513600	6518000	recognizable and there's a bit more here because i'm loading checkpoints and stuff like that
+6518000	6522160	i'm separating out the parameters into those that should be weight decayed and those that
+6522160	6528240	shouldn't but the generate function should also be very very similar so a few details are different
+6528240	6533160	but you should definitely be able to look at this file and be able to understand a lot of the pieces
+6533160	6538440	now so let's now bring things back to chat gpt what would it look like if we wanted to train
+6538440	6543680	chat gpt ourselves and how does it relate to what we learned today well to train the chat gpt there
+6543680	6547980	are roughly two stages first is the pre-training stage and then the fine-tuning stage and then the
+6548000	6553920	pre-training stage in the pre-training stage we are training on a large chunk of internet and just
+6553920	6560400	trying to get a first decoder only transformer to babble text so it's very very similar to what
+6560400	6567920	we've done ourselves except we've done like a tiny little baby pre-training step and so in our case
+6569360	6573440	this is how you print a number of parameters i printed it and it's about 10 million
+6573440	6577120	so this transformer that i created here to create a little shakespeare
+6578000	6585140	transformer was about 10 million parameters our data set is roughly 1 million characters so
+6585140	6589900	roughly 1 million tokens but you have to remember that openai uses different vocabulary they're not
+6589900	6595480	on the character level they use these subword chunks of words and so they have a vocabulary
+6595480	6602640	of 50 000 roughly elements and so their sequences are a bit more condensed so our data set the
+6602640	6607840	shakespeare data set would be probably around 300 000 tokens in the openai vocabulary roughly
+6608480	6615520	so we trained about 10 million parameter model on roughly 300 000 tokens now when you go to the gpt3 paper
+6616960	6622400	and you look at the transformers that they trained they trained a number of transformers
+6622400	6628640	of different sizes but the biggest transformer here has 175 billion parameters uh so ours is
+6628640	6635040	again 10 million they used this number of layers in the transformer this is the n embed this is
+6635040	6637620	the number of heads and this is the head size
+6638000	6645440	and then this is the batch size so ours was 65 and the learning rate is similar
+6645440	6650600	now when they train this transformer they trained on 300 billion tokens so
+6650600	6656320	again remember ours is about 300,000 so this is about a million fold increase
+6656320	6659580	and this number would not be even that large by today's standards you'd be
+6659580	6665660	going up 1 trillion and above so they are training a significantly larger
+6665660	6672020	model on a good chunk of the internet and that is the pre-training stage but
+6672020	6675380	otherwise these hyperparameters should be fairly recognizable to you and the
+6675380	6678420	architecture is actually like nearly identical to what we implemented
+6678420	6682460	ourselves but of course it's a massive infrastructure challenge to train this
+6682460	6687140	you're talking about typically thousands of GPUs having to you know talk to each
+6687140	6691880	other to train models of this size so that's just a pre-training stage now
+6691880	6695540	after you complete the pre-training stage you don't get something that
+6695540	6695640	you don't get something that you don't get something that you don't get
+6695640	6700240	a response to your questions with answers and it's not helpful and etc you
+6700240	6705640	get a document completer right so it babbles but it doesn't babble Shakespeare
+6705640	6709560	it babbles internet it will create arbitrary news articles and documents
+6709560	6712080	and it will try to complete documents because that's what it's trained for
+6712080	6715740	it's trying to complete the sequence so when you give it a question it would
+6715740	6719520	just potentially just give you more questions it would follow with more
+6719520	6724240	questions it will do whatever it looks like the some closed document would do
+6724240	6725520	in the training data
+6725520	6728840	on the internet and so who knows you're getting kind of like undefined behavior
+6728840	6733320	it might basically answer with two questions with other questions it might
+6733320	6736980	ignore your question it might just try to complete some news article it's
+6736980	6742020	totally unaligned as we say so the second fine-tuning stage is to actually
+6742020	6748280	align it to be an assistant and this is the second stage and so this chat GPT
+6748280	6752480	blog post from opening I talks a little bit about how this stage is achieved we
+6752480	6754920	basically
+6755520	6759540	roughly three steps to it to this stage so what they do here is they start to
+6759540	6763260	collect training data that looks specifically like what an assistant
+6763260	6766560	would do so there are documents that have the format where the question is on
+6766560	6770700	top and then an answer is below and they have a large number of these but
+6770700	6773760	probably not on the order of the internet this is probably on the order
+6773760	6780600	of maybe thousands of examples and so they they then fine-tune the model to
+6780600	6785220	basically only focus on documents that look like that and so you're starting to
+6785220	6788720	slowly align it so it's going to expect a question at the top and it's going to
+6788720	6793980	expect to complete the answer and these very very large models are very sample
+6793980	6798120	efficient during their fine-tuning so this actually somehow works but that's
+6798120	6801780	just step one that's just fine-tuning so then they actually have more steps where
+6801780	6806340	okay the second step is you let the model respond and then different raters
+6806340	6810540	look at the different responses and rank them for their preferences to which one
+6810540	6815000	is better than the other they use that to train a reward model so they can predict a
+6815000	6822040	basically using a different network, how much of any candidate response would be desirable.
+6822720	6827900	And then once they have a reward model, they run PPO, which is a form of policy gradient
+6827900	6835640	reinforcement learning optimizer, to fine-tune this sampling policy so that the answers that
+6835640	6842700	the chat GPT now generates are expected to score a high reward according to the reward model.
+6842700	6848160	And so basically there's a whole aligning stage here, or fine-tuning stage. It's got multiple
+6848160	6853900	steps in between there as well, and it takes the model from being a document completer to a
+6853900	6859520	question answerer, and that's like a whole separate stage. A lot of this data is not
+6859520	6865120	available publicly. It is internal to OpenAI, and it's much harder to replicate this stage.
+6866320	6872180	And so that's roughly what would give you a chat GPT. And NanoGPT focuses on the pre-training stage.
+6872180	6872580	Okay.
+6872700	6878920	And that's everything that I wanted to cover today. So we trained, to summarize, a decoder-only
+6878920	6885460	transformer following this famous paper, Attention is All You Need, from 2017. And so that's
+6885460	6893420	basically a GPT. We trained it on tiny Shakespeare and got sensible results. All of the training
+6893420	6902140	code is roughly 200 lines of code. I will be releasing this code base. So also it comes with
+6902140	6902420	all the...
+6902700	6908780	Git log commits along the way, as we built it up. In addition to this code, I'm going to release
+6908780	6914540	the notebook, of course, the Google Colab. And I hope that gave you a sense for how you can train
+6916140	6921100	these models, like, say, GPT-3, that will be architecturally basically identical to what we
+6921100	6925580	have, but they are somewhere between 10,000 and 1 million times bigger, depending on how you count.
+6926620	6932540	And so that's all I have for now. We did not talk about any of the fine-tuning stages. That would,
+6932540	6936460	typically, go on top of this. So if you're interested in something that's not just language
+6936460	6941580	modeling, but you actually want to, you know, say, perform tasks, or you want them to be aligned in
+6941580	6947180	a specific way, or you want to detect sentiment or anything like that, basically, any time you
+6947180	6951340	don't want something that's just a document completer, you have to complete further stages
+6951340	6956380	of fine-tuning, which we did not cover. And that could be simple, supervised fine-tuning,
+6956380	6960780	or it can be something more fancy, like we see in ChatGPT, where we actually train a reward model,
+6960780	6962540	and then do rounds of PPO to...
+6962540	6967340	align it with respect to the reward model. So there's a lot more that can be done on top of it.
+6967340	6972620	I think for now, we're starting to get to about two hours, Mark. So I'm going to kind of finish
+6972620	6979660	here. I hope you enjoyed the lecture. And yeah, go forth and transform. See you later.
