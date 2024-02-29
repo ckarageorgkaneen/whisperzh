@@ -1,0 +1,2608 @@
+1
+00:00:00,000 --> 00:00:15,000
+Please welcome AI researcher and founding member of OpenAI, Andrej Karpathy.
+
+2
+00:00:15,000 --> 00:00:23,560
+Andrej Karpathy Hi, everyone.
+
+3
+00:00:23,560 --> 00:00:28,820
+I'm happy to be here to tell you about the state of GPT and more generally about the
+
+4
+00:00:28,820 --> 00:00:32,140
+rapidly growing ecosystem of large language models.
+
+5
+00:00:32,140 --> 00:00:35,400
+So I would like to partition the talk into two parts.
+
+6
+00:00:35,400 --> 00:00:39,580
+In the first part, I would like to tell you about how we train GPT assistants.
+
+7
+00:00:39,580 --> 00:00:43,740
+And then in the second part, we are going to take a look at how we can use these assistants
+
+8
+00:00:43,740 --> 00:00:46,760
+effectively for your applications.
+
+9
+00:00:46,760 --> 00:00:50,500
+So first, let's take a look at the emerging recipe for how to train these assistants.
+
+10
+00:00:50,500 --> 00:00:53,200
+And keep in mind that this is all very new and still rapidly evolving.
+
+11
+00:00:53,200 --> 00:00:55,960
+But so far, the recipe looks something like this.
+
+12
+00:00:55,960 --> 00:00:58,800
+Now this is kind of a complicated slide, so I'm going to go through it piece by piece.
+
+13
+00:00:58,800 --> 00:01:05,400
+But roughly speaking, we have four major stages, pre-training, supervised fine-tuning,
+
+14
+00:01:05,400 --> 00:01:10,040
+reward modeling, reinforcement learning, and they follow each other serially.
+
+15
+00:01:10,040 --> 00:01:14,900
+Now in each stage, we have a data set that powers that stage.
+
+16
+00:01:14,900 --> 00:01:21,420
+We have an algorithm that for our purposes will be an objective for training the neural
+
+17
+00:01:21,420 --> 00:01:22,420
+network.
+
+18
+00:01:22,420 --> 00:01:24,060
+And then we have a resulting model.
+
+19
+00:01:24,060 --> 00:01:25,980
+And then there's some notes on the bottom.
+
+20
+00:01:25,980 --> 00:01:28,160
+So the first stage we're going to start with is the pre-training stage.
+
+21
+00:01:28,160 --> 00:01:28,640
+So the first stage we're going to start with is the pre-training stage.
+
+22
+00:01:28,800 --> 00:01:33,640
+Now this stage is kind of special in this diagram, and this diagram is not to scale.
+
+23
+00:01:33,640 --> 00:01:36,460
+Because this stage is where all of the computational work basically happens.
+
+24
+00:01:36,460 --> 00:01:42,020
+This is 99% of the training compute time, and also flops.
+
+25
+00:01:42,020 --> 00:01:48,560
+And so this is where we are dealing with internet-scale data sets with thousands of GPUs in the supercomputer,
+
+26
+00:01:48,560 --> 00:01:51,420
+and also months of training, potentially.
+
+27
+00:01:51,420 --> 00:01:56,120
+The other three stages are fine-tuning stages that are much more along the lines of a small
+
+28
+00:01:56,120 --> 00:01:58,160
+few number of GPUs and hours or days.
+
+29
+00:01:58,800 --> 00:02:04,180
+So let's take a look at the pre-training stage to achieve a base model.
+
+30
+00:02:04,180 --> 00:02:07,860
+First we're going to gather a large amount of data.
+
+31
+00:02:07,860 --> 00:02:13,100
+Here's an example of what we call a data mixture that comes from this paper that was released
+
+32
+00:02:13,100 --> 00:02:16,400
+by Meta, where they released this LAMA base model.
+
+33
+00:02:16,400 --> 00:02:20,560
+Now you can see roughly the kinds of data sets that enter into these collections.
+
+34
+00:02:20,560 --> 00:02:25,540
+So we have Common Crawl, which is just a web scrape, C4, which is also Common Crawl, and
+
+35
+00:02:25,540 --> 00:02:27,360
+then some high-quality data sets as well.
+
+36
+00:02:27,360 --> 00:02:27,960
+So for example, GitHub, Wikipedia, and so on.
+
+37
+00:02:27,960 --> 00:02:28,460
+So we have common crawl, which is just a web scrape, C4, which is also common crawl, and then some high-quality data sets as well. So for example, GitHub, Wikipedia, and so on.
+
+38
+00:02:28,800 --> 00:02:29,300
+So we have Common Crawl, which is just a web scrape, C4, which is also common crawl, and then some high-quality data sets as well.
+
+39
+00:02:29,300 --> 00:02:29,800
+So we have Common Crawl, which is just a web scrape, C4, which is also common crawl, and then some high-quality data sets as well.
+
+40
+00:02:29,800 --> 00:02:36,280
+These are all mixed up together, and then they are sampled according to some given proportions,
+
+41
+00:02:36,280 --> 00:02:40,040
+and that forms the training set for the neural net, for the GPT.
+
+42
+00:02:40,040 --> 00:02:45,120
+Now before we can actually train on this data, we need to go through one more pre-processing
+
+43
+00:02:45,120 --> 00:02:46,920
+step, and that is tokenization.
+
+44
+00:02:46,920 --> 00:02:50,820
+And this is basically a translation of the raw text that we scraped from the internet
+
+45
+00:02:50,820 --> 00:02:53,300
+into sequences of integers.
+
+46
+00:02:53,300 --> 00:02:57,420
+Because that's the native representation over which GPTs function.
+
+47
+00:02:57,420 --> 00:02:57,960
+Now, this is a lossless method of group mapping.
+
+48
+00:02:57,960 --> 00:02:58,460
+Now, this is a lossless method of group mapping.
+
+49
+00:02:58,460 --> 00:03:04,180
+lossless kind of translation between pieces of text and tokens and integers. And there are a
+
+50
+00:03:04,180 --> 00:03:07,960
+number of algorithms for this stage. Typically, for example, you could use something like byte
+
+51
+00:03:07,960 --> 00:03:14,180
+pairing coding, which iteratively merges little text chunks and groups them into tokens. And so
+
+52
+00:03:14,180 --> 00:03:18,780
+here I'm showing some example chunks of these tokens. And then this is the raw integer sequence
+
+53
+00:03:18,780 --> 00:03:26,060
+that will actually feed into a transformer. Now, here I'm showing two sort of like examples for
+
+54
+00:03:26,060 --> 00:03:31,300
+hyperparameters that govern this stage. So GPT-4, we did not release too much information about how
+
+55
+00:03:31,300 --> 00:03:35,340
+it was trained and so on. So I'm using GPT-3's numbers. But GPT-3 is, of course, a little bit
+
+56
+00:03:35,340 --> 00:03:41,180
+old by now, about three years ago. But LAMA is a fairly recent model from Meta. So these are
+
+57
+00:03:41,180 --> 00:03:44,280
+roughly the orders of magnitude that we're dealing with when we're doing pre-training.
+
+58
+00:03:45,080 --> 00:03:49,780
+The vocabulary size is usually a couple 10,000 tokens. The context length is usually something
+
+59
+00:03:49,780 --> 00:03:55,740
+like 2,000, 4,000, or nowadays even 100,000. And this governs the maximum number of integers
+
+60
+00:03:55,740 --> 00:03:56,040
+that we're dealing with. And so this is the order of magnitude that we're dealing with.
+
+61
+00:03:56,060 --> 00:04:00,040
+That the GPT will look at when it's trying to predict the next integer in a sequence.
+
+62
+00:04:01,800 --> 00:04:05,840
+You can see that roughly the number of parameters is, say, 65 billion for LAMA.
+
+63
+00:04:06,280 --> 00:04:11,040
+Now, even though LAMA has only 65B parameters compared to GPT-3's 175 billion parameters,
+
+64
+00:04:11,440 --> 00:04:16,360
+LAMA is a significantly more powerful model. And intuitively, that's because the model is
+
+65
+00:04:16,360 --> 00:04:20,980
+trained for significantly longer. In this case, 1.4 trillion tokens instead of just 300 billion
+
+66
+00:04:20,980 --> 00:04:25,160
+tokens. So you shouldn't judge the power of a model just by the number of parameters that it
+
+67
+00:04:25,160 --> 00:04:25,500
+contains.
+
+68
+00:04:26,060 --> 00:04:32,420
+Below, I'm showing some tables of rough hyperparameters that typically go into specifying
+
+69
+00:04:32,420 --> 00:04:36,520
+the transformer neural network. So the number of heads, the dimension size, number of layers,
+
+70
+00:04:36,600 --> 00:04:42,140
+and so on. And on the bottom, I'm showing some training hyperparameters. So for example,
+
+71
+00:04:42,280 --> 00:04:50,920
+to train the 65B model, Meta used 2,000 GPUs, roughly 21 days of training, and roughly several
+
+72
+00:04:50,920 --> 00:04:56,040
+million dollars. And so that's the rough orders of magnitude that you should have in mind for the
+
+73
+00:04:56,060 --> 00:04:56,940
+pre-training stage.
+
+74
+00:04:59,040 --> 00:05:03,680
+Now, when we're actually pre-training, what happens? Roughly speaking, we are going to take our tokens,
+
+75
+00:05:03,700 --> 00:05:08,520
+and we're going to lay them out into data batches. So we have these arrays that will feed into the
+
+76
+00:05:08,520 --> 00:05:13,720
+transformer, and these arrays are B, the batch size, and these are all independent examples stacked
+
+77
+00:05:13,720 --> 00:05:19,400
+up in rows, and B by T, T being the maximum context length. So in my picture, I only have 10,
+
+78
+00:05:20,180 --> 00:05:26,040
+the context length. So this could be 2,000, 4,000, et cetera. So these are extremely long rows. And what we do is we take these
+
+79
+00:05:26,060 --> 00:05:32,440
+documents, and we pack them into rows, and we delimit them with these special end-of-text tokens, basically telling the
+
+80
+00:05:32,440 --> 00:05:39,020
+transformer where a new document begins. And so here I have a few examples of documents, and then I've stretched them out
+
+81
+00:05:39,020 --> 00:05:48,640
+into this input. Now, we're going to feed all of these numbers into transformer. And let me just focus on a single
+
+82
+00:05:48,640 --> 00:05:55,440
+particular cell, but the same thing will happen at every cell in this diagram. So let's look at the green cell. The green cell is
+
+83
+00:05:56,060 --> 00:06:03,740
+going to take a look at all of the tokens before it, so all of the tokens in yellow, and we're going to feed that entire context into the
+
+84
+00:06:03,740 --> 00:06:10,820
+transformer neural network, and the transformer is going to try to predict the next token in a sequence, in this case, in red. Now, the
+
+85
+00:06:10,820 --> 00:06:16,860
+transformer, I don't have too much time to, unfortunately, go into the full details of this neural network architecture. It's just a large blob of
+
+86
+00:06:16,860 --> 00:06:23,120
+neural net stuff for our purposes, and it's got several 10 billion parameters, typically, or something like that. And, of course, as you
+
+87
+00:06:23,120 --> 00:06:26,040
+tune these parameters, you're getting slightly different predicted distributions. And so what we're going to do is we're going to take a look at the
+
+88
+00:06:26,060 --> 00:06:35,300
+distributions for every single one of these cells. And so, for example, if our vocabulary size is 50,257 tokens, then we're going to have that
+
+89
+00:06:35,300 --> 00:06:42,120
+many numbers, because we need to specify a probability distribution for what comes next. So basically, we have a probability for whatever may
+
+90
+00:06:42,120 --> 00:06:50,300
+follow. Now, in this specific example, for this specific cell, 513 will come next, and so we can use this as a source of supervision to update our
+
+91
+00:06:50,300 --> 00:06:56,020
+transformer's weights. And so we're applying this, basically, on every single cell in the parallel, and we keep swapping back and forth between the
+
+92
+00:06:56,060 --> 00:07:03,000
+batches, and we're trying to get the transformer to make the correct predictions over what token comes next in a sequence. So let me show you more
+
+93
+00:07:03,000 --> 00:07:10,040
+concretely what this looks like when you train one of these models. This is actually coming from the New York Times, and they trained a small GPT on
+
+94
+00:07:10,040 --> 00:07:18,140
+Shakespeare. And so here's a small snippet of Shakespeare, and they trained a GPT on it. Now, in the beginning, at initialization, the GPT starts with
+
+95
+00:07:18,140 --> 00:07:25,740
+completely random weights, so you're just getting completely random outputs as well. But over time, as you train the GPT longer and longer,
+
+96
+00:07:26,060 --> 00:07:34,920
+you are getting more and more coherent and consistent sort of samples from the model. And the way you sample from it, of course, is you predict what comes
+
+97
+00:07:34,920 --> 00:07:43,080
+next, you sample from that distribution, and you keep feeding that back into the process, and you can basically sample large sequences. And so by the end, you see
+
+98
+00:07:43,080 --> 00:07:49,680
+that the transformer has learned about words and where to put spaces and where to put commas and so on. And so we're making more and more consistent
+
+99
+00:07:49,680 --> 00:07:56,000
+predictions over time. These are the kinds of plots that you're looking at when you're doing model pre-training. Effectively, we're looking at
+
+100
+00:07:56,060 --> 00:08:05,060
+a loss function over time as you train, and low loss means that our transformer is predicting the correct, is giving a higher probability to get the correct next
+
+101
+00:08:05,060 --> 00:08:14,900
+integer in a sequence. Now, what are we going to do with this model once we've trained it after a month? Well, the first thing that we noticed, we, the field, is that
+
+102
+00:08:14,900 --> 00:08:23,540
+these models basically, in the process of language modeling, learn very powerful general representations, and it's possible to very efficiently fine-tune them
+
+103
+00:08:23,540 --> 00:08:26,040
+for any arbitrary downstream task you might be interested in.
+
+104
+00:08:26,060 --> 00:08:37,120
+So as an example, if you're interested in sentiment classification, the approach used to be that you collect a bunch of positives and negatives, and then you train some kind of an NLP model for that.
+
+105
+00:08:37,120 --> 00:08:50,740
+But the new approach is, ignore sentiment classification, go off and do large language model pre-training, train the large transformer, and then you can only, you may only have a few examples, and you can very efficiently fine-tune your model for that task.
+
+106
+00:08:50,740 --> 00:08:55,940
+And so this works very well in practice, and the reason for this is that basically, the transformer is
+
+107
+00:08:55,940 --> 00:09:02,260
+forced to multitask a huge amount of tasks in the language modeling task, because just in terms of
+
+108
+00:09:02,260 --> 00:09:06,680
+predicting the next token, it's forced to understand a lot about the structure of the text
+
+109
+00:09:06,680 --> 00:09:12,760
+and all the different concepts therein. So that was GPT-1. Now, around the time of GPT-2, people
+
+110
+00:09:12,760 --> 00:09:17,120
+noticed that actually even better than fine-tuning, you can actually prompt these models very
+
+111
+00:09:17,120 --> 00:09:21,080
+effectively. So these are language models, and they want to complete documents. So you can actually
+
+112
+00:09:21,080 --> 00:09:26,340
+trick them into performing tasks just by arranging these fake documents. So in this example,
+
+113
+00:09:26,500 --> 00:09:31,800
+for example, we have some passage, and then we sort of like do QA, QA, QA. This is called a few-shot
+
+114
+00:09:31,800 --> 00:09:36,040
+prompt. And then we do Q. And then as the transformer is trying to complete the document,
+
+115
+00:09:36,200 --> 00:09:40,560
+it's actually answering our question. And so this is an example of prompt engineering a base model,
+
+116
+00:09:40,900 --> 00:09:44,960
+making it believe that it's sort of imitating a document and getting it to perform a task.
+
+117
+00:09:45,680 --> 00:09:50,600
+And so this picked off, I think, the era of, I would say, prompting over fine-tuning and seeing
+
+118
+00:09:50,600 --> 00:09:51,060
+that this actually works. And so this is an example of prompt engineering a base model,
+
+119
+00:09:51,060 --> 00:09:54,540
+actually can work extremely well on a lot of problems, even without training any neural
+
+120
+00:09:54,540 --> 00:10:00,380
+networks, fine-tuning, or so on. Now, since then, we've seen an entire evolutionary tree of base
+
+121
+00:10:00,380 --> 00:10:06,880
+models that everyone has trained. Not all of these models are available. For example, the GPT-4 base
+
+122
+00:10:06,880 --> 00:10:11,480
+model was never released. The GPT-4 model that you might be interacting with over API is not a base
+
+123
+00:10:11,480 --> 00:10:16,900
+model. It's an assistant model. And we're going to cover how to get those in a bit. GPT-3 base
+
+124
+00:10:16,900 --> 00:10:20,020
+model is available via the API under the name DaVinci.
+
+125
+00:10:20,020 --> 00:10:25,300
+And GPT-2 base model is available even as weights on our GitHub repo. But currently,
+
+126
+00:10:25,420 --> 00:10:30,660
+the best available base model probably is the Lama series from Meta, although it is not
+
+127
+00:10:30,660 --> 00:10:37,100
+commercially licensed. Now, one thing to point out is base models are not assistants. They don't
+
+128
+00:10:37,100 --> 00:10:44,200
+want to make answers to your questions. They just want to complete documents. So if you tell them,
+
+129
+00:10:44,480 --> 00:10:49,540
+write a poem about the bread and cheese, it will answer questions with more questions. It's just
+
+130
+00:10:49,540 --> 00:10:54,280
+completing what it thinks is a document. However, you can prompt them in a specific way for base
+
+131
+00:10:54,280 --> 00:11:00,060
+models that is more likely to work. So as an example, here's a poem about bread and cheese. And in
+
+132
+00:11:00,060 --> 00:11:06,400
+that case, it will autocomplete correctly. You can even trick base models into being assistants. And
+
+133
+00:11:06,400 --> 00:11:10,860
+the way you would do this is you would create like a specific few-shot prompt that makes it look like
+
+134
+00:11:10,860 --> 00:11:14,680
+there's some kind of a document between a human and assistant, and they're exchanging sort of
+
+135
+00:11:14,680 --> 00:11:19,160
+information. And then at the bottom, you sort of put your query at the end.
+
+136
+00:11:19,540 --> 00:11:26,140
+And the base model will sort of like condition itself into being like a helpful assistant and kind of
+
+137
+00:11:26,140 --> 00:11:30,100
+answer. But this is not very reliable and doesn't work super well in practice, although it can be
+
+138
+00:11:30,100 --> 00:11:36,020
+done. So instead, we have a different path to make actual GPT assistants, not just base model document
+
+139
+00:11:36,020 --> 00:11:40,840
+completers. And so that takes us into supervised fine-tuning. So in the supervised fine-tuning
+
+140
+00:11:40,840 --> 00:11:46,660
+stage, we are going to collect small but high-quality data sets. And in this case, we're going to ask
+
+141
+00:11:49,540 --> 00:11:54,160
+you to collect a set of the form prompt and ideal response. And we're going to collect lots of these,
+
+142
+00:11:54,160 --> 00:11:58,480
+typically tens of thousands or something like that. And then we're going to still do language
+
+143
+00:11:58,480 --> 00:12:02,320
+modeling on this data. So nothing changed algorithmically. We're just swapping out a
+
+144
+00:12:02,320 --> 00:12:08,080
+training set. So it used to be internet documents, which is a high-quantity, low-quality, for
+
+145
+00:12:08,080 --> 00:12:14,740
+basically a QA prompt response kind of data. And that is low-quantity, high-quality. So we
+
+146
+00:12:14,740 --> 00:12:19,060
+still do language modeling, and then after training, we get an SFD model. And you can
+
+147
+00:12:19,540 --> 00:12:24,100
+see these models, and they are actual assistants, and they work to some extent. Let me show you what
+
+148
+00:12:24,100 --> 00:12:27,640
+an example demonstration might look like. So here's something that a human contractor might
+
+149
+00:12:27,640 --> 00:12:32,380
+come up with. Here's some random prompt. Can you write a short introduction about the relevance of
+
+150
+00:12:32,380 --> 00:12:36,700
+the term monopsony or something like that? And then the contractor also writes out an ideal
+
+151
+00:12:36,700 --> 00:12:41,260
+response. And when they write out these responses, they are following extensive labeling documentations,
+
+152
+00:12:41,260 --> 00:12:47,440
+and they are being asked to be helpful, truthful, and harmless. And this is labeling instructions
+
+153
+00:12:47,440 --> 00:12:49,520
+here. You probably can't read it.
+
+154
+00:12:49,540 --> 00:12:54,100
+Neither can I. But they're long, and this is just people following instructions and trying to
+
+155
+00:12:54,100 --> 00:12:58,360
+complete these prompts. So that's what the data set looks like, and you can train these models,
+
+156
+00:12:58,360 --> 00:13:03,760
+and this works to some extent. Now, you can actually continue the pipeline from here on and
+
+157
+00:13:03,760 --> 00:13:09,100
+go into RLHF, reinforcement learning from human feedback, that consists of both reward modeling
+
+158
+00:13:09,100 --> 00:13:13,300
+and reinforcement learning. So let me cover that, and then I'll come back to why you may want to go
+
+159
+00:13:13,300 --> 00:13:18,040
+through the extra steps and how that compares to just SFD models. So in the reward modeling step,
+
+160
+00:13:19,540 --> 00:13:23,860
+we're now going to shift our data collection to be of the form of comparisons. So here's an example
+
+161
+00:13:23,860 --> 00:13:28,180
+of what our data set will look like. I have the same prompt, identical prompt on the top,
+
+162
+00:13:28,180 --> 00:13:34,240
+which is asking the assistant to write a program or a function that checks if a given string is
+
+163
+00:13:34,240 --> 00:13:39,340
+a palindrome. And then what we do is we take the SFD model, which we've already trained,
+
+164
+00:13:39,340 --> 00:13:43,060
+and we create multiple completions. So in this case, we have three completions that the model
+
+165
+00:13:43,060 --> 00:13:49,120
+has created. And then we ask people to rank these completions. So if you stare at this for a while,
+
+166
+00:13:49,540 --> 00:13:53,680
+these are very difficult things to do to compare some of these predictions. And this can take
+
+167
+00:13:53,680 --> 00:14:00,400
+people even hours for a single prompt completion pairs. But let's say we decided that one of these
+
+168
+00:14:00,400 --> 00:14:04,900
+is much better than the others and so on. So we rank them. Then we can follow that with something
+
+169
+00:14:04,900 --> 00:14:08,680
+that looks very much kind of like a binary classification on all the possible pairs
+
+170
+00:14:08,680 --> 00:14:14,080
+between these completions. So what we do now is we lay out our prompt in rows, and the prompts
+
+171
+00:14:14,080 --> 00:14:18,940
+is identical across all three rows here. So it's all the same prompt, but the completion does vary.
+
+172
+00:14:19,540 --> 00:14:23,920
+So the yellow tokens are coming from the SFD model. Then what we do is we append another
+
+173
+00:14:23,920 --> 00:14:30,460
+special reward readout token at the end. And we basically only supervise the transformer at this
+
+174
+00:14:30,460 --> 00:14:36,640
+single green token. And the transformer will predict some reward for how good that completion
+
+175
+00:14:36,640 --> 00:14:42,580
+is for that prompt. And so basically, it makes a guess about the quality of each completion. And
+
+176
+00:14:42,580 --> 00:14:46,720
+then once it makes a guess for every one of them, we also have the ground truth, which is telling
+
+177
+00:14:46,720 --> 00:14:49,480
+us the ranking of them. And so we can actually enforce that. And so we can actually enforce that,
+
+178
+00:14:49,480 --> 00:14:53,620
+some of these numbers should be much higher than others and so on. We formulate this into a loss
+
+179
+00:14:53,620 --> 00:14:58,060
+function, and we train our model to make reward predictions that are consistent with the ground
+
+180
+00:14:58,060 --> 00:15:02,440
+truth coming from the comparisons from all these contractors. So that's how we train our reward
+
+181
+00:15:02,440 --> 00:15:08,320
+model. And that allows us to score how good a completion is for a prompt. Once we have a reward
+
+182
+00:15:08,320 --> 00:15:13,780
+model, we can't deploy this because this is not very useful as an assistant by itself, but it's
+
+183
+00:15:13,780 --> 00:15:18,400
+very useful for the reinforcement learning stage that follows now. Because we have a reward model,
+
+184
+00:15:18,400 --> 00:15:19,180
+we can score
+
+185
+00:15:19,480 --> 00:15:24,280
+the quality of any arbitrary completion for any given prompt. So what we do during reinforcement
+
+186
+00:15:24,280 --> 00:15:29,080
+learning is we basically get, again, a large collection of prompts. And now we do reinforcement
+
+187
+00:15:29,080 --> 00:15:33,940
+learning with respect to the reward model. So here's what that looks like. We take a single
+
+188
+00:15:33,940 --> 00:15:39,520
+prompt, we lay it out in rows, and now we use basically the model we'd like to train,
+
+189
+00:15:39,520 --> 00:15:44,680
+which is initialized at SFT model, to create some completions in yellow. And then we append
+
+190
+00:15:44,680 --> 00:15:49,420
+the reward token again, and we read off the reward according to the reward model, which
+
+191
+00:15:49,480 --> 00:15:54,820
+is now kept fixed. It doesn't change anymore. And now the reward model tells us the quality of every
+
+192
+00:15:54,820 --> 00:15:59,740
+single completion for these prompts. And so what we can do is we can now just basically apply the
+
+193
+00:15:59,740 --> 00:16:05,920
+same language modeling loss function, but we're currently training on the yellow tokens, and we
+
+194
+00:16:05,920 --> 00:16:11,740
+are weighing the language modeling objective by the rewards indicated by the reward model. So as
+
+195
+00:16:11,740 --> 00:16:16,960
+an example, in the first row, the reward model said that this is a fairly high scoring completion,
+
+196
+00:16:16,960 --> 00:16:19,260
+and so all of the tokens that we happened to
+
+197
+00:16:19,480 --> 00:16:23,640
+on the first row are going to get reinforced and they're going to get higher probabilities
+
+198
+00:16:23,640 --> 00:16:28,700
+for the future. Conversely, on the second row, the reward model really did not like this completion,
+
+199
+00:16:28,920 --> 00:16:33,940
+negative 1.2. And so therefore, every single token that we sampled in that second row is going to
+
+200
+00:16:33,940 --> 00:16:38,200
+get a slightly higher probability for the future. And we do this over and over on many prompts,
+
+201
+00:16:38,200 --> 00:16:44,520
+on many batches. And basically, we get a policy which creates yellow tokens here. And it basically,
+
+202
+00:16:44,720 --> 00:16:48,540
+all of them, all of the completions here will score high according to the reward model that
+
+203
+00:16:48,540 --> 00:16:54,640
+we trained in the previous stage. So that's how we train. That's what the RLHF pipeline is.
+
+204
+00:16:55,840 --> 00:16:59,780
+Now, and then at the end, you get a model that you could deploy. And so as an example,
+
+205
+00:17:00,160 --> 00:17:05,040
+ChatGPT is an RLHF model. But some other models that you might come across, like for example,
+
+206
+00:17:05,040 --> 00:17:11,100
+the Kuna 13b and so on, these are SFT models. So we have base models, SFT models, and RLHF models.
+
+207
+00:17:11,900 --> 00:17:16,500
+And that's kind of like the state of things there. Now, why would you want to do RLHF?
+
+208
+00:17:16,920 --> 00:17:18,400
+So one answer that is kind of...
+
+209
+00:17:18,540 --> 00:17:22,440
+not that exciting, is that it just works better. So this comes from the InstructGPT paper.
+
+210
+00:17:22,840 --> 00:17:27,760
+According to these experiments a while ago now, these PPO models are RLHF.
+
+211
+00:17:27,760 --> 00:17:31,720
+And we see that they are basically just preferred in a lot of comparisons
+
+212
+00:17:32,300 --> 00:17:34,880
+when we give them to humans. So humans just prefer out
+
+213
+00:17:35,460 --> 00:17:41,800
+basically tokens that come from RLHF models compared to SFT models, compared to base model that is prompted to be an assistant.
+
+214
+00:17:41,800 --> 00:17:45,160
+And so it just works better. But you might ask why?
+
+215
+00:17:45,800 --> 00:17:48,380
+Why does it work better? And I don't think that there's a single
+
+216
+00:17:48,540 --> 00:17:55,440
+like amazing answer that the community has really like agreed on, but I will just offer one reason, potentially.
+
+217
+00:17:55,440 --> 00:18:01,800
+And it has to do with the asymmetry between how easy computationally it is to compare versus generate.
+
+218
+00:18:02,300 --> 00:18:07,920
+So let's take an example of generating a haiku. Suppose I ask a model to write a haiku about paperclips.
+
+219
+00:18:07,920 --> 00:18:14,160
+If you're a contractor trying to give training data, then imagine being a contractor collecting basically data for the SFT stage.
+
+220
+00:18:14,160 --> 00:18:18,380
+How are you supposed to create a nice haiku for a paperclip? You might just not be very good at that.
+
+221
+00:18:18,540 --> 00:18:23,660
+But if I give you a few examples of haikus, you might be able to appreciate some of these haikus a lot more than others.
+
+222
+00:18:23,660 --> 00:18:26,780
+And so judging which one of these is good is a much easier task.
+
+223
+00:18:26,780 --> 00:18:33,160
+And so basically this asymmetry makes it so that comparisons are a better way to potentially
+
+224
+00:18:33,340 --> 00:18:37,040
+leverage yourself as a human and your judgment to create a slightly better model.
+
+225
+00:18:37,740 --> 00:18:43,040
+Now, RLHF models are not strictly an improvement on the base models in some cases.
+
+226
+00:18:43,360 --> 00:18:46,580
+So in particular, we've noticed, for example, that they lose some entropy.
+
+227
+00:18:46,580 --> 00:18:48,420
+So that means that they give more
+
+228
+00:18:48,540 --> 00:18:56,120
+peaky results. They can output lower variations, like they can output samples with lower variation than base model.
+
+229
+00:18:56,120 --> 00:19:00,240
+So base model has lots of entropy and will give lots of diverse outputs.
+
+230
+00:19:00,240 --> 00:19:13,740
+So, for example, one kind of place where I still prefer to use a base model is in a setup where you basically have n things and you want to generate more things like it.
+
+231
+00:19:13,740 --> 00:19:16,700
+And so here is an example that I just cooked up.
+
+232
+00:19:16,700 --> 00:19:18,540
+I want to generate cool Pokemon names.
+
+233
+00:19:18,540 --> 00:19:24,160
+I gave it seven Pokemon names, and I asked the base model to complete the document, and it gave me a lot more Pokemon names.
+
+234
+00:19:24,460 --> 00:19:28,540
+These are fictitious. I tried to look them up. I don't believe they're actual Pokemons.
+
+235
+00:19:29,420 --> 00:19:33,260
+And this is the kind of task that I think base model would be good at, because it still has lots of entropy.
+
+236
+00:19:33,260 --> 00:19:38,100
+It will give you lots of diverse, cool, kind of more things that look like whatever you give it before.
+
+237
+00:19:40,220 --> 00:19:44,860
+So this is what, this is number, having said all that, these are kind of like the assistant models
+
+238
+00:19:44,860 --> 00:19:46,860
+that are probably available to you at this point.
+
+239
+00:19:47,260 --> 00:19:48,380
+There's a team at Berkeley,
+
+240
+00:19:48,380 --> 00:19:53,260
+that ranked a lot of the available assistant models and gave them basically ELO ratings.
+
+241
+00:19:53,260 --> 00:19:59,500
+So currently some of the best models, of course, are GPT-4, by far, I would say, followed by Clawed, GPT-3.5,
+
+242
+00:19:59,500 --> 00:20:04,140
+and then a number of models, some of these might be available as weights, like the Kuna, Koala, etc.
+
+243
+00:20:04,700 --> 00:20:13,100
+And the first three rows here, they're all RLHF models, and all of the other models, to my knowledge, are SFT models, I believe.
+
+244
+00:20:16,060 --> 00:20:18,300
+Okay, so that's how we train these models.
+
+245
+00:20:18,300 --> 00:20:19,340
+On the high level.
+
+246
+00:20:19,340 --> 00:20:25,580
+Now I'm going to switch gears, and let's look at how we can best apply a GPT assistant model to your problems.
+
+247
+00:20:26,220 --> 00:20:29,900
+Now, I would like to work in a setting of a concrete example.
+
+248
+00:20:29,900 --> 00:20:33,020
+So let's work with a concrete example here.
+
+249
+00:20:33,020 --> 00:20:37,980
+Let's say that you are working on an article or a blog post, and you're going to write this sentence at the end.
+
+250
+00:20:38,620 --> 00:20:41,020
+California's population is 53 times that of Alaska.
+
+251
+00:20:41,020 --> 00:20:44,060
+So for some reason, you want to compare the populations of these two states.
+
+252
+00:20:45,180 --> 00:20:48,060
+Think about the rich internal monologue and tool use,
+
+253
+00:20:48,300 --> 00:20:53,260
+and how much work actually goes computationally in your brain to generate this one final sentence.
+
+254
+00:20:53,260 --> 00:20:55,100
+So here's maybe what that could look like in your brain.
+
+255
+00:20:55,740 --> 00:21:00,380
+Okay, for this next step, let me blog, or my blog, let me compare these two populations.
+
+256
+00:21:01,020 --> 00:21:04,540
+Okay, first I'm going to obviously need to get both of these populations.
+
+257
+00:21:05,180 --> 00:21:08,940
+Now, I know that I probably don't know these populations off the top of my head.
+
+258
+00:21:08,940 --> 00:21:12,380
+So I'm kind of like aware of what I know or don't know of my self-knowledge, right?
+
+259
+00:21:13,180 --> 00:21:18,140
+So I go, I do some tool use, and I go to Wikipedia, and I look up California's population.
+
+260
+00:21:18,300 --> 00:21:19,260
+And Alaska's population.
+
+261
+00:21:20,140 --> 00:21:22,140
+Now I know that I should divide the two.
+
+262
+00:21:22,140 --> 00:21:26,780
+But again, I know that dividing 39.2 by 0.74 is very unlikely to succeed.
+
+263
+00:21:26,780 --> 00:21:29,580
+That's not the kind of thing that I can do in my head.
+
+264
+00:21:29,580 --> 00:21:32,300
+And so therefore, I'm going to rely on the calculator.
+
+265
+00:21:32,300 --> 00:21:36,140
+So I'm going to use a calculator, punch it in, and see that the output is roughly 53.
+
+266
+00:21:37,180 --> 00:21:40,700
+And then maybe I do some reflection and sanity checks in my brain.
+
+267
+00:21:40,700 --> 00:21:42,540
+So does 53 make sense?
+
+268
+00:21:42,540 --> 00:21:46,220
+Well, that's quite a large fraction, but then California is the most populous state.
+
+269
+00:21:46,220 --> 00:21:47,260
+So maybe that looks okay.
+
+270
+00:21:47,260 --> 00:21:47,420
+Okay.
+
+271
+00:21:47,420 --> 00:21:47,660
+Okay.
+
+272
+00:21:47,660 --> 00:21:47,740
+Okay.
+
+273
+00:21:47,740 --> 00:21:48,060
+Okay.
+
+274
+00:21:48,060 --> 00:21:48,140
+Okay.
+
+275
+00:21:48,140 --> 00:21:48,220
+Okay.
+
+276
+00:21:48,220 --> 00:21:48,300
+Okay.
+
+277
+00:21:48,300 --> 00:21:49,980
+So then I have all the information I might need.
+
+278
+00:21:49,980 --> 00:21:52,700
+And now I get to the sort of creative portion of writing.
+
+279
+00:21:52,700 --> 00:21:57,100
+So I might start to write something like, California has 53x times greater.
+
+280
+00:21:57,100 --> 00:22:00,220
+And then I think to myself, that's actually like really awkward phrasing.
+
+281
+00:22:00,220 --> 00:22:02,780
+So let me actually delete that, and let me try again.
+
+282
+00:22:03,420 --> 00:22:08,300
+And so as I'm writing, I have this separate process almost inspecting what I'm writing
+
+283
+00:22:08,300 --> 00:22:10,140
+and judging whether it looks good or not.
+
+284
+00:22:10,940 --> 00:22:15,100
+And then maybe I delete, and maybe I reframe it, and then maybe I'm happy with what comes out.
+
+285
+00:22:15,740 --> 00:22:18,060
+So basically, long story short, a ton happens.
+
+286
+00:22:18,060 --> 00:22:20,380
+So I'm writing this sentence under the hood in terms of your internal monologue when you
+
+287
+00:22:20,380 --> 00:22:21,420
+create sentences like this.
+
+288
+00:22:21,980 --> 00:22:25,980
+But what does a sentence like this look like when we are training a GPT on it?
+
+289
+00:22:27,340 --> 00:22:29,900
+From GPT's perspective, this is just a sequence of tokens.
+
+290
+00:22:30,620 --> 00:22:35,180
+So a GPT, when it's reading or generating these tokens, it just goes chunk, chunk,
+
+291
+00:22:35,180 --> 00:22:36,220
+chunk, chunk, chunk.
+
+292
+00:22:36,220 --> 00:22:39,820
+And each chunk is roughly the same amount of computational work for each token.
+
+293
+00:22:40,380 --> 00:22:43,260
+And these transformers are not very shallow networks.
+
+294
+00:22:43,260 --> 00:22:45,340
+They have about 80 layers of reasoning.
+
+295
+00:22:45,340 --> 00:22:46,940
+But 80 is still not like too much.
+
+296
+00:22:47,500 --> 00:22:51,340
+And so this transformer is going to do its best to imitate.
+
+297
+00:22:51,340 --> 00:22:55,260
+But of course, the process here looks very, very different from the process that you took.
+
+298
+00:22:56,460 --> 00:23:01,020
+So in particular, in our final artifacts, in the data sets that we create and then eventually feed
+
+299
+00:23:01,020 --> 00:23:04,220
+to LLMs, all of that internal dialogue is completely stripped.
+
+300
+00:23:04,780 --> 00:23:10,380
+And unlike you, the GPT will look at every single token and spend the same amount of
+
+301
+00:23:10,380 --> 00:23:12,060
+compute on every one of them.
+
+302
+00:23:12,060 --> 00:23:16,140
+And so you can't expect it to actually like, well, you can't expect it to do,
+
+303
+00:23:16,940 --> 00:23:18,540
+sort of do too much work per token.
+
+304
+00:23:19,660 --> 00:23:23,740
+And also in particular, basically these transformers are just like token simulators.
+
+305
+00:23:23,740 --> 00:23:25,660
+So they don't know what they don't know.
+
+306
+00:23:25,660 --> 00:23:27,900
+Like they just imitate the next token.
+
+307
+00:23:27,900 --> 00:23:29,660
+They don't know what they're good at or not good at.
+
+308
+00:23:29,660 --> 00:23:31,660
+They just tried their best to imitate the next token.
+
+309
+00:23:32,300 --> 00:23:33,980
+They don't reflect in the loop.
+
+310
+00:23:33,980 --> 00:23:35,420
+They don't sanity check anything.
+
+311
+00:23:35,420 --> 00:23:37,900
+They don't correct their mistakes along the way by default.
+
+312
+00:23:37,900 --> 00:23:39,980
+They just sample token sequences.
+
+313
+00:23:40,860 --> 00:23:43,660
+They don't have separate inner monologue streams in their head, right?
+
+314
+00:23:43,660 --> 00:23:44,940
+They're evaluating what's happening.
+
+315
+00:23:45,580 --> 00:23:46,540
+Now, they do have some.
+
+316
+00:23:46,540 --> 00:23:51,260
+A sort of cognitive advantages, I would say, and that is that they do actually have very
+
+317
+00:23:51,260 --> 00:23:55,980
+large fact based knowledge across a vast number of areas because they have, say, several 10
+
+318
+00:23:55,980 --> 00:23:56,860
+billion parameters.
+
+319
+00:23:56,860 --> 00:23:59,020
+So that's a lot of storage for a lot of facts.
+
+320
+00:23:59,900 --> 00:24:04,620
+But and they also, I think, have a relatively large and perfect working memory.
+
+321
+00:24:04,620 --> 00:24:09,260
+So whatever fixed into the whatever fits into the context window is immediately available
+
+322
+00:24:09,260 --> 00:24:12,380
+to the transformer through its internal self attention mechanism.
+
+323
+00:24:12,380 --> 00:24:16,060
+And so it's kind of like perfect memory, but it's got a finite size.
+
+324
+00:24:16,540 --> 00:24:20,860
+The transformer has a very direct access to it, and so it can like a losslessly remember
+
+325
+00:24:20,860 --> 00:24:23,100
+anything that is inside its context window.
+
+326
+00:24:23,980 --> 00:24:25,820
+So that's kind of how I would compare those two.
+
+327
+00:24:25,820 --> 00:24:30,460
+And the reason I bring all of this up is because I think to a large extent, prompting is just
+
+328
+00:24:30,460 --> 00:24:37,340
+making up for this sort of cognitive difference between these two kind of architectures like
+
+329
+00:24:37,340 --> 00:24:39,500
+our brains here and LLM brains.
+
+330
+00:24:39,500 --> 00:24:40,780
+You can look at it that way almost.
+
+331
+00:24:41,980 --> 00:24:45,900
+So here's one thing that people found, for example, works pretty well in practice, especially
+
+332
+00:24:45,900 --> 00:24:48,140
+if your tasks require reasoning.
+
+333
+00:24:48,140 --> 00:24:52,220
+You can't expect the transformer to make to do too much reasoning per token.
+
+334
+00:24:52,220 --> 00:24:55,900
+And so you have to really spread out the reasoning across more and more tokens.
+
+335
+00:24:55,900 --> 00:24:59,420
+So, for example, you can't give a transformer a very complicated question and expect it
+
+336
+00:24:59,420 --> 00:25:00,780
+to get the answer in a single token.
+
+337
+00:25:00,780 --> 00:25:02,060
+There's just not enough time for it.
+
+338
+00:25:02,700 --> 00:25:06,300
+These transformers need tokens to think, quote unquote, I like to say sometimes.
+
+339
+00:25:06,860 --> 00:25:08,860
+And so this is some of the things that work well.
+
+340
+00:25:08,860 --> 00:25:12,380
+You may, for example, have a few shot prompt that shows the transformer that it should
+
+341
+00:25:12,380 --> 00:25:15,660
+like show its work when it's answering the question when it's answering a question.
+
+342
+00:25:15,900 --> 00:25:20,700
+And if you give a few examples, the transformer will imitate that template and it will just
+
+343
+00:25:20,700 --> 00:25:23,740
+end up working out better in terms of its evaluation.
+
+344
+00:25:24,540 --> 00:25:28,220
+Additionally, you can elicit this kind of behavior from the transformer by saying, let's
+
+345
+00:25:28,220 --> 00:25:32,860
+think step by step, because this conditioned the transformer into sort of like showing
+
+346
+00:25:32,860 --> 00:25:33,580
+its work.
+
+347
+00:25:33,580 --> 00:25:37,900
+And because it kind of snaps into a mode of showing its work, it's going to do less
+
+348
+00:25:37,900 --> 00:25:39,500
+computational work per token.
+
+349
+00:25:40,060 --> 00:25:45,180
+And so it's more likely to succeed as a result because it's making slower reasoning over
+
+350
+00:25:45,180 --> 00:25:45,580
+time.
+
+351
+00:25:46,460 --> 00:25:47,420
+Here's another example.
+
+352
+00:25:47,420 --> 00:25:48,860
+This one is called self-consistency.
+
+353
+00:25:49,820 --> 00:25:54,540
+We saw that we had the ability to start writing and then if it didn't work out, I can try
+
+354
+00:25:54,540 --> 00:26:00,540
+again and I can try multiple times and and maybe select the one that worked best.
+
+355
+00:26:00,540 --> 00:26:04,700
+So in these kinds of approaches, you may sample not just once, but you may sample multiple
+
+356
+00:26:04,700 --> 00:26:09,260
+times and then have some process for finding the ones that are good and then keeping just
+
+357
+00:26:09,260 --> 00:26:11,900
+those samples or doing a majority vote or something like that.
+
+358
+00:26:11,900 --> 00:26:15,580
+So basically, these transformers in the process as they predict the next token.
+
+359
+00:26:15,900 --> 00:26:19,900
+Just like you, they can get unlucky and they could they could sample and not a very good
+
+360
+00:26:19,900 --> 00:26:23,900
+token and they can go down sort of like a blind alley in terms of reasoning.
+
+361
+00:26:23,900 --> 00:26:27,180
+And so unlike you, they cannot recover from that.
+
+362
+00:26:27,180 --> 00:26:30,940
+They are stuck with every single token they sample, and so they will continue the sequence
+
+363
+00:26:30,940 --> 00:26:34,060
+even if they even know that this sequence is not going to work out.
+
+364
+00:26:34,060 --> 00:26:39,820
+So give them the ability to look back, inspect or try to find, try to basically sample around
+
+365
+00:26:39,820 --> 00:26:39,980
+it.
+
+366
+00:26:41,180 --> 00:26:41,980
+Here's one technique.
+
+367
+00:26:41,980 --> 00:26:42,620
+Also, you could.
+
+368
+00:26:43,580 --> 00:26:44,540
+It turns out that actually, LLMs.
+
+369
+00:26:44,540 --> 00:26:45,500
+Like, they know they're going to be able to do it.
+
+370
+00:26:45,500 --> 00:26:45,740
+They know they're going to be able to do it.
+
+371
+00:26:45,740 --> 00:26:45,820
+They know they're going to be able to do it.
+
+372
+00:26:45,820 --> 00:26:47,340
+They know when they've screwed up.
+
+373
+00:26:47,340 --> 00:26:53,580
+So as an example, say you asked the model to generate a poem that does not rhyme, and
+
+374
+00:26:53,580 --> 00:26:55,900
+it might give you a poem, but it actually rhymes.
+
+375
+00:26:55,900 --> 00:26:59,900
+But it turns out that especially for the bigger models like GPT-4, you can just ask it, did
+
+376
+00:26:59,900 --> 00:27:01,020
+you meet the assignment?
+
+377
+00:27:01,020 --> 00:27:04,780
+And actually, GPT-4 knows very well that it did not meet the assignment.
+
+378
+00:27:04,780 --> 00:27:07,100
+It just kind of got unlucky in its sampling.
+
+379
+00:27:07,100 --> 00:27:09,580
+And so it will tell you, no, I didn't actually meet the assignment here.
+
+380
+00:27:09,580 --> 00:27:10,300
+Let me try again.
+
+381
+00:27:10,940 --> 00:27:15,660
+But without you prompting it, it doesn't even like it doesn't know it doesn't know
+
+382
+00:27:15,660 --> 00:27:17,820
+to revisit and and so on.
+
+383
+00:27:17,820 --> 00:27:19,980
+So you have to make up for that in your prompts.
+
+384
+00:27:19,980 --> 00:27:21,900
+You have to get it to check.
+
+385
+00:27:21,900 --> 00:27:24,140
+If you don't ask it to check, it's not going to check by itself.
+
+386
+00:27:24,140 --> 00:27:25,260
+It's just a token simulator.
+
+387
+00:27:29,020 --> 00:27:33,420
+I think more generally, a lot of these techniques fall into the bucket of what I would say recreating
+
+388
+00:27:33,420 --> 00:27:34,540
+our system, too.
+
+389
+00:27:34,540 --> 00:27:37,820
+So you might be familiar with the system one system to thinking for humans.
+
+390
+00:27:37,820 --> 00:27:41,980
+System one is a fast automatic process, and I think kind of corresponds to like an LLM
+
+391
+00:27:41,980 --> 00:27:45,500
+just sampling tokens and system two is the slower, the
+
+392
+00:27:45,500 --> 00:27:48,460
+deliberate planning sort of part of your brain.
+
+393
+00:27:49,260 --> 00:27:53,180
+And so this is a paper actually from just last week because this space is pretty quickly
+
+394
+00:27:53,180 --> 00:27:53,740
+evolving.
+
+395
+00:27:53,740 --> 00:27:58,700
+It's called Tree of Thought and in Tree of Thought, the authors of this paper proposed
+
+396
+00:27:58,700 --> 00:28:04,140
+maintaining multiple completions for any given prompt, and then they are also scoring them
+
+397
+00:28:04,140 --> 00:28:08,060
+along the way and keeping the ones that are going well, if that makes sense.
+
+398
+00:28:08,060 --> 00:28:13,740
+And so a lot of people are like really playing around with kind of prompt engineering to
+
+399
+00:28:14,780 --> 00:28:15,260
+basically.
+
+400
+00:28:15,260 --> 00:28:19,020
+Bring back some of these abilities that we sort of have in our brain for LLMs.
+
+401
+00:28:19,820 --> 00:28:22,780
+Now, one thing I would like to note here is that this is not just a prompt.
+
+402
+00:28:22,780 --> 00:28:27,980
+This is actually prompts that are together used with some Python glue code because you
+
+403
+00:28:27,980 --> 00:28:31,180
+don't you actually have to maintain multiple prompts and you also have to do some tree
+
+404
+00:28:31,180 --> 00:28:35,340
+search algorithm here to figure out which prompts to expand, etc.
+
+405
+00:28:35,340 --> 00:28:40,220
+So it's a symbiosis of Python glue code and individual prompts that are called in a while
+
+406
+00:28:40,220 --> 00:28:41,500
+loop or in a bigger algorithm.
+
+407
+00:28:42,380 --> 00:28:44,540
+I also think there's a really cool parallel here to AlphaGo.
+
+408
+00:28:44,540 --> 00:28:49,660
+AlphaGo has a policy for placing the next stone when it plays go, and this policy was
+
+409
+00:28:49,660 --> 00:28:51,900
+trained originally by imitating humans.
+
+410
+00:28:52,460 --> 00:28:57,180
+But in addition to this policy, it also does multi-color tree search, and basically it
+
+411
+00:28:57,180 --> 00:29:00,620
+will play out a number of possibilities in its head and evaluate all of them and only
+
+412
+00:29:00,620 --> 00:29:01,820
+keep the ones that work well.
+
+413
+00:29:01,820 --> 00:29:07,020
+And so I think this is kind of an equivalent of AlphaGo, but for text, if that makes sense.
+
+414
+00:29:08,780 --> 00:29:13,100
+So just like Tree of Thought, I think more generally people are starting to really explore
+
+415
+00:29:13,100 --> 00:29:17,900
+more general techniques of not just the simple question answer prompts, but something
+
+416
+00:29:17,900 --> 00:29:21,980
+that looks a lot more like Python glue code stringing together many prompts.
+
+417
+00:29:21,980 --> 00:29:27,500
+So on the right, I have an example from this paper called React, where they structure the
+
+418
+00:29:27,500 --> 00:29:34,140
+answer to a prompt as a sequence of thought, action, observation, thought, action, observation,
+
+419
+00:29:34,140 --> 00:29:37,660
+and it's a full rollout, a kind of a thinking process to answer the query.
+
+420
+00:29:38,300 --> 00:29:41,500
+And in these actions, the model is also allowed to tool use.
+
+421
+00:29:42,220 --> 00:29:42,860
+On the left.
+
+422
+00:29:43,100 --> 00:29:45,340
+I have an example of AutoGPT.
+
+423
+00:29:45,340 --> 00:29:52,460
+And now AutoGPT, by the way, is a project that I think got a lot of hype recently, but
+
+424
+00:29:52,460 --> 00:29:54,860
+I think I still find it kind of inspirationally interesting.
+
+425
+00:29:55,980 --> 00:30:00,940
+It's a project that allows an LLM to sort of keep a task list and continue to recursively
+
+426
+00:30:00,940 --> 00:30:02,060
+break down tasks.
+
+427
+00:30:02,060 --> 00:30:05,420
+And I don't think this currently works very well, and I would not advise people to use
+
+428
+00:30:05,420 --> 00:30:07,020
+it in practical applications.
+
+429
+00:30:07,020 --> 00:30:10,060
+I just think it's something to generally take inspiration from in terms of where this is
+
+430
+00:30:10,060 --> 00:30:11,180
+going, I think, over time.
+
+431
+00:30:11,180 --> 00:30:16,220
+So that's kind of like giving our model system to thinking.
+
+432
+00:30:16,220 --> 00:30:20,940
+The next thing that I find kind of interesting is this following sort of, I would say, almost
+
+433
+00:30:20,940 --> 00:30:25,500
+psychological quirk of LLMs is that LLMs don't want to succeed.
+
+434
+00:30:26,540 --> 00:30:27,500
+They want to imitate.
+
+435
+00:30:28,460 --> 00:30:30,380
+You want to succeed, and you should ask for it.
+
+436
+00:30:31,180 --> 00:30:36,620
+So what I mean by that is when Transformers are trained, they have training sets, and
+
+437
+00:30:37,500 --> 00:30:41,180
+there can be an entire spectrum of performance qualities in their training data.
+
+438
+00:30:41,180 --> 00:30:44,780
+So, for example, there could be some kind of a prompt for some physics question or something
+
+439
+00:30:44,780 --> 00:30:48,380
+like that, and there could be a student solution that is completely wrong, but there can also
+
+440
+00:30:48,380 --> 00:30:50,460
+be an expert answer that is extremely right.
+
+441
+00:30:51,020 --> 00:30:55,980
+And Transformers can't tell the difference between like, I mean, they know about low
+
+442
+00:30:55,980 --> 00:30:59,740
+quality solutions and high quality solutions, but by default, they want to imitate all of
+
+443
+00:30:59,740 --> 00:31:02,300
+it because they're just trained on language modeling.
+
+444
+00:31:02,300 --> 00:31:06,060
+And so at test time, you actually have to ask for a good performance.
+
+445
+00:31:06,060 --> 00:31:10,300
+So in this example, in this paper, they tried various prompts.
+
+446
+00:31:11,180 --> 00:31:14,700
+Let's think step by step was very powerful because it sort of like spread out the reasoning
+
+447
+00:31:14,700 --> 00:31:15,660
+over many tokens.
+
+448
+00:31:15,660 --> 00:31:19,740
+But what worked even better is let's work this out in a step by step way to be sure we
+
+449
+00:31:19,740 --> 00:31:20,860
+have the right answer.
+
+450
+00:31:20,860 --> 00:31:23,740
+And so it's kind of like conditioning on getting the right answer.
+
+451
+00:31:23,740 --> 00:31:27,180
+And this actually makes the Transformer work better because the Transformer doesn't have
+
+452
+00:31:27,180 --> 00:31:31,100
+to now hedge its probability mass on low quality solutions.
+
+453
+00:31:31,100 --> 00:31:32,860
+As ridiculous as that sounds.
+
+454
+00:31:32,860 --> 00:31:37,260
+And so basically, don't feel free to ask for a strong solution.
+
+455
+00:31:37,260 --> 00:31:39,740
+Say something like you are a leading expert on this topic.
+
+456
+00:31:39,740 --> 00:31:41,020
+Pretend you have IQ 120.
+
+457
+00:31:41,180 --> 00:31:41,980
+Et cetera.
+
+458
+00:31:41,980 --> 00:31:47,020
+But don't try to ask for too much IQ because if you ask for IQ like 400, you might be out
+
+459
+00:31:47,020 --> 00:31:52,060
+of data distribution or even worse, you could be in data distribution for some like sci-fi
+
+460
+00:31:52,060 --> 00:31:56,380
+stuff and it will start to like take on some sci-fi like role playing or something like
+
+461
+00:31:56,380 --> 00:31:56,940
+that.
+
+462
+00:31:56,940 --> 00:31:58,780
+So you have to find like the right amount of IQ.
+
+463
+00:31:59,580 --> 00:32:01,660
+I think it's got some U-shaped curve there.
+
+464
+00:32:03,100 --> 00:32:08,860
+Next up, as we saw when we are trying to solve problems, we know what we are good at and
+
+465
+00:32:08,860 --> 00:32:09,660
+what we're not good at.
+
+466
+00:32:09,660 --> 00:32:11,020
+And we lean on tools.
+
+467
+00:32:11,020 --> 00:32:11,980
+Computationally.
+
+468
+00:32:11,980 --> 00:32:14,460
+You want to do the same potentially with your LLMs.
+
+469
+00:32:15,100 --> 00:32:21,420
+So in particular, we may want to give them calculators, code interpreters, and so on.
+
+470
+00:32:21,980 --> 00:32:23,260
+The ability to do search.
+
+471
+00:32:23,820 --> 00:32:26,620
+And there's a lot of techniques for doing that.
+
+472
+00:32:27,180 --> 00:32:31,580
+One thing to keep in mind again is that these Transformers by default may not know what
+
+473
+00:32:31,580 --> 00:32:32,780
+they don't know.
+
+474
+00:32:32,780 --> 00:32:36,700
+So you may even want to tell the Transformer in a prompt, you are not very good at mental
+
+475
+00:32:36,700 --> 00:32:37,500
+arithmetic.
+
+476
+00:32:37,500 --> 00:32:41,020
+Whenever you need to do very large number addition, multiplication, or whatever, you're
+
+477
+00:32:41,020 --> 00:32:42,460
+going to use this calculator.
+
+478
+00:32:42,460 --> 00:32:43,740
+Here's how you use the calculator.
+
+479
+00:32:43,740 --> 00:32:46,380
+Use this token combination, et cetera, et cetera.
+
+480
+00:32:46,380 --> 00:32:49,580
+So you have to actually like spell it out because the model by default doesn't know
+
+481
+00:32:49,580 --> 00:32:51,660
+what it's good at or not good at necessarily.
+
+482
+00:32:51,660 --> 00:32:53,500
+Just like you and I might be.
+
+483
+00:32:55,500 --> 00:33:00,540
+Next up, I think something that is very interesting is we went from a world that was retrieval
+
+484
+00:33:00,540 --> 00:33:05,420
+only all the way the pendulum has swung to the other extreme where it's memory only in
+
+485
+00:33:05,420 --> 00:33:06,060
+LLMs.
+
+486
+00:33:06,060 --> 00:33:10,380
+But actually, there's this entire space in between of these retrieval augmented models.
+
+487
+00:33:10,380 --> 00:33:10,940
+And this was a very interesting thing.
+
+488
+00:33:10,940 --> 00:33:12,380
+This works extremely well in practice.
+
+489
+00:33:13,180 --> 00:33:17,100
+As I mentioned, the context window of a Transformer is its working memory.
+
+490
+00:33:17,100 --> 00:33:21,260
+If you can load the working memory with any information that is relevant to the task,
+
+491
+00:33:21,260 --> 00:33:25,660
+the model will work extremely well because it can immediately access all that memory.
+
+492
+00:33:26,380 --> 00:33:32,060
+And so I think a lot of people are really interested in basically retrieval augmented
+
+493
+00:33:32,060 --> 00:33:33,020
+generation.
+
+494
+00:33:33,020 --> 00:33:37,180
+And on the bottom, I have like an example of LLMA index, which is one sort of data connector
+
+495
+00:33:37,180 --> 00:33:38,940
+to lots of different types of data.
+
+496
+00:33:38,940 --> 00:33:40,540
+And you can make it.
+
+497
+00:33:40,940 --> 00:33:44,220
+You can index all of that data, and you can make it accessible to LLMs.
+
+498
+00:33:44,220 --> 00:33:48,460
+And the emerging recipe there is you take relevant documents, you split them up into
+
+499
+00:33:48,460 --> 00:33:52,860
+chunks, you embed all of them, and you basically get embedding vectors that represent that
+
+500
+00:33:52,860 --> 00:33:53,420
+data.
+
+501
+00:33:53,420 --> 00:33:57,420
+You store that in the vector store, and then at test time, you make some kind of a query
+
+502
+00:33:57,420 --> 00:34:01,980
+to your vector store, and you fetch chunks that might be relevant to your task, and you
+
+503
+00:34:01,980 --> 00:34:04,060
+stuff them into the prompt, and then you generate.
+
+504
+00:34:04,060 --> 00:34:06,300
+So this can work quite well in practice.
+
+505
+00:34:06,300 --> 00:34:10,380
+So this is, I think, similar to when you and I solve problems, you can do everything from
+
+506
+00:34:10,380 --> 00:34:13,660
+your memory, and transformers have very large and extensive memory.
+
+507
+00:34:13,660 --> 00:34:17,580
+But also, it really helps to reference some primary documents.
+
+508
+00:34:17,580 --> 00:34:21,420
+So whenever you find yourself going back to a textbook to find something, or whenever
+
+509
+00:34:21,420 --> 00:34:26,140
+you find yourself going back to documentation of a library to look something up, the transformers
+
+510
+00:34:26,140 --> 00:34:27,660
+definitely want to do that too.
+
+511
+00:34:27,660 --> 00:34:32,540
+You have some memory over how some documentation of a library works, but it's much better to
+
+512
+00:34:32,540 --> 00:34:33,180
+look it up.
+
+513
+00:34:33,180 --> 00:34:34,780
+So the same applies here.
+
+514
+00:34:36,860 --> 00:34:39,580
+Next, I wanted to briefly talk about constraint prompting.
+
+515
+00:34:39,580 --> 00:34:40,300
+I also find this very useful.
+
+516
+00:34:40,300 --> 00:34:40,860
+Very interesting.
+
+517
+00:34:42,140 --> 00:34:50,220
+This is basically techniques for forcing a certain template in the outputs of LLMs.
+
+518
+00:34:50,220 --> 00:34:52,780
+So guidance is one example from Microsoft, actually.
+
+519
+00:34:53,340 --> 00:34:57,260
+And here we are enforcing that the output from the LLM will be JSON.
+
+520
+00:34:57,820 --> 00:35:01,980
+And this will actually guarantee that the output will take on this form, because they
+
+521
+00:35:01,980 --> 00:35:04,860
+go in and they mess with the probabilities of all the different tokens that come out
+
+522
+00:35:04,860 --> 00:35:07,500
+of the transformer, and they clamp those tokens.
+
+523
+00:35:07,500 --> 00:35:09,980
+And then the transformer is only filling in the blanks here.
+
+524
+00:35:09,980 --> 00:35:13,340
+And then you can enforce additional restrictions on what could go into those blanks.
+
+525
+00:35:13,340 --> 00:35:14,700
+So this might be really helpful.
+
+526
+00:35:14,700 --> 00:35:17,340
+And I think this kind of constraint sampling is also extremely interesting.
+
+527
+00:35:20,060 --> 00:35:22,380
+I also wanted to say a few words about fine tuning.
+
+528
+00:35:22,380 --> 00:35:27,260
+It is the case that you can get really far with prompt engineering, but it's also possible
+
+529
+00:35:27,260 --> 00:35:28,940
+to think about fine tuning your models.
+
+530
+00:35:29,580 --> 00:35:33,020
+Now, fine tuning models means that you are actually going to change the weights of the
+
+531
+00:35:33,020 --> 00:35:33,340
+model.
+
+532
+00:35:34,220 --> 00:35:38,780
+It is becoming a lot more accessible to do this in practice, and that's because of a
+
+533
+00:35:38,780 --> 00:35:39,820
+number of techniques that have been developed.
+
+534
+00:35:39,820 --> 00:35:43,020
+And I have libraries for very recently.
+
+535
+00:35:43,020 --> 00:35:46,780
+So, for example, parameter efficient fine tuning techniques like LoRa make sure that
+
+536
+00:35:47,660 --> 00:35:50,940
+you're only training small, sparse pieces of your model.
+
+537
+00:35:50,940 --> 00:35:55,260
+So most of the model is kept clamped at the base model, and some pieces of it are allowed
+
+538
+00:35:55,260 --> 00:35:55,820
+to change.
+
+539
+00:35:55,820 --> 00:35:59,900
+And this still works pretty well empirically, and makes it much cheaper to sort of tune
+
+540
+00:35:59,900 --> 00:36:01,100
+only small pieces of your model.
+
+541
+00:36:03,020 --> 00:36:07,100
+It also means that because most of your model is clamped, you can use very low precision
+
+542
+00:36:07,100 --> 00:36:09,740
+inference for computing those parts, because they are
+
+543
+00:36:09,740 --> 00:36:11,660
+not going to be updated by gradient descent.
+
+544
+00:36:11,660 --> 00:36:13,580
+And so that makes everything a lot more efficient as well.
+
+545
+00:36:14,220 --> 00:36:17,420
+And in addition, we have a number of open sourced, high quality based models.
+
+546
+00:36:17,420 --> 00:36:21,580
+Currently, as I mentioned, I think LAMA is quite nice, although it is not commercially
+
+547
+00:36:21,580 --> 00:36:22,700
+licensed, I believe, right now.
+
+548
+00:36:24,300 --> 00:36:29,580
+Something to keep in mind is that basically fine tuning is a lot more technically involved.
+
+549
+00:36:29,580 --> 00:36:32,700
+It requires a lot more, I think, technical expertise to do right.
+
+550
+00:36:32,700 --> 00:36:37,020
+It requires human data contractors for data sets and or synthetic data pipelines that
+
+551
+00:36:37,020 --> 00:36:37,980
+can be pretty complicated.
+
+552
+00:36:38,540 --> 00:36:41,260
+This will definitely slow down your iteration cycle by a lot.
+
+553
+00:36:41,820 --> 00:36:47,420
+And I would say on a high level, SFT is achievable, because it is just your continuing the language
+
+554
+00:36:47,420 --> 00:36:48,140
+modeling task.
+
+555
+00:36:48,140 --> 00:36:49,660
+It's relatively straightforward.
+
+556
+00:36:49,660 --> 00:36:55,020
+But RLHF, I would say, is very much research territory, and is even much harder to get
+
+557
+00:36:55,020 --> 00:36:55,740
+to work.
+
+558
+00:36:55,740 --> 00:37:00,620
+And so I would probably not advise that someone just tries to roll their own RLHF implementation.
+
+559
+00:37:00,620 --> 00:37:04,540
+These things are pretty unstable, very difficult to train, not something that is, I think,
+
+560
+00:37:04,540 --> 00:37:05,900
+very beginner friendly right now.
+
+561
+00:37:05,900 --> 00:37:07,900
+And it's also potentially likely, also.
+
+562
+00:37:08,460 --> 00:37:10,220
+To change pretty rapidly still.
+
+563
+00:37:12,140 --> 00:37:14,940
+So I think these are my sort of default recommendations right now.
+
+564
+00:37:15,660 --> 00:37:18,220
+I would break up your task into two major parts.
+
+565
+00:37:18,220 --> 00:37:20,460
+Number one, achieve your top performance.
+
+566
+00:37:20,460 --> 00:37:23,260
+And number two, optimize your performance, in that order.
+
+567
+00:37:24,220 --> 00:37:27,500
+Number one, the best performance will currently come from GFT4 model.
+
+568
+00:37:27,500 --> 00:37:29,020
+It is the most capable model by far.
+
+569
+00:37:29,900 --> 00:37:31,820
+Use prompts that are very detailed.
+
+570
+00:37:31,820 --> 00:37:35,660
+They have lots of task contents, relevant information and instructions.
+
+571
+00:37:36,460 --> 00:37:37,740
+Think along the lines of, what would you do?
+
+572
+00:37:37,740 --> 00:37:40,860
+Would you tell a task contractor if they can't email you back?
+
+573
+00:37:40,860 --> 00:37:44,860
+But then also keep in mind that a task contractor is a human, and they have inner monologue,
+
+574
+00:37:44,860 --> 00:37:46,300
+and they're very clever, et cetera.
+
+575
+00:37:46,300 --> 00:37:48,620
+LLMs do not possess those qualities.
+
+576
+00:37:48,620 --> 00:37:55,580
+So make sure to think through the psychology of the LLM, almost, and cater prompts to that.
+
+577
+00:37:55,580 --> 00:38:00,620
+Retrieve and add any relevant context and information to these prompts.
+
+578
+00:38:00,620 --> 00:38:03,100
+Basically refer to a lot of the prompt engineering techniques.
+
+579
+00:38:03,100 --> 00:38:05,100
+Some of them I've highlighted in the slides above.
+
+580
+00:38:05,100 --> 00:38:07,340
+But also, this is a very large space.
+
+581
+00:38:07,340 --> 00:38:11,740
+And I would just advise you to look for prompt engineering techniques online.
+
+582
+00:38:11,740 --> 00:38:12,860
+There's a lot to cover there.
+
+583
+00:38:13,740 --> 00:38:15,820
+Experiment with few-shot examples.
+
+584
+00:38:15,820 --> 00:38:17,820
+What this refers to is, you don't just want to tell.
+
+585
+00:38:17,820 --> 00:38:19,980
+You want to show, whenever it's possible.
+
+586
+00:38:19,980 --> 00:38:22,060
+So give it examples of everything.
+
+587
+00:38:22,060 --> 00:38:24,380
+That helps it really understand what you mean, if you can.
+
+588
+00:38:25,820 --> 00:38:29,660
+Experiment with tools and plug-ins to offload a task that are difficult for LLMs natively.
+
+589
+00:38:31,180 --> 00:38:35,820
+And then think about not just a single prompt and answer, think about potential chains and reflection,
+
+590
+00:38:35,820 --> 00:38:37,020
+and how you glue them together.
+
+591
+00:38:37,340 --> 00:38:39,420
+How you could potentially make multiple samples, and so on.
+
+592
+00:38:40,700 --> 00:38:43,420
+Finally, if you think you've squeezed out prompt engineering,
+
+593
+00:38:43,420 --> 00:38:45,260
+which I think you should stick with for a while,
+
+594
+00:38:45,900 --> 00:38:51,420
+look at some potentially fine-tuning a model to your application.
+
+595
+00:38:51,420 --> 00:38:54,060
+But expect this to be a lot more slower and involved.
+
+596
+00:38:54,060 --> 00:38:58,300
+And then there's an expert fragile research zone here, and I would say that is RLHF,
+
+597
+00:38:58,300 --> 00:39:02,220
+which currently does work a bit better than SFT, if you can get it to work.
+
+598
+00:39:02,220 --> 00:39:04,700
+But again, this is pretty involved, I would say.
+
+599
+00:39:05,260 --> 00:39:07,340
+And to optimize your costs, try to explore,
+
+600
+00:39:07,340 --> 00:39:11,100
+look for lower capacity models, or shorter prompts, and so on.
+
+601
+00:39:13,420 --> 00:39:15,900
+I also wanted to say a few words about the use cases,
+
+602
+00:39:15,900 --> 00:39:18,940
+in which I think LLMs are currently well-suited for.
+
+603
+00:39:18,940 --> 00:39:22,860
+So in particular, note that there's a large number of limitations to LLMs today.
+
+604
+00:39:22,860 --> 00:39:26,540
+And so I would keep that definitely in mind for all your applications.
+
+605
+00:39:26,540 --> 00:39:28,780
+Models, and this, by the way, could be an entire talk,
+
+606
+00:39:28,780 --> 00:39:30,940
+so I don't have time to cover it in full detail.
+
+607
+00:39:30,940 --> 00:39:34,220
+Models may be biased, they may fabricate, hallucinate information.
+
+608
+00:39:34,220 --> 00:39:35,340
+They may have reasoning errors.
+
+609
+00:39:35,340 --> 00:39:36,540
+They may struggle.
+
+610
+00:39:36,540 --> 00:39:37,980
+LLMs can run entire classes of applications.
+
+611
+00:39:38,540 --> 00:39:39,980
+They have knowledge cut-offs,
+
+612
+00:39:39,980 --> 00:39:43,820
+so they might not know any information above, say, September 2021.
+
+613
+00:39:43,820 --> 00:39:46,380
+They are susceptible to a large range of attacks,
+
+614
+00:39:46,380 --> 00:39:48,780
+which are sort of like coming out on Twitter daily,
+
+615
+00:39:48,780 --> 00:39:52,380
+including prompt injection, jailbreak attacks, data poisoning attacks, and so on.
+
+616
+00:39:52,940 --> 00:39:57,580
+So my recommendation right now is use LLMs in low-stakes applications,
+
+617
+00:39:57,580 --> 00:40:00,220
+combine them with always with human oversight,
+
+618
+00:40:00,220 --> 00:40:02,860
+use them as a source of inspiration and suggestions,
+
+619
+00:40:02,860 --> 00:40:05,740
+and think co-pilots instead of completely autonomous agents,
+
+620
+00:40:05,740 --> 00:40:07,340
+that are just like performing a task somewhere.
+
+621
+00:40:07,900 --> 00:40:10,300
+It's just not clear that the models are there right now.
+
+622
+00:40:12,300 --> 00:40:15,020
+So I wanted to close by saying that GPT-4 is an amazing artifact.
+
+623
+00:40:15,020 --> 00:40:16,300
+I'm very thankful that it exists.
+
+624
+00:40:16,860 --> 00:40:18,220
+And it's beautiful.
+
+625
+00:40:18,220 --> 00:40:20,220
+It has a ton of knowledge across so many areas.
+
+626
+00:40:20,220 --> 00:40:23,020
+It can do math, code, and so on.
+
+627
+00:40:23,020 --> 00:40:25,980
+And in addition, there's this thriving ecosystem of everything else
+
+628
+00:40:25,980 --> 00:40:28,700
+that is being built and incorporated into the ecosystem.
+
+629
+00:40:29,260 --> 00:40:31,340
+Some of these things I've talked about.
+
+630
+00:40:32,060 --> 00:40:35,180
+And all of this power is accessible at your fingertips.
+
+631
+00:40:35,740 --> 00:40:38,540
+So here's everything that's needed in terms of code
+
+632
+00:40:38,540 --> 00:40:41,740
+to ask GPT-4 a question, to prompt it, and get a response.
+
+633
+00:40:42,460 --> 00:40:43,420
+In this case, I said,
+
+634
+00:40:44,060 --> 00:40:47,260
+can you say something to inspire the audience of Microsoft Build 2023?
+
+635
+00:40:47,900 --> 00:40:53,020
+And I just punched this into Python, and verbatim, GPT-4 said the following.
+
+636
+00:40:54,060 --> 00:40:57,340
+And by the way, I did not know that they used this trick in the keynote.
+
+637
+00:40:57,340 --> 00:41:02,700
+So I thought I was being clever, but it is really good at this.
+
+638
+00:41:02,700 --> 00:41:05,660
+It says, ladies and gentlemen, innovators and trailblazers, Microsoft.
+
+639
+00:41:05,740 --> 00:41:07,340
+Build 2023.
+
+640
+00:41:07,340 --> 00:41:09,980
+Welcome to the gathering of brilliant minds like no other.
+
+641
+00:41:09,980 --> 00:41:11,740
+You are the architects of the future,
+
+642
+00:41:11,740 --> 00:41:15,580
+the visionaries molding the digital realm in which humanity thrives.
+
+643
+00:41:15,580 --> 00:41:17,820
+Embrace the limitless possibilities of technologies
+
+644
+00:41:17,820 --> 00:41:20,380
+and let your ideas soar as high as your imagination.
+
+645
+00:41:20,380 --> 00:41:22,860
+Together, let's create a more connected, remarkable,
+
+646
+00:41:22,860 --> 00:41:25,260
+and inclusive world for generations to come.
+
+647
+00:41:25,260 --> 00:41:27,260
+Get ready to unleash your creativity,
+
+648
+00:41:27,260 --> 00:41:30,300
+canvass the unknown, and turn dreams into reality.
+
+649
+00:41:30,300 --> 00:41:32,140
+Your journey begins today.
+
+650
+00:41:35,740 --> 00:41:40,220
+www.microsoft.com
+
+651
+00:42:05,740 --> 00:42:07,740
+www.microsoft.com
+
+652
+00:42:35,740 --> 00:42:37,740
+www.microsoft.com
+
