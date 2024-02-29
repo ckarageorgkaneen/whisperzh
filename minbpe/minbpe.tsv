@@ -1,0 +1,3061 @@
+start	end	text
+0	4320	Hi everyone. So in this video, I'd like us to cover the process of tokenization in large
+4320	10040	language models. Now, you see here that I have a sad face, and that's because tokenization is my
+10040	14020	least favorite part of working with large language models, but unfortunately it is necessary to
+14020	18600	understand in some detail because it is fairly hairy, gnarly, and there's a lot of hidden foot
+18600	23560	guns to be aware of, and a lot of oddness with large language models typically traces back
+23560	29720	to tokenization. So what is tokenization? Now, in my previous video, Let's Build GPT
+29720	34480	from Scratch, we actually already did tokenization, but we did a very naive,
+34780	39080	simple version of tokenization. So when you go to the Google Colab for that video,
+39880	46120	you see here that we loaded our training set, and our training set was this Shakespeare data set.
+47360	51820	Now, in the beginning, the Shakespeare data set is just a large string in Python. It's just text,
+52300	57900	and so the question is, how do we plug text into large language models? And in this case here,
+58780	59700	we created
+59700	65740	a vocabulary of 65 possible characters that we saw occur in this string. These were the possible
+65740	71860	characters, and we saw that there are 65 of them, and then we created a lookup table for converting
+71860	79280	from every possible character, a little string piece, into a token, an integer. So here, for
+79280	86080	example, we tokenized the string, hi there, and we received this sequence of tokens. And here,
+86080	89100	we took the first 1,000 characters of our data set,
+89700	96440	we encoded it into tokens. And because this is character level, we received 1,000 tokens in
+96440	105460	the sequence. So, token 1847, etc. Now, later, we saw that the way we plug these tokens into the
+105460	112540	language model is by using an embedding table. And so basically, if we have 65 possible tokens,
+112540	118300	then this embedding table is going to have 65 rows. And roughly speaking, we're taking the
+118300	119040	integer
+119040	124040	with every single token. We're using that as a lookup into this table and we're
+124040	129220	plucking out the corresponding row and this row is trainable parameters
+129220	132840	that we're going to train using back propagation and this is the vector that
+132840	136440	then feeds into the transformer and that's how the transformer sort of
+136440	142360	perceives every single token. So here we had a very naive tokenization process
+142360	147240	that was a character level tokenizer but in practice in state-of-the-art language
+147240	151000	models people use a lot more complicated schemes unfortunately for
+151000	157260	constructing these token vocabularies. So we're not dealing on the character level
+157260	162660	we're dealing on chunk level and the way these character chunks are constructed
+162660	166840	is using algorithms such as for example the byte pair encoding algorithm which
+166840	172680	we're going to go into in detail and cover in this video. I'd like to briefly
+172680	176940	show you the paper that introduced a byte level encoding as a mechanism for
+176940	177200	tokenization.
+177240	181140	In the context of large language models and I would say that that's probably the
+181140	187260	GPT-2 paper and if you scroll down here to the section input representation this
+187260	190600	is where they cover tokenization the kinds of properties that you'd like the
+190600	194760	tokenization to have and they conclude here that they're going to have a
+194760	198840	tokenizer where you have a vocabulary of fifty thousand two hundred and fifty
+198840	206460	seven possible tokens and the context size is going to be 1024 tokens so in
+206460	206940	the entire
+206940	211020	concept in the attention layer of the transformer neural network every single
+211020	214500	token is attending to the previous tokens in the sequence and it's going to
+214500	222360	see up to 1024 tokens so tokens are this like fundamental unit the atom of large
+222360	225240	language models if you will and everything is in units of tokens
+225240	230160	everything is about tokens and tokenization is the process for translating strings or
+230160	236640	text into sequences of tokens and vice versa when you go into the Lama 2 paper
+236640	240600	as well I can show you that when you search token you're going to get 63 hits
+240600	245120	and that's because tokens are again pervasive so here they mentioned that
+245120	250340	they trained on two trillion tokens of data and so on so we're going to build
+250340	253860	our own tokenizer luckily the byte-bearing coding algorithm is not
+253860	258200	that super complicated and we can build it from scratch ourselves and we'll see
+258200	261980	exactly how this works before we dive into code I'd like to give you a brief
+261980	265760	taste of some of the complexities that come from the tokenization because I
+265760	266460	just want to make sure that we're very clear on how the tokenization works and so let's get started.
+266640	273200	motivated sufficiently for why we are doing all this and why this is so gross. So tokenization
+273200	276960	is at the heart of a lot of weirdness in large language models and I would advise that you do
+276960	282240	not brush it off. A lot of the issues that may look like just issues with the neural network
+282240	287680	architecture or the large language model itself are actually issues with the tokenization and
+287680	293440	fundamentally trace back to it. So if you've noticed any issues with large language models
+293440	298400	can't, you know, not able to do spelling tasks very easily, that's usually due to tokenization.
+298960	303600	Simple string processing can be difficult for the large language model to perform natively.
+304720	309360	Non-English languages can work much worse and to a large extent this is due to tokenization.
+310160	317520	Sometimes LLMs are bad at simple arithmetic, also can be traced to tokenization. GPT-2 specifically
+317520	322880	would have had quite a bit more issues with Python than future versions of it due to tokenization.
+323600	327040	There's a lot of other issues, maybe you've seen weird warnings about a trailing whitespace,
+327040	334880	this is a tokenization issue. If you had asked GPT earlier about solid gold Magikarp and what it is,
+334880	340080	you would see the LLM go totally crazy and it would start going off about a completely unrelated
+340080	344640	tangent topic. Maybe you've been told to use YAML over JSON in structured data,
+344640	348800	all of that has to do with tokenization. So basically tokenization is at the heart
+348800	352960	of many issues. I will loop back around to these at the end of the video,
+353040	358400	but for now let me just skip over it a little bit and let's go to this web app,
+359520	364880	the tiktokenizer.versal.app. So I have it loaded here and what I like about this web app is that
+364880	370560	tokenization is running a sort of live in your browser in JavaScript. So you can just type here
+370560	378720	stuff, hello world, and the whole string retokenizes. So here what we see on the left
+378720	382480	is a string that you put in, on the right we're currently using the GPT-2 tokenizer,
+383120	388000	we see that this string that I pasted here is currently tokenizing into 300 tokens
+388560	393440	and here they are sort of shown explicitly in different colors for every single token.
+394240	403680	So for example this word tokenization became two tokens, the token 30642 and 1634.
+404880	412400	The token space is is token 318. So be careful on the bottom you can show white space,
+413200	418480	and keep in mind that there are spaces and slash n new line characters in here,
+418480	425440	but you can hide them for clarity. The token space at is token 379,
+426400	434960	the token space the is 262, etc. So you notice here that the space is part of that token chunk.
+436800	442240	Now so this is kind of like how our English sentence broke up and that seems all well and good.
+443040	452400	Now here I put in some arithmetic. So we see that the token 127 plus and then token 6 space 6
+452400	457760	followed by 77. So what's happening here is that 127 is feeding in as a single token into
+457760	464880	the large language model, but the number 677 will actually feed in as two separate tokens.
+465680	472320	And so the large language model has to sort of take account of that and process it correctly in
+472320	478240	its network. And see here 804 will be broken up into two tokens and it's all completely arbitrary.
+478880	483280	And here I have another example of four digit numbers and they break up in the way that they
+483280	488480	break up and it's totally arbitrary. Sometimes you have multiple digits single token, sometimes
+488480	493120	you have individual digits as many tokens, and it's all kind of pretty arbitrary and coming out
+493120	501440	of the tokenizer. Here's another example. We have the string egg and you see here that this became two tokens.
+503200	507680	But for some reason when I say I have an egg, you see when it's a space egg
+508640	514480	it's a single token. So just egg by itself in the beginning of a sentence is
+514480	520960	two tokens, but here as a space egg is suddenly a single token for the exact same string.
+521600	526880	Here lowercase egg turns out to be a single token and in particular notice that
+526880	531840	the color is different, so this is a different token, so this is case sensitive. And of course,
+532480	538720	if you look at the formula for the literal egg, it would also be different tokens. And again this
+538720	544160	would be two tokens arbitrarily. So for the same concept egg depending on if it's in the beginning
+544160	549360	of a sentence, at the end of a sentence, lowercase, uppercase or mixed, all this will be basically
+549360	554160	very different tokens and different IDs. And the language model has to learn from raw data from
+554160	557520	all the internet text that it's going to be training on that these are actually all the
+557520	561600	exact same concept. And it has to sort of group them in the parameters of the neural network and understand, just based on data,
+561600	565360	just based on the data patterns that these are all very similar but maybe not
+565360	572220	almost exactly similar but very very similar. After the demonstration here I
+572220	581160	have an introduction from OpenAI's ChatGPT in Korean so 만났어, 반가워요, etc.
+581160	586320	So this is in Korean and the reason I put this here is because you'll notice
+586320	593940	that non-English languages work slightly worse in ChatGPT. Part of this is
+593940	597720	because of course the training data set for ChatGPT is much larger for
+597720	601360	English than for everything else but the same is true not just for the large
+601360	605580	language model itself but also for the tokenizer. So when we train the tokenizer
+605580	608520	we're going to see that there's a training set as well and there's a lot
+608520	612540	more English than non-English and what ends up happening is that we're going to
+612540	616300	have a lot more longer tokens for English
+616300	621400	so how do I put this if you have a single sentence in English and you
+621400	625460	tokenize it you might see that it's 10 tokens or something like that but if you
+625460	629360	translate that sentence into say Korean or Japanese or something else you'll
+629360	633520	typically see that number of tokens used is much larger and that's because the
+633520	638440	chunks here are a lot more broken up so we're using a lot more tokens for the
+638440	643720	exact same thing and what this does is it bloats up the sequence length of all
+643720	645920	the documents so you're using up more tokens if the number of tokens you use is
+645920	650160	more tokens and then in the attention of the transformer when these tokens try to attend
+650160	656320	each other you are running out of context in the maximum context length of that transformer
+656320	662400	and so basically all the non-english text is stretched out from the perspective of the
+662400	667600	transformer and this just has to do with the trainings that used for the tokenizer and the
+667600	673760	tokenization itself so it will create a lot bigger tokens and a lot larger groups in english and it
+673760	677200	will have a lot of little boundaries for all the other non-english text
+679280	683040	so if we translated this into english it would be significantly fewer tokens
+684240	688320	the final example i have here is a little snippet of python for doing fizzbuzz
+689040	695920	and what i'd like you to notice is look all these individual spaces are all separate tokens they are
+695920	703680	token 220 so uh 220 220 220 220 and then space if is a single token
+703760	708280	token. And so what's going on here is that when the transformer is going to consume or try to
+708280	715740	create this text, it needs to handle all these spaces individually. They all feed in one by one
+715740	721440	into the entire transformer in the sequence. And so this is being extremely wasteful tokenizing it
+721440	727900	in this way. And so as a result of that, GPT-2 is not very good with Python, and it's not anything
+727900	732080	to do with coding or the language model itself. It's just that if you use a lot of indentation
+732080	738040	using space in Python, like we usually do, you just end up bloating out all the text, and it's
+738040	742020	separated across way too much of the sequence, and we are running out of the context length
+742020	746660	in the sequence. That's roughly speaking what's happening. We're being way too wasteful. We're
+746660	751000	taking up way too much token space. Now we can also scroll up here, and we can change the tokenizer.
+751640	758140	So note here that GPT-2 tokenizer creates a token count of 300 for this string here. We can change
+758140	762020	it to CL100KBASE, which is the GPT-4 tokenizer. And we see
+762020	762060	that it's not very good with Python, and it's not very good with Python, and it's not very good
+762060	768440	the token count drops to 185. So for the exact same string, we are now roughly halving the number
+768440	774540	of tokens. And roughly speaking, this is because the number of tokens in the GPT-4 tokenizer is
+774540	779840	roughly double that of the number of tokens in the GPT-2 tokenizer. So we went from roughly 50K
+779840	785920	to roughly 100K. Now you can imagine that this is a good thing, because the same text is now
+786200	792000	squished into half as many tokens. So this is a lot denser input to the
+792000	797840	transformer. And in the transformer, every single token has a finite number of tokens before it
+797840	803240	that it's going to pay attention to. And so what this is doing is we're roughly able to see twice
+803240	809800	as much text as a context for what token to predict next because of this change. But of course,
+809980	814940	just increasing the number of tokens is not strictly better infinitely, because as you
+814940	820280	increase the number of tokens, now your embedding table is sort of getting a lot larger. And also
+820280	821980	at the output, we are trying to predict the next number of tokens. So we're able to see
+822000	825880	the next token, and there's the softmax there, and that grows as well. We're going to go into more
+825880	831400	detail later on this. But there's some kind of a sweet spot somewhere where you have a just right
+831400	835560	number of tokens in your vocabulary, where everything is appropriately dense and still
+835560	841080	fairly efficient. Now, one thing I would like you to note specifically for the GPT-4 tokenizer
+841080	847480	is that the handling of the whitespace for Python has improved a lot. You see that here,
+847480	851960	these four spaces are represented as one single token for the three spaces here.
+852000	859820	And here, seven spaces were all grouped into a single token. So we're being a lot more efficient
+859820	863900	in how we represent Python. And this was a deliberate choice made by OpenAI when they
+863900	869960	designed the GPT-4 tokenizer. And they group a lot more whitespace into a single character.
+870480	877720	What this does is this densifies Python, and therefore we can attend to more code before it
+877720	881940	when we're trying to predict the next token in the sequence. And so the improvement in
+882000	887680	Python coding ability from GPT-2 to GPT-4 is not just a matter of the language model and the
+887680	892080	architecture and the details of the optimization, but a lot of the improvement here is also coming
+892080	897160	from the design of the tokenizer and how it groups characters into tokens. Okay, so let's
+897160	903200	now start writing some code. So remember what we want to do. We want to take strings and feed them
+903200	909080	into language models. For that, we need to somehow tokenize strings into some integers
+909080	911320	in some fixed vocabulary.
+912000	917040	And then we will use those integers to make a lookup into a lookup table of vectors and feed
+917040	922240	those vectors into the transformer as an input. Now, the reason this gets a little bit tricky,
+922240	926320	of course, is that we don't just want to support the simple English alphabet. We want to support
+926320	931440	different kinds of languages. So this is annyeonghaseyo in Korean, which is hello.
+931440	935520	And we also want to support many kinds of special characters that we might find on the internet.
+935520	941920	For example, emoji. So how do we feed this text into a transformer?
+942000	948560	Well, what is this text anyway in Python? So if you go to the documentation of a string in
+948560	955600	Python, you can see that strings are immutable sequences of Unicode code points. Okay, what are
+955600	963040	Unicode code points? We can go to Wikipedia. So Unicode code points are defined by the Unicode
+963040	969520	consortium as part of the Unicode standard. And what this is really is that it's just a definition
+969520	971680	of roughly 150,000 characters right now. So it's just a definition of roughly 150,000 characters
+972000	978560	right now. And roughly speaking, what they look like and what integers represent those characters.
+978560	984560	So it says 150,000 characters across 161 scripts as of right now. So if you scroll down here,
+984560	989760	you can see that the standard is very much alive. The latest standard 15.1 is September 2023.
+991040	998800	And basically, this is just a way to define lots of types of characters. Like for example,
+998800	1000400	all these characters across different scripts.
+1002000	1006480	The way we can access the Unicode code point given a single character is by using the ORT
+1006480	1012800	function in Python. So for example, I can pass in ORT of H. And I can see that for the single
+1012800	1021280	character H, the Unicode code point is 104. Okay. But this can be arbitrarily complicated. So we
+1021280	1026560	can take, for example, our emoji here. And we can see that the code point for this one is 128,000.
+1027520	1028960	Or we can take un.
+1032000	1038800	Now keep in mind, you can't plug in strings here because this doesn't have a single code point.
+1038800	1045520	It only takes a single Unicode code point character and tells you its integer. So in this
+1045520	1052640	way, we can look up all the characters of this specific string and their code points. So ORT of
+1052640	1061520	X for X in this string. And we get this encoding here. Now see here, we've already turned the raw
+1062000	1067360	code points. Already have integers. So why can't we simply just use these integers and not have any
+1067360	1071520	tokenization at all? Why can't we just use this natively as is and just use the code point?
+1072320	1076160	Well, one reason for that, of course, is that the vocabulary in that case would be quite long.
+1076160	1082880	So in this case, for Unicode, this is a vocabulary of 150,000 different code points. But more
+1082880	1088640	worryingly than that, I think the Unicode standard is very much alive and it keeps changing. And so
+1088640	1091920	it's not kind of a stable representation necessarily that we may want to use.
+1092000	1096720	So for those reasons, we need something a bit better. So to find something better,
+1096720	1101200	we turn to encodings. So if you go to the Wikipedia page here, we see that the Unicode
+1101200	1109440	consortium defines three types of encodings, UTF-8, UTF-16, and UTF-32. These encodings are
+1109440	1115120	the way by which we can take Unicode text and translate it into binary data or byte streams.
+1116000	1121840	UTF-8 is by far the most common. So this is the UTF-8 page. Now, this Wikipedia page is actually
+1121840	1126880	quite long, but what's important for our purposes is that UTF-8 takes every single code point
+1127680	1133440	and it translates it to a byte stream. And this byte stream is between one to four bytes. So it's
+1133440	1137840	a variable length encoding. So depending on the Unicode point according to the schema,
+1137840	1143200	you're going to end up with between one to four bytes for each code point. On top of that, there's
+1143200	1150880	UTF-8, UTF-16, and UTF-32. UTF-32 is nice because it is fixed length instead of variable length,
+1150880	1151840	but it has many other variables. So here's the UTF-8 code, and here's UTF-16 code, and here's UTF-32.
+1151840	1158020	downsides as well. So the full kind of spectrum of pros and cons of all these
+1158020	1161980	different tree encodings are beyond the scope of this video. I just like to point
+1161980	1166600	out that I enjoyed this blog post and this blog post at the end of it also has
+1166600	1171660	a number of references that can be quite useful. One of them is UTF-8 Everywhere
+1171660	1177160	manifesto and this manifesto describes the reason why UTF-8 is significantly
+1177160	1182480	preferred and a lot nicer than the other encodings and why it is used a lot
+1182480	1188700	more prominently on the Internet. One of the major advantages does just give you
+1188700	1193180	a sense is that UTF-8 is the only one of these that is backwards compatible to
+1193180	1197780	the much simpler ASCII encoding of text, but I'm not going to go into the full
+1197780	1202220	detail in this video. So suffice to say that we like the UTF-8 encoding and
+1202220	1207060	let's try to take the string and see what we get if we encode it into UTF-8.
+1207060	1207120	So let's try to take the string and see what we get if we encode it into UTF-8.
+1207120	1207140	So let's try to take the string and see what we get if we encode it into UTF-8.
+1207140	1213120	the string class in python actually has dot encode and you can give it the encoding which is
+1213120	1220700	say utf-8 now we get out of this is not very nice because this is the bytes is a bytes object and
+1220700	1225680	it's not very nice in the way that it's printed so i personally like to take it through a list
+1225680	1232760	because then we actually get the raw bytes of this encoding so this is the raw bytes
+1232760	1240360	that represent this string according to the utf-8 encoding we can also look at utf-16 we get a
+1240360	1245880	slightly different byte stream and here we start to see one of the disadvantages of utf-16 you see
+1245880	1250100	how we have zero zero something zero something zero something we're starting to get a sense
+1250100	1255800	that this is a bit of a wasteful encoding and indeed for simple ascii characters or english
+1255800	1261080	characters here we just have the structure of zero something zero something and it's not exactly
+1261080	1262740	nice same for utf-8
+1262760	1267320	but if we look at utf-32 when we expand this we can start to get a sense of the wastefulness of
+1267320	1273640	this encoding for our purposes you see a lot of zeros followed by something and so this is not
+1273640	1282840	desirable so suffice it to say that we would like to stick with utf-8 for our purposes however if we
+1282840	1290120	just use utf-8 naively these are byte streams so that would imply a vocabulary length of only 256
+1290120	1291080	possible tokens
+1292120	1292520	but this
+1292760	1297880	this vocabulary size is very very small what this is going to do if we just were to use it naively
+1297880	1304840	is that all of our text would be stretched out over very very long sequences of bytes and so
+1307320	1311720	what this does is that certainly the embedding table is going to be tiny and the prediction at
+1311720	1316360	the top of the final layer is going to be very tiny but our sequences are very long and remember
+1316360	1322680	that we have pretty finite context lengths in the attention that we can support in a transformer for
+1322760	1328440	computational reasons and so we only have as much context length but now we have very very long
+1328440	1332840	sequences and this is just inefficient and it's not going to allow us to attend to sufficiently
+1332840	1339560	long text before us for the purposes of the next token prediction task so we don't want to use
+1340280	1346760	the raw bytes of the utf-8 encoding we want to be able to support larger vocabulary size that
+1346760	1352280	we can tune as a height parameter but we want to stick with the utf-8 encoding of these strings
+1352760	1357320	so what do we do well the answer of course is we turn to the byte pair encoding algorithm
+1357320	1359800	which will allow us to compress these byte sequences
+1361160	1365960	to a variable amount so we'll get to that in a bit but i just want to briefly speak to the
+1365960	1371880	fact that i would love nothing more than to be able to feed raw byte sequences into
+1372920	1377800	language models in fact there's a paper about how this could potentially be done from summer
+1377800	1382280	last year now the problem is you actually have to go in and you have to modify the transformer
+1383080	1387720	because as i mentioned you're going to have a problem where the attention will start to become
+1387720	1393720	extremely expensive because the sequences are so long and so in this paper they propose kind of a
+1393720	1399880	hierarchical structuring of the transformer that could allow you to just feed in raw bytes and so
+1399880	1404040	at the end they say together these results establish the viability of tokenization free
+1404040	1407960	autoregressive sequence modeling at scale so tokenization free would indeed be
+1407960	1412680	amazing we would just feed byte streams directly into our models but unfortunately
+1412760	1417480	I don't know that this has really been proven out yet by sufficiently many groups and at sufficient
+1417480	1421880	scale but something like this at one point would be amazing and I hope someone comes up with it
+1421880	1426840	but for now we have to come back and we can't feed this directly into language models and we have to
+1426840	1431320	compress it using the byte pair encoding algorithm so let's see how that works so as I mentioned the
+1431320	1435640	byte pair encoding algorithm is not all that complicated and the Wikipedia page is actually
+1435640	1440680	quite instructive as far as the basic idea goes what we're doing is we have some kind of a input
+1440680	1446600	sequence like for example here we have only four elements in our vocabulary a b c and d and we have
+1446600	1453400	a sequence of them so instead of bytes let's say we just had four a vocab size of four the sequence
+1453400	1461320	is too long we'd like to compress it so we do is that we iteratively find the pair of tokens that
+1461320	1469320	occur the most frequently and then once we've identified that pair we replace that pair with
+1469320	1470600	just a single new token
+1470680	1477560	that we append to our vocabulary so for example here the byte pair a a occurs most often so we
+1477560	1483880	meant a new token let's call it capital Z and we replace every single occurrence of a a by z
+1484680	1492440	so now we have two z's here so here we took a sequence of 11 characters with vocabulary size
+1492440	1500360	four and we've converted it to a sequence of only nine tokens but now with a vocabulary of five
+1500360	1500520	b and z so that's how we make our token of a and b so let's now move on from that we're going to
+1500520	1500600	make our token of a and b our token of a and b now we're going to make our token of a and b so
+1500600	1500660	now we have a binary of 10 characters of 10 characters of 10 characters of 10 characters of 10 characters of 10 characters
+1500660	1502800	because we have a fifth vocabulary element
+1502800	1503840	that we just created,
+1503840	1507340	and it's Z standing for concatenation of AA.
+1507340	1509700	And we can, again, repeat this process.
+1509700	1512040	So we, again, look at the sequence
+1512040	1516720	and identify the pair of tokens that are most frequent.
+1516720	1519180	Let's say that that is now AB.
+1519180	1520660	Well, we are going to replace AB
+1520660	1523500	with a new token that we meant called Y.
+1523500	1524640	So Y becomes AB,
+1524640	1526280	and then every single occurrence of AB
+1526280	1528160	is now replaced with Y.
+1528160	1529820	So we end up with this.
+1530660	1532900	So now we only have one, two, three,
+1532900	1536120	four, five, six, seven characters in our sequence,
+1536120	1541120	but we have not just four vocabulary elements,
+1541420	1543600	or five, but now we have six.
+1543600	1545560	And for the final round,
+1545560	1547320	we, again, look through the sequence,
+1547320	1551520	find that the phrase ZY or the pair ZY is most common,
+1551520	1555520	and replace it one more time with another character,
+1555520	1556560	let's say X.
+1556560	1559960	So X is ZY, and we replace all occurrences of ZY,
+1559960	1562020	and we get this following sequence.
+1562020	1564840	So basically, after we have gone through this process,
+1564840	1569840	instead of having a sequence of 11 tokens
+1572500	1574680	with a vocabulary length of four,
+1574680	1579680	we now have a sequence of one, two, three, four, five tokens,
+1580780	1584120	but our vocabulary length now is seven.
+1584120	1585240	And so in this way,
+1585240	1587580	we can iteratively compress our sequence
+1587580	1589280	as we mint new tokens.
+1589960	1591320	In the exact same way,
+1591320	1594260	we start out with byte sequences.
+1594260	1597500	So we have 256 vocabulary size,
+1597500	1598960	but we're now going to go through these
+1598960	1602140	and find the byte pairs that occur the most.
+1602140	1604900	And we're going to iteratively start minting new tokens,
+1604900	1608140	appending them to our vocabulary, and replacing things.
+1608140	1608980	And in this way,
+1608980	1611540	we're going to end up with a compressed training dataset,
+1611540	1614880	and also an algorithm for taking any arbitrary sequence
+1614880	1618200	and encoding it using this vocabulary,
+1618200	1619820	and also decoding it back to store.
+1619820	1622060	So we can then use this to do string.
+1622060	1623960	So let's now implement all that.
+1623960	1625360	So here's what I did.
+1625360	1627560	I went to this blog post that I enjoyed,
+1627560	1628960	and I took the first paragraph
+1628960	1631740	and I copy pasted it here into text.
+1631740	1633900	So this is one very long line here.
+1635200	1637340	Now, to get the tokens, as I mentioned,
+1637340	1640300	we just take our text and we encode it into UTF-8.
+1640300	1643440	The tokens here at this point will be a raw bytes,
+1643440	1645580	single stream of bytes.
+1645580	1647620	And just so that it's easier to work with,
+1647620	1649820	instead of just a bytes object,
+1649820	1652120	we can import all those bytes to integers,
+1652120	1653500	and then create a list of it,
+1653500	1655100	just so it's easier for us to manipulate
+1655100	1657300	and work with in Python and visualize.
+1657300	1658400	And here I'm printing all of that.
+1658400	1661400	So this is the original paragraph,
+1664560	1668800	and its length is 533 code points.
+1668800	1672840	And then here are the bytes encoded in UTF-8.
+1672840	1676240	And we see that this has a length of 616 bytes
+1676240	1678580	at this point, or 616 tokens.
+1678580	1679820	And the reason this is more,
+1679820	1683220	is because a lot of these simple ASCII characters,
+1683220	1686220	or simple characters, they just become a single byte.
+1686220	1688860	But a lot of these Unicode, more complex characters,
+1688860	1690740	become multiple bytes, up to four.
+1690740	1692760	And so we are expanding that size.
+1693860	1695900	So now what we'd like to do as a first step of the algorithm
+1695900	1697700	is we'd like to iterate over here
+1697700	1702040	and find the pair of bytes that occur most frequently,
+1702040	1703840	because we're then going to merge it.
+1703840	1706480	So if you are working along on a notebook on a side,
+1706480	1708740	then I encourage you to basically click on the link,
+1708740	1709680	find this notebook,
+1709820	1711920	and try to write that function yourself.
+1711920	1714060	Otherwise, I'm going to come here and implement first
+1714060	1716300	the function that finds the most common pair.
+1716300	1717660	Okay, so here's what I came up with.
+1717660	1719800	There are many different ways to implement this,
+1719800	1721400	but I'm calling the function getStats.
+1721400	1723300	It expects a list of integers.
+1723300	1725200	I'm using a dictionary to keep track
+1725200	1726800	of basically the counts.
+1726800	1728040	And then this is a Pythonic way
+1728040	1731280	to iterate consecutive elements off this list,
+1731280	1733680	which we covered in a previous video.
+1733680	1735980	And then here, I'm just keeping track of
+1735980	1739320	just incrementing by one for all the pairs.
+1739820	1742160	So if I do this on all the tokens here,
+1742160	1744460	then the stats comes out here.
+1744460	1745860	So this is the dictionary.
+1745860	1749700	The keys are these tuples of consecutive elements,
+1749700	1751340	and this is the count.
+1751340	1754940	So just to print it in a slightly better way,
+1754940	1757740	this is one way that I like to do that,
+1757740	1760980	where it's a little bit compound here,
+1760980	1762380	so you can pause if you like.
+1762380	1764640	But we iterate all the items.
+1764640	1769220	The items called on dictionary returns pairs of key value,
+1769220	1774100	instead, I create a list here of value key,
+1774100	1776260	because if it's a value key list,
+1776260	1778060	then I can call sort on it.
+1778060	1782800	And by default, Python will use the first element,
+1782800	1784100	which in this case, it will be value,
+1784100	1786540	to sort by if it's given tuples.
+1786540	1789240	And then reverse, so it's descending, and print that.
+1789240	1792680	So basically, it looks like 101 comma 32
+1792680	1795580	was the most commonly occurring consecutive pair,
+1795580	1797480	and it occurred 20 times.
+1797480	1799180	We can double check that that makes
+1799220	1800220	a reasonable sense.
+1800220	1803160	So if I just search 101, 32,
+1803160	1807660	then you see that these are the 20 occurrences of that pair.
+1809440	1811460	And if we'd like to take a look at what exactly
+1811460	1813940	that pair is, we can use char,
+1813940	1816340	which is the opposite of ord in Python.
+1816340	1819180	So we give it a Unicode code point,
+1819180	1824180	so 101 and of 32, and we see that this is E and space.
+1824940	1828220	So basically, there's a lot of E space here,
+1828220	1829220	meaning that a lot of these words
+1829220	1830580	seem to end with E.
+1830580	1833120	So here's E space as an example.
+1833120	1834460	So there's a lot of that going on here,
+1834460	1836720	and this is the most common pair.
+1836720	1839040	So now that we've identified the most common pair,
+1839040	1841860	we would like to iterate over the sequence.
+1841860	1846240	We're going to mint a new token with the ID of 256, right?
+1846240	1849640	Because these tokens currently go from zero to 255.
+1849640	1851080	So when we create a new token,
+1851080	1853680	it will have an ID of 256.
+1853680	1858340	And we're going to iterate over this entire list,
+1858340	1859180	and every,
+1859220	1862020	every time we see 101 comma 32,
+1862020	1864860	we're going to swap that out for 256.
+1864860	1866960	So let's implement that now,
+1866960	1869800	and feel free to do that yourself as well.
+1869800	1871600	So first I commented this,
+1871600	1874900	just so we don't pollute the notebook too much.
+1874900	1877980	This is a nice way of, in Python,
+1877980	1880400	obtaining the highest ranking pair.
+1880400	1884980	So we're basically calling the max on this dictionary stats,
+1884980	1888580	and this will return the maximum key.
+1888580	1891720	And then the question is, how does it rank keys?
+1891720	1894820	So you can provide it with a function that ranks keys,
+1894820	1896860	and that function is just stats.get.
+1897720	1901100	Stats.get would basically return the value.
+1901100	1902720	And so we're ranking by the value
+1902720	1904460	and getting the maximum key.
+1904460	1907500	So it's 101 comma 32, as we saw.
+1907500	1909840	Now to actually merge 101, 32,
+1911040	1912200	this is the function that I wrote,
+1912200	1914800	but again, there are many different versions of it.
+1914800	1916880	So we're going to take a list of IDs
+1916880	1917780	and the pair that we want to replace, and we're going to do that.
+1917780	1918580	And we're going to take a list of IDs, and the pair that we want to replace,
+1918580	1922820	and that pair will be replaced with the new index IDX.
+1922820	1924980	So iterating through IDs,
+1924980	1928220	if we find the pair, swap it out for IDX.
+1928220	1931660	So we create this new list, and then we start at zero,
+1931660	1933820	and then we go through this entire list sequentially
+1933820	1934820	from left to right.
+1935760	1938000	And here we are checking for equality
+1938000	1940400	at the current position with the pair.
+1942200	1944640	So here we are checking that the pair matches.
+1944640	1946340	Now here's a bit of a tricky condition
+1946340	1948580	that you have to append if you're trying to be careful.
+1948580	1951620	And that is that you don't want this here
+1951620	1954220	to be out of bounds at the very last position
+1954220	1956580	when you're on the rightmost element of this list.
+1956580	1959320	Otherwise this would give you an out of bounds error.
+1959320	1960700	So we have to make sure that we're not
+1960700	1962720	at the very, very last element.
+1962720	1965760	So this would be false for that.
+1965760	1970500	So if we find a match, we append to this new list
+1970500	1974000	that replacement index, and we increment the position by two.
+1974000	1976340	So we skip over that entire pair.
+1976340	1978580	But otherwise, if we haven't found a matching pair,
+1978580	1982380	we just sort of copy over the element at that position
+1982380	1986020	and increment by one, and then return this.
+1986020	1987520	So here's a very small toy example.
+1987520	1989960	If we have a list five, six, six, seven, nine, one,
+1989960	1993300	and we wanna replace the occurrences of 67 with 99,
+1993300	1997000	then calling this on that will give us
+1997000	1998300	what we're asking for.
+1998300	2001140	So here the six, seven is replaced with nine, nine.
+2002340	2005940	So now I'm gonna uncomment this for our actual use case,
+2005940	2008200	where we wanna take our tokens,
+2008200	2008580	we wanna take our tokens,
+2008580	2011020	we wanna take the top pair here
+2011020	2014080	and replace it with two, five, six to get tokens two.
+2014080	2016660	If we run this, we get the following.
+2018220	2023220	So recall that previously we had a length 616 in this list.
+2024700	2027540	And now we have a length 596, right?
+2027540	2030200	So this decreased by 20, which makes sense
+2030200	2032400	because there are 20 occurrences.
+2032400	2035480	Moreover, we can try to find two, five, six here,
+2035480	2037600	and we see plenty of occurrences of it.
+2038580	2039780	And moreover, just double check,
+2039780	2042340	there should be no occurrence of 101, 32.
+2042340	2044980	So this is the original array, plenty of them.
+2044980	2048320	And in the second array, there are no occurrences of 101, 32.
+2048320	2051500	So we've successfully merged this single pair.
+2051500	2053320	And now we just iterate this.
+2053320	2055440	So we are gonna go over the sequence again,
+2055440	2057740	find the most common pair and replace it.
+2057740	2060180	So let me now write a while loop that uses these functions
+2060180	2062820	to do this sort of iteratively.
+2062820	2065180	And how many times do we do it for?
+2065180	2067460	Well, that's totally up to us as a hyperparameter.
+2067460	2068460	The more, the better.
+2068580	2072380	The more steps we take, the larger will be our vocabulary
+2072380	2074460	and the shorter will be our sequence.
+2074460	2076940	And there is some sweet spot that we usually find
+2076940	2078760	works the best in practice.
+2078760	2081560	And so this is kind of a hyperparameter and we tune it
+2081560	2084000	and we find good vocabulary sizes.
+2084000	2087760	As an example, GPT-4 currently uses roughly 100,000 tokens
+2087760	2091560	and ballpark, those are reasonable numbers currently
+2091560	2093460	in state-of-the-art language language models.
+2093460	2096560	So let me now write, putting it all together
+2096560	2098340	and iterating these steps.
+2098580	2100480	Okay, now, before we dive into the while loop,
+2100480	2103120	I wanted to add one more cell here
+2103120	2104520	where I went to the blog post
+2104520	2107040	and instead of grabbing just the first paragraph or two,
+2107040	2108680	I took the entire blog post
+2108680	2110740	and I stretched it out in a single line.
+2110740	2112400	And basically just using longer text
+2112400	2114680	will allow us to have more representative statistics
+2114680	2115880	for the byte pairs
+2115880	2118900	and we'll just get a more sensible results out of it
+2118900	2120240	because it's longer text.
+2121420	2123140	So here we have the raw text.
+2123140	2127380	We encode it into bytes using the UTF-8 encoding.
+2127380	2128460	And then here,
+2128460	2130600	as before we are just changing it
+2130600	2132200	into a list of integers in Python,
+2132200	2134020	just so it's easier to work with
+2134020	2136340	instead of the raw bytes objects.
+2136340	2140200	And then this is the code that I came up with
+2140200	2143840	to actually do the merging and loop.
+2143840	2145660	These two functions here are identical
+2145660	2146700	to what we had above.
+2146700	2148080	I only included them here
+2148080	2150740	just so that you have the point of reference here.
+2151640	2153980	So these two are identical
+2153980	2156500	and then this is the new code that I added.
+2156500	2158340	So the first thing you wanna do is you want to decide on a,
+2158340	2160140	the final vocabulary size
+2160140	2162440	that we want our tokenizer to have.
+2162440	2163980	And as I mentioned, this is a hyperparameter
+2163980	2165240	and you set it in some way
+2165240	2167480	depending on your best performance.
+2167480	2170100	So let's say for us, we're going to use 276
+2170100	2173960	because that way we're going to be doing exactly 20 merges.
+2173960	2178380	And 20 merges because we already have 256 tokens
+2178380	2180240	for the raw bytes.
+2180240	2183560	And to reach 276, we have to do 20 merges
+2183560	2185120	to add 20 new tokens.
+2186480	2187560	Here, this is a one way in Python,
+2187560	2188080	we have to do 20 merges to add 20 new tokens.
+2188080	2188620	So I'm going to use the same method in Python
+2188620	2190720	to just create a copy of a list.
+2191580	2193240	So I'm taking the tokens list
+2193240	2194880	and by wrapping it in the list,
+2194880	2196900	Python will construct a new list
+2196900	2198060	of all the individual elements.
+2198060	2199660	So this is just a copy operation.
+2200960	2204300	Then here, I'm creating a merges dictionary.
+2204300	2207120	So this merges dictionary is going to maintain basically
+2207120	2212120	the child one, child two mapping to a new token.
+2212260	2213700	And so what we're going to be building up here
+2213700	2216460	is a binary tree of merges.
+2216460	2217840	But actually it's not exactly a tree
+2217840	2220500	because a tree would have a single root node
+2220500	2222220	with a bunch of leaves.
+2222220	2224640	For us, we're starting with the leaves on the bottom,
+2224640	2226060	which are the individual bytes.
+2226060	2228600	Those are the starting 256 tokens.
+2228600	2231400	And then we're starting to like merge two of them at a time.
+2231400	2233800	And so it's not a tree, it's more like a forest
+2236180	2238360	as we merge these elements.
+2238360	2241560	So for 20 merges,
+2241560	2244840	we're going to find the most commonly occurring pair.
+2244840	2247840	We're going to mint a new token integer for it.
+2247840	2249360	So I here will start at zero.
+2249360	2251840	So we're going to start at 256.
+2251840	2253520	We're going to print that we're merging it.
+2253520	2256560	And we're going to replace all the occurrences of that pair
+2256560	2259440	with the new, newly minted token.
+2259440	2262900	And we're going to record that this pair of integers
+2262900	2265340	merged into this new integer.
+2266400	2269860	So running this gives us the following output.
+2272080	2274060	So we did 20 merges.
+2274060	2277180	And for example, the first merge was exactly as before.
+2277180	2282180	The 101, 32 tokens merging into a new token, 256.
+2282900	2286460	Now keep in mind that the individual tokens 101 and 32
+2286460	2289240	can still occur in the sequence after merging.
+2289240	2291820	It's only when they occur exactly consecutively
+2291820	2293700	that that becomes 256 now.
+2295700	2297640	And in particular, the other thing to notice here
+2297640	2300920	is that the token 256, which is the newly minted token,
+2300920	2302860	is also eligible for merging.
+2302860	2305660	So here on the bottom, the 20th merge was a merge of 256,
+2305660	2307180	and 256 was the second merge.
+2307180	2309800	So now we have 259 becoming 275.
+2309800	2312180	So every time we replace these tokens,
+2312180	2313680	they become eligible for merging
+2313680	2315820	in the next round of the iteration.
+2315820	2318440	So that's why we're building up a small sort of binary forest
+2318440	2320240	instead of a single individual tree.
+2321260	2323020	One thing we can take a look at as well
+2323020	2324740	is we can take a look at the compression ratio
+2324740	2326120	that we've achieved.
+2326120	2329360	So in particular, we started off with this tokens list.
+2330240	2333480	So we started off with 24,000 bytes.
+2333480	2336940	And after merging 20 times, we now have, you know,
+2336940	2341240	we now have only 19,000 tokens.
+2341240	2342700	And so therefore, the compression ratio,
+2342700	2346240	simply just dividing the two, is roughly 1.27.
+2346240	2348380	So that's the amount of compression we were able to achieve
+2348380	2351120	of this text with only 20 merges.
+2352180	2355380	And of course, the more vocabulary elements you add,
+2355380	2357700	the greater the compression ratio here would be.
+2360320	2364160	Finally, so that's kind of like the training
+2364160	2365760	of the tokenizer, if you will.
+2365760	2366940	Now, one point that I wanted
+2366940	2369360	to make is that, and maybe this is a diagram
+2369360	2372320	that can help kind of illustrate,
+2372320	2374780	is that the tokenizer is a completely separate object
+2374780	2376780	from the large language model itself.
+2376780	2377920	So everything in this lecture,
+2377920	2380080	we're not really touching the LLM itself.
+2380080	2381660	We're just training the tokenizer.
+2381660	2384820	This is a completely separate pre-processing stage usually.
+2384820	2387440	So the tokenizer will have its own training set,
+2387440	2388640	just like a large language model
+2388640	2391540	has a potentially different training set.
+2391540	2393300	So the tokenizer has a training set of documents
+2393300	2395720	on which you're going to train the tokenizer.
+2395720	2396880	And then,
+2396940	2399400	we're performing the byte-pair encoding algorithm,
+2399400	2400480	as we saw above,
+2400480	2403620	to train the vocabulary of this tokenizer.
+2403620	2405020	So it has its own training set.
+2405020	2406340	It has a pre-processing stage
+2406340	2408780	that you would run a single time in the beginning.
+2409880	2411700	And the tokenizer is trained
+2411700	2413800	using byte-pair encoding algorithm.
+2413800	2415120	Once you have the tokenizer,
+2415120	2417160	once it's trained and you have the vocabulary
+2417160	2419180	and you have the merges,
+2419180	2422260	we can do both encoding and decoding.
+2422260	2424300	So these two arrows here.
+2424300	2426420	So the tokenizer is a translation layer
+2426420	2428180	between raw text,
+2428180	2431800	which is as we saw the sequence of Unicode code points.
+2431800	2435500	It can take raw text and turn it into a token sequence
+2435500	2436340	and vice versa,
+2436340	2438060	it can take a token sequence
+2438060	2440100	and translate it back into raw text.
+2441860	2444100	So now that we have trained the tokenizer
+2444100	2445900	and we have these merges,
+2445900	2448080	we are going to turn to how we can do the encoding
+2448080	2449360	and the decoding step.
+2449360	2451980	If you give me text, here are the tokens and vice versa.
+2451980	2454200	If you give me tokens, here's the text.
+2454200	2455040	Once we have that,
+2455040	2455960	we can translate between these two.
+2455960	2459140	And then the language model is going to be trained
+2459140	2461080	as a step two afterwards.
+2461080	2465240	And typically in a sort of a state of the art application,
+2465240	2466640	you might take all of your training data
+2466640	2467760	for the language model
+2467760	2469420	and you might run it through the tokenizer
+2469420	2471260	and sort of translate everything
+2471260	2473020	into a massive token sequence.
+2473020	2474640	And then you can throw away the raw text.
+2474640	2477000	You're just left with the tokens themselves.
+2477000	2479100	And those are stored on disk.
+2479100	2481420	And that is what the large language model is actually reading
+2481420	2482920	when it's training on them.
+2482920	2484140	So that's one approach that you can take
+2484140	2485880	as a single massive pre-processing state.
+2485960	2490220	So yeah, basically,
+2490220	2491800	I think the most important thing I want to get across
+2491800	2493440	is that this is completely separate stage.
+2493440	2496340	It usually has its own entire training set.
+2496340	2498460	You may want to have those training sets be different
+2498460	2500720	between the tokenizer and the large language model.
+2500720	2503160	So for example, when you're training the tokenizer,
+2503160	2504000	as I mentioned,
+2504000	2506420	we don't just care about the performance of English text.
+2506420	2509460	We care about multi, many different languages.
+2509460	2511640	And we also care about code or not code.
+2511640	2514600	So you may want to look into different kinds of mixtures
+2514600	2515960	of different kinds of languages
+2515960	2518760	and different amounts of code and things like that,
+2518760	2521340	because the amount of different language
+2521340	2523720	that you have in your tokenizer training set
+2523720	2527280	will determine how many merges of it there will be.
+2527280	2529420	And therefore that determines the density
+2529420	2534420	with which this type of data is sort of has
+2534500	2536220	in the token space.
+2536220	2538800	And so roughly speaking, intuitively,
+2538800	2540000	if you add some amount of data,
+2540000	2541720	like say you have a ton of Japanese data
+2541720	2544060	in your tokenizer training set,
+2544060	2544260	then that means that more Japanese tokens will get in there,
+2544260	2544300	then that means that more Japanese tokens will get in there,
+2544300	2546800	then that means that more Japanese tokens will get merged,
+2546800	2549900	and therefore Japanese will have shorter sequences.
+2549900	2551120	And that's going to be beneficial
+2551120	2552340	for the large language model,
+2552340	2554260	which has a finite context length
+2554260	2557780	on which it can work on in the token space.
+2557780	2559300	So hopefully that makes sense.
+2559300	2562080	So we're now going to turn to encoding and decoding
+2562080	2564000	now that we have trained a tokenizer.
+2564000	2566120	So we have our merges,
+2566120	2568300	and now how do we do encoding and decoding?
+2568300	2570080	Okay, so let's begin with decoding,
+2570080	2571840	which is this arrow over here.
+2571840	2573780	So given a token sequence,
+2573780	2574980	let's go through the tokenizer
+2574980	2577200	to get back a Python string object,
+2577200	2579100	so the raw text.
+2579100	2581820	So this is the function that we'd like to implement.
+2581820	2583240	We're given the list of integers,
+2583240	2584960	and we want to return a Python string.
+2584960	2587400	If you'd like, try to implement this function yourself.
+2587400	2588560	It's a fun exercise.
+2588560	2592240	Otherwise, I'm going to start pasting in my own solution.
+2592240	2595080	So there are many different ways to do it.
+2595080	2596400	Here's one way.
+2596400	2599440	I will create a kind of preprocessing variable
+2599440	2600760	that I will call vocab.
+2601960	2603620	And vocab is a function that's called vocab.
+2603620	2603700	And vocab is a function that's called vocab.
+2603700	2603780	And vocab is a function that's called vocab.
+2603780	2606020	And vocab is a mapping or dictionary in Python
+2606020	2611020	from the token ID to the bytes object for that token.
+2611560	2615880	So we begin with the raw bytes for tokens from zero to 255.
+2615880	2618760	And then we go in order of all the merges,
+2618760	2621720	and we sort of populate this vocab list
+2621720	2623360	by doing an addition here.
+2623360	2626860	So this is basically the bytes representation
+2626860	2629940	of the first child, followed by the second one.
+2629940	2631740	And remember, these are bytes objects.
+2631740	2633620	So this addition here is an addition
+2633620	2637080	of two bytes objects, just concatenation.
+2637080	2638440	So that's what we get here.
+2639700	2641540	One tricky thing to be careful with, by the way,
+2641540	2644340	is that I'm iterating a dictionary in Python
+2644340	2645900	using a dot items.
+2645900	2649420	And it really matters that this runs in the order
+2649420	2653220	in which we inserted items into the merges dictionary.
+2653220	2655120	Luckily, starting with Python 3.7,
+2655120	2656640	this is guaranteed to be the case.
+2656640	2658280	But before Python 3.7,
+2658280	2660140	this iteration may have been out of order
+2660140	2662880	with respect to how we inserted elements into merges.
+2662880	2663540	And this may not have been the case.
+2664440	2667120	But we are using modern Python, so we're okay.
+2669120	2670400	And then here, given the IDs,
+2670400	2673520	the first thing we're going to do is get the tokens.
+2673520	2677840	So the way I implemented this here is I'm taking,
+2677840	2679880	I'm iterating over all the IDs.
+2679880	2682080	I'm using vocab to look up their bytes.
+2682080	2684660	And then here, this is one way in Python
+2684660	2688940	to concatenate all these bytes together to create our tokens.
+2688940	2692000	And then these tokens here at this point are raw bytes.
+2692000	2699180	bytes so I have to decode using UTF-8 now back into Python strings. So
+2699180	2703240	previously we called dot encode on a string object to get the bytes and now
+2703240	2707680	we're doing it opposite. We're taking the bytes and calling a decode on the bytes
+2707680	2715920	object to get a string in Python and then we can return text. So this is how
+2715920	2721700	we can do it. Now this actually has a issue in the way I implemented it. In
+2721700	2725660	this could actually throw an error. So try to figure out why this code
+2725660	2731660	could actually result in an error if we plug in some sequence of IDs that is
+2731660	2736880	unlucky. So let me demonstrate the issue. When I try to decode just something like
+2736880	2743720	97, I am going to get a letter A here back so nothing too crazy happening. But
+2743720	2750220	when I try to decode 128 as a single element, the token 128 is what in string
+2750220	2751660	or in Python.
+2751700	2758240	So this is an object, Unicode decoder. UTF-8 can't decode byte 0x80 which is
+2758240	2763340	this in hex in position 0 invalid start byte. What does that mean? Well to
+2763340	2767120	understand what this means we have to go back to our UTF-8 page that I briefly
+2767120	2772280	showed earlier and this is Wikipedia UTF-8 and basically there's a specific
+2772280	2777920	schema that UTF-8 bytes take. So in particular if you have a multi byte
+2777920	2781640	object for some of the Unicode characters they have to have the
+2781700	2786500	special sort of envelope in how the encoding works. And so what's happening
+2786500	2793220	here is that invalid start byte that's because 128 the binary representation of
+2793220	2799580	it is 1 followed by all zeros. So we have 1 and then all 0 and we see here that
+2799580	2803000	that doesn't conform to the format because 1 followed by all 0 just doesn't
+2803000	2808100	fit any of these rules so to speak. So it's an invalid start byte which is byte
+2808100	2811600	1. This 1 must have a 1 following it.
+2811700	2817220	And then a 0 following it. And then the content of your Unicode in X is here. So
+2817220	2821300	basically we don't exactly follow the UTF-8 standard and this cannot be
+2821300	2830760	decoded. And so the way to fix this is to use this errors equals in bytes.decode
+2830760	2836500	function of Python. And by default errors is strict so we will throw an error if
+2836500	2841680	it's not valid UTF-8 bytes encoding. But there are many different things that
+2841700	2845240	you could put here on error handling. This is the full list of all the errors
+2845240	2848820	that you can use. And in particular instead of strict let's change it to
+2848820	2855560	replace. And that will replace with this special marker. This is the replacement
+2855560	2864200	character. So errors equals replace. And now we just get that character back. So
+2864200	2870640	basically not every single byte sequence is valid UTF-8. And if it happens that
+2870640	2871680	your large language is not valid, then it's not valid UTF-8. So basically not every single byte sequence is valid UTF-8. And if it happens that your large language
+2871700	2877160	model for example predicts your tokens in a bad manner, then they might not fall
+2877160	2883220	into valid UTF-8. And then we won't be able to decode them. So the standard
+2883220	2887720	practice is to basically use errors equals replace. And this is what you will
+2887720	2892700	also find in the OpenAI code that they released as well. But basically
+2892700	2895480	whenever you see this kind of a character in your output in that case
+2895480	2901080	something went wrong and the LM output was not valid sort of sequence of tokens.
+2902420	2907620	OK. And now we're going to go the other way. So we are going to implement this error right here.
+2907620	2910960	Where we are going to be given a string and we want to encode it into tokens.
+2912100	2915060	So this is a signature of the function that we're interested in
+2915060	2921820	and this should basically print a list of integers of the tokens. So again try
+2921820	2925840	to maybe implement this yourself if you'd like a fun exercise. And pause here
+2925840	2929920	otherwise I'm going to start putting in my solution. So again there are many ways
+2929920	2930780	to do this.
+2930780	2931420	So
+2931700	2936820	This is one of the ways that I came up with.
+2936820	2939380	The first thing we're going to do is we are going
+2939380	2944940	to take our text encoded into UTF-8 to get the raw bytes.
+2944940	2946940	Then as before, we're going to call list on
+2946940	2951480	the bytes object to get a list of integers of those bytes.
+2951480	2953200	Those are the starting tokens.
+2953200	2955300	Those are the raw bytes of our sequence.
+2955300	2958800	But now, of course, according to the merges dictionary above,
+2958800	2961360	and recall this was the merges,
+2961360	2965680	some of the bytes may be merged according to this lookup.
+2965680	2967340	In addition to that, remember that
+2967340	2969280	the merges was built from top to bottom.
+2969280	2972520	This is the order in which we inserted stuff into merges.
+2972520	2974980	We prefer to do all these merges in
+2974980	2977580	the beginning before we do these merges later.
+2977580	2979540	Because for example,
+2979540	2983980	this merge over here relies on the 256 which got merged here.
+2983980	2987140	We have to go in the order from top to bottom
+2987140	2988760	if we are going to be merging anything.
+2988760	2992080	Now, we expect to be doing a few merges,
+2992080	2994720	so we're going to be doing while true.
+2995320	2999160	Now, we want to find a pair of bytes that is
+2999160	3003060	consecutive that we are allowed to merge according to this.
+3003060	3006120	In order to reuse some of the functionality that we've already written,
+3006120	3009540	I'm going to reuse the function getStats.
+3009540	3014780	Recall that getStats will basically count up how many times
+3014780	3018200	every single pair occurs in our sequence of tokens.
+3018200	3020140	Return that as a dictionary.
+3020140	3023640	The dictionary was a mapping from
+3023640	3026260	all the different byte pairs
+3026260	3028700	to the number of times that they occur.
+3028700	3033000	At this point, we don't actually care how many times they occur in the sequence.
+3033000	3036600	We only care what the raw pairs are in that sequence.
+3036600	3039700	I'm only going to be using basically the keys of the dictionary.
+3039700	3041140	I only care about the set of
+3041140	3044200	possible merge candidates, if that makes sense.
+3044200	3048080	Now, we want to identify the pair that we're going to be merging at this stage,
+3048080	3049320	of the loop.
+3049320	3050120	So, what do we want?
+3050120	3054740	We want to find the pair, or like a key inside stats,
+3054740	3059360	that has the lowest index in the merges dictionary,
+3059360	3064040	because we want to do all the early merges before we work our way to the late merges.
+3064040	3066180	So, again, there are many different ways to implement this,
+3066180	3072280	but I'm going to do something a little bit fancy here.
+3072280	3075920	So, I'm going to be using the min over an iterator.
+3075920	3078080	In Python, when you call min on an iterator,
+3078080	3079880	and stats here is a dictionary,
+3079880	3083440	we're going to be iterating the keys of this dictionary in Python.
+3083440	3088380	So, we're looking at all the pairs inside stats,
+3088380	3090440	which are all the consecutive pairs.
+3090440	3094180	And we're going to be taking the consecutive pair inside tokens
+3094180	3097040	that has the minimum, what.
+3097040	3098920	The min takes a key,
+3098920	3101880	which gives us the function that is going to return a value
+3101880	3104080	over which we're going to do the min.
+3104080	3107320	And the one we care about is we care about taking merges,
+3107320	3113720	and basically getting that pair's index.
+3113720	3118180	So, basically, for any pair inside stats,
+3118180	3122680	we are going to be looking into merges at what index it has,
+3122680	3125760	and we want to get the pair with the min number.
+3125760	3128280	So, as an example, if there's a pair 101 and 32,
+3128280	3130560	we definitely want to get that pair.
+3130560	3132520	We want to identify it here and return it,
+3132520	3136780	and pair would become 101, 32 if it occurs.
+3136780	3140780	And the reason that I'm putting a float inf here as a fallback
+3140780	3143820	is that in the get function, when we call,
+3143820	3148340	when we basically consider a pair that doesn't occur in the merges,
+3148340	3150680	then that pair is not eligible to be merged, right?
+3150680	3152640	So, if in the token sequence,
+3152640	3155120	there's some pair that is not a merging pair,
+3155120	3156380	it cannot be merged,
+3156380	3158580	then it doesn't actually occur here,
+3158580	3160180	and it doesn't have an index,
+3160180	3161780	and it cannot be merged,
+3161780	3164080	which we will denote as float inf.
+3164080	3166480	And the reason infinity is nice here is because for sure,
+3166480	3168720	we're guaranteed that it's not going to participate
+3168720	3171840	in the list of candidates when we do the min.
+3171840	3175080	So, this is one way to do it.
+3175080	3176380	So, basically, long story short,
+3176380	3180720	this returns the most eligible merging candidate pair
+3180720	3182340	that occurs in the tokens.
+3182340	3185140	Now, one thing to be careful with here is
+3185140	3189520	this function here might fail in the following way.
+3189520	3191180	If there is nothing to merge,
+3191180	3196180	then there's nothing in merges that satisfies this function.
+3196480	3198720	If there is nothing that is satisfied anymore,
+3198720	3199820	there's nothing to merge.
+3199820	3202180	Everything just returns float infs,
+3202180	3203980	and then the pair, I think,
+3203980	3207980	will just become the very first element of stats.
+3207980	3209780	But this pair is not actually a mergeable pair.
+3209780	3213480	It just becomes the first pair inside stats arbitrarily
+3213480	3216980	because all of these pairs evaluate to float inf
+3216980	3218720	for the merging criterion.
+3218720	3221320	So, basically, it could be that this doesn't succeed
+3221320	3222620	because there's no more merging pairs.
+3222620	3225780	So, if this pair is not in merges that was returned,
+3225780	3226320	then this is a failure.
+3226480	3228320	So, this signals for us that, actually,
+3228320	3229720	there was nothing to merge.
+3229720	3231720	No single pair can be merged anymore.
+3231720	3235480	In that case, we will break out.
+3235480	3239320	Nothing else can be merged.
+3239320	3240680	You might come up with a different implementation,
+3240680	3240980	by the way.
+3240980	3245480	This is kind of like really trying hard in Python.
+3245480	3247240	But really, we're just trying to find a pair
+3247240	3250720	that can be merged with a lowest index here.
+3250720	3255520	Now, if we did find a pair that is inside merges
+3255520	3255780	with the lowest index,
+3255780	3257680	then we can merge it.
+3257680	3262420	So, we're going to look into the mergers dictionary
+3262420	3265240	for that pair to look up the index,
+3265240	3268620	and we're going to now merge into that index.
+3268620	3270220	So, we're going to do tokens equals,
+3270220	3274440	and we're going to replace the original tokens.
+3274440	3276620	We're going to be replacing the pair pair,
+3276620	3279020	and we're going to be replacing it with index IDX.
+3279020	3281580	And this returns a new list of tokens
+3281580	3284440	where every occurrence of pair is replaced with IDX.
+3284440	3285620	So, we're doing a merge.
+3285780	3287540	And we're going to be continuing this
+3287540	3289320	until eventually nothing can be merged.
+3289320	3291280	We'll come out here and we'll break out.
+3291280	3294180	And here, we just return tokens.
+3294180	3296780	And so, that's the implementation, I think.
+3296780	3298140	So, hopefully, this runs.
+3298140	3300980	Okay, cool.
+3300980	3302880	Yeah, and this looks reasonable.
+3302880	3305520	So, for example, 32 is a space in ASCII.
+3305520	3308380	So, that's here.
+3308380	3309920	So, this looks like it worked.
+3309920	3310680	Great.
+3310680	3313440	Okay, so let's wrap up this section of the video, at least.
+3313440	3315680	I wanted to point out that this is not quite the right implementation.
+3315680	3318680	Just yet, because we are leaving out a special case.
+3318680	3321480	So, in particular, if we try to do this,
+3321480	3323180	this would give us an error.
+3323180	3326280	And the issue is that if we only have a single character
+3326280	3328880	or an empty string, then stats is empty.
+3328880	3330920	And that causes an issue inside min.
+3330920	3336080	So, one way to fight this is if len of tokens is at least two.
+3336080	3338720	Because if it's less than two, it's just a single token or no tokens,
+3338720	3340880	then let's just, there's nothing to merge.
+3340880	3342320	So, we just return.
+3342320	3345380	So, that would fix that case.
+3345380	3346280	Okay.
+3346280	3349880	And then second, I have a few test cases here for us as well.
+3349880	3355080	So, first, let's make sure about, or let's note the following.
+3355080	3358680	If we take a string and we try to encode it and then decode it back,
+3358680	3360980	you'd expect to get the same string back, right?
+3360980	3365580	Is that true for all strings?
+3365580	3367380	So, I think, so here it is the case.
+3367380	3371080	And I think in general, this is probably the case.
+3371080	3375180	But notice that going backwards is not, is not, you're not going to have an identity.
+3375380	3376280	Going backwards.
+3376280	3384380	Because as I mentioned, not all token sequences are valid UTF-8 sort of byte streams.
+3384380	3388480	And so, therefore, some of them can't even be decodable.
+3388480	3391080	So, this only goes in one direction.
+3391080	3393980	But for that one direction, we can check here.
+3393980	3397380	If we take the training text, which is the text that we trained the tokenizer on,
+3397380	3401680	we can make sure that when we encode and decode, we get the same thing back, which is true.
+3401680	3403280	And here I took some validation data.
+3403280	3405280	So, I went to, I think, this web page.
+3405280	3406880	And I grabbed some text.
+3406880	3409280	So, this is text that the tokenizer has not seen.
+3409280	3412580	And we can make sure that this also works.
+3412580	3415880	So, that gives us some confidence that this was correctly implemented.
+3415880	3419080	So, those are the basics of the byte pair encoding algorithm.
+3419080	3423580	We saw how we can take some training set, train a tokenizer.
+3423580	3427780	The parameters of this tokenizer really are just this dictionary of merges.
+3427780	3432480	And that basically creates the little binary forest on top of raw bytes.
+3432480	3434580	Once we have this, the merges table,
+3434580	3438780	we can both encode and decode between raw text and token sequences.
+3438780	3442180	So, that's the simplest setting of the tokenizer.
+3442180	3445180	What we're going to do now, though, is we're going to look at some of the state-of-the-art
+3445180	3448380	large language models and the kinds of tokenizers that they use.
+3448380	3450980	And we're going to see that this picture complexifies very quickly.
+3450980	3457080	So, we're going to go through the details of this complexification one at a time.
+3457080	3459880	So, let's kick things off by looking at the GPT series.
+3459880	3463180	So, in particular, I have the GPT-2 paper here.
+3463180	3467780	And this paper is from 2019 or so, so five years ago.
+3467780	3470980	And let's scroll down to input representation.
+3470980	3474880	This is where they talk about the tokenizer that they're using for GPT-2.
+3474880	3479680	Now, this is all fairly readable, so I encourage you to pause and read this yourself.
+3479680	3483680	But this is where they motivate the use of the byte pair encoding algorithm
+3483680	3488380	on the byte level representation of UTF-8 encoding.
+3488380	3492780	So, this is where they motivate it, and they talk about the vocabulary sizes and everything.
+3493180	3496080	Now, everything here is exactly as we've covered it so far,
+3496080	3498780	but things start to depart around here.
+3498780	3503580	So, what they mention is that they don't just apply the naive algorithm as we have done it.
+3503580	3506280	And in particular, here's a motivating example.
+3506280	3508480	Suppose that you have common words like dog.
+3508480	3512680	What will happen is that dog, of course, occurs very frequently in the text,
+3512680	3516180	and it occurs right next to all kinds of punctuation, as an example.
+3516180	3520880	So, dog dot, dog exclamation mark, dog question mark, et cetera.
+3520880	3522980	And naively, you might imagine that the BP algorithm
+3522980	3525580	could merge these to be single tokens.
+3525580	3528080	And then you end up with lots of tokens that are just like dog
+3528080	3530080	with a slightly different punctuation.
+3530080	3532480	And so, it feels like you're clustering things that shouldn't be clustered.
+3532480	3536480	You're combining kind of semantics with punctuation.
+3536480	3538780	And this feels suboptimal.
+3538780	3541480	And indeed, they also say that this is suboptimal,
+3541480	3543380	according to some of the experiments.
+3543380	3546280	So, what they want to do is they want to top-down, in a manual way,
+3546280	3552680	enforce that some types of characters should never be merged together.
+3552680	3554780	So, they want to enforce these merging rules
+3554780	3557680	on top of the byte pair encoding algorithm.
+3557680	3561480	So, let's take a look at their code and see how they actually enforce this
+3561480	3564280	and what kinds of mergers they actually do perform.
+3564280	3569480	So, I have the tab open here for GPT-2 under OpenAI on GitHub.
+3569480	3573980	And when we go to source, there is an encoder.py.
+3573980	3576280	Now, I don't personally love that they call it encoder.py
+3576280	3578080	because this is the tokenizer.
+3578080	3581080	And the tokenizer can do both encode and decode.
+3581080	3582580	So, it feels kind of awkward to me that it's called that.
+3582680	3585780	It's called encoder, but that is the tokenizer.
+3585780	3586880	And there's a lot going on here,
+3586880	3589580	and we're going to step through it in detail at one point.
+3589580	3593380	For now, I just want to focus on this part here.
+3593380	3596480	They create a regex pattern here that looks very complicated,
+3596480	3598880	and we're going to go through it in a bit.
+3598880	3602880	But this is the core part that allows them to enforce rules
+3602880	3607280	for what parts of the text will never be merged for sure.
+3607280	3609880	Now, notice that re.compile here is a little bit misleading
+3609880	3612380	because we're not just doing import re,
+3612380	3615680	we're doing import regex as re,
+3615680	3618780	and regex is a Python package that you can install,
+3618780	3621780	pip install regex, and it's basically an extension of re,
+3621780	3626080	so it's a bit more powerful re.
+3626080	3629680	So, let's take a look at this pattern and what it's doing
+3629680	3632280	and why this is actually doing the separation
+3632280	3633880	that they are looking for.
+3633880	3635780	Okay, so I've copy pasted the pattern here
+3635780	3638280	to our Jupyter notebook where we left off,
+3638280	3640680	and let's take this pattern for a spin.
+3640680	3642180	So, in the exact same way that
+3642380	3645780	Jupyter code does, we're going to call an re.findall
+3645780	3648180	for this pattern on any arbitrary string
+3648180	3649480	that we are interested in.
+3649480	3653680	So, this is the string that we want to encode into tokens
+3653680	3656880	to feed into an LLM like GPT-2.
+3656880	3659080	So, what exactly is this doing?
+3659080	3661080	Well, re.findall will take this pattern
+3661080	3664980	and try to match it against this string.
+3664980	3667780	The way this works is that you are going from left to right
+3667780	3671380	in the string, and you're trying to match the pattern.
+3671380	3672280	And re.fall,
+3672380	3675080	re.findall will get all the occurrences
+3675080	3677380	and organize them into a list.
+3677380	3680480	Now, when you look at this pattern,
+3680480	3683880	first of all, notice that this is a raw string,
+3683880	3686180	and then these are three double quotes
+3686180	3687780	just to start the string.
+3687780	3689380	So, really, the string itself,
+3689380	3692380	this is the pattern itself, right?
+3692380	3695280	And notice that it's made up of a lot of ors.
+3695280	3696480	So, see these vertical bars?
+3696480	3699380	Those are ors in regex.
+3699380	3701380	And so, you go from left to right in this pattern
+3701380	3704480	and try to match it against the string wherever you are.
+3704480	3707980	So, we have hello, and we're going to try to match it.
+3707980	3709480	Well, it's not apostrophe s.
+3709480	3712480	It's not apostrophe t or any of these,
+3712480	3717180	but it is an optional space followed by dash p of,
+3717180	3720280	sorry, slash p of l one or more times.
+3720280	3721880	What is slash p of l?
+3721880	3726880	It is coming to some documentation that I found.
+3726880	3729180	There might be other sources as well.
+3729180	3731180	Slash p of l is a letter.
+3731180	3733680	Any kind of letter from any language.
+3733680	3736080	And hello is made up of letters.
+3736080	3738380	H-E-L-L-O, et cetera.
+3738380	3741480	So, optional space followed by a bunch of letters,
+3741480	3744780	one or more letters, is going to match hello,
+3744780	3748780	but then the match ends because a white space is not a letter.
+3748780	3753280	So, from there on begins a new sort of attempt
+3753280	3755880	to match against the string again.
+3755880	3759180	And starting in here, we're going to skip over all of these again
+3759180	3760980	until we get to the exact same point again.
+3761180	3763580	And we see that there's an optional space.
+3763580	3766180	This is the optional space followed by a bunch of letters,
+3766180	3767180	one or more of them.
+3767180	3768680	And so, that matches.
+3768680	3773080	So, when we run this, we get a list of two elements, hello,
+3773080	3775680	and then space world.
+3775680	3778880	So, how are you if we add more letters?
+3778880	3781180	We would just get them like this.
+3781180	3783680	Now, what is this doing and why is this important?
+3783680	3788380	We are taking our string and instead of directly encoding it
+3788380	3791080	for tokenization, we are first splitting it.
+3791180	3793980	And when you actually step through the code,
+3793980	3796180	and we'll do that in a bit more detail,
+3796180	3800680	what really it's doing on a high level is that it first splits your text
+3800680	3804480	into a list of texts, just like this one.
+3804480	3807480	And all these elements of this list are processed independently
+3807480	3809080	by the tokenizer.
+3809080	3813080	And all of the results of that processing are simply concatenated.
+3813080	3815180	So, hello, world.
+3815180	3817480	Oh, I missed how.
+3817480	3819380	Hello, world, how are you?
+3819380	3821180	We have five elements of a list.
+3821180	3828080	All of these will independently go from text to a token sequence.
+3828080	3830580	And then that token sequence is going to be concatenated.
+3830580	3832680	It's all going to be joined up.
+3832680	3837380	And roughly speaking, what that does is you're only ever finding merges
+3837380	3839280	between the elements of this list.
+3839280	3841480	So, you can only ever consider merges within every one
+3841480	3844080	of these elements individually.
+3844080	3847880	And after you've done all the possible merging for all
+3847880	3850180	of these elements individually, the results of all
+3850180	3851080	that will be joined up.
+3851180	3859180	So, basically, what you're doing effectively is you are never going
+3859180	3863480	to be merging this E with this space because they are now parts
+3863480	3865880	of the separate elements of this list.
+3865880	3871080	And so, you are saying we are never going to merge E space
+3871080	3873580	because we're breaking it up in this way.
+3873580	3876580	So, basically, using this regex pattern to chunk
+3876580	3881080	up the text is just one way of enforcing that some merges
+3881180	3882380	are not to happen.
+3882380	3884980	And we're going to go into more of this text and we'll see
+3884980	3887180	that what this is trying to do on a high level is we're trying
+3887180	3890180	to not merge across letters, across numbers,
+3890180	3892680	across punctuation, and so on.
+3892680	3894480	So, let's see in more detail how that works.
+3894480	3895880	So, let's continue now.
+3895880	3899680	We have slash P of N. If you go to the documentation,
+3899680	3904380	slash P of N is any kind of numeric character in any script.
+3904380	3905880	So, it's numbers.
+3905880	3907880	So, we have an optional space followed by numbers
+3907880	3909680	and those would be separated out.
+3909680	3911180	So, letters and numbers are being separated out.
+3911180	3914980	So, if I do hello world, one, two, three, how are you?
+3914980	3919580	Then world will stop matching here because one is not a letter anymore.
+3919580	3922480	But one is a number, so this group will match for that
+3922480	3926780	and we'll get it as a separate entity.
+3926780	3928380	Let's see how these apostrophes work.
+3928380	3936680	So, here, if we have slash V or, I mean, apostrophe V as an example,
+3936680	3940580	then apostrophe here is not a letter or a number.
+3940580	3945880	So, hello will stop matching and then we will exactly match this with that.
+3945880	3949180	So, that will come out as a separate thing.
+3949180	3951580	So, why are they doing the apostrophes here?
+3951580	3954780	Honestly, I think that these are just like very common apostrophes
+3954780	3957980	that are used typically.
+3957980	3959580	I don't love that they've done this
+3959580	3966380	because let me show you what happens when you have some Unicode apostrophes.
+3966380	3970080	Like, for example, you can have, if you have house,
+3970080	3973080	then this will be separated out because of this matching.
+3973080	3977180	But if you use the Unicode apostrophe like this,
+3977180	3979880	then suddenly this does not work.
+3979880	3983680	And so, this apostrophe will actually become its own thing now.
+3983680	3988180	And so, it's basically hard-coded for this specific kind of apostrophe
+3988180	3993180	and otherwise they become completely separate tokens.
+3993180	3997580	In addition to this, you can go to the GPT-2 docs
+3997580	3999880	and here when they define the pattern, they say,
+4000080	4002280	should have added re.ignorecase.
+4002280	4005580	So, BP merges can happen for capitalized versions of contractions.
+4005580	4008480	So, what they're pointing out is that you see how this is apostrophe
+4008480	4010780	and then lowercase letters.
+4010780	4013880	Well, because they didn't do re.ignorecase,
+4013880	4019880	then these rules will not separate out the apostrophes if it's uppercase.
+4019880	4024780	So, house would be like this.
+4024780	4029880	But if I did house from uppercase, then notice,
+4030080	4033280	suddenly the apostrophe comes by itself.
+4033280	4037480	So, the tokenization will work differently in uppercase and lowercase,
+4037480	4039880	inconsistently separating out these apostrophes.
+4039880	4043880	So, it feels extremely gnarly and slightly gross.
+4043880	4045780	But that's how that works.
+4045780	4047280	Okay, so let's come back.
+4047280	4049880	After trying to match a bunch of apostrophe expressions,
+4049880	4053280	by the way, the other issue here is that these are quite language-specific probably.
+4053280	4057080	So, I don't know that all the languages, for example, use or don't use apostrophes,
+4057080	4059880	but that would be inconsistently tokenized as a result.
+4060080	4064280	Well, then we try to match letters, then we try to match numbers,
+4064280	4067480	and then if that doesn't work, we fall back to here.
+4067480	4071280	And what this is saying is, again, optional space followed by something that is not a letter,
+4071280	4075080	number, or a space, and one or more of that.
+4075080	4078280	So, what this is doing effectively is this is trying to match punctuation,
+4078280	4081080	roughly speaking, not letters and not numbers.
+4081080	4083280	So, this group will try to trigger for that.
+4083280	4089480	So, if I do something like this, then these parts here are not letters or numbers,
+4089480	4093480	but they will actually get caught here.
+4093480	4095680	And so, they become its own group.
+4095680	4098380	So, we've separated out the punctuation.
+4098380	4101580	And finally, this is also a little bit confusing.
+4101580	4104080	So, this is matching whitespace,
+4104080	4108980	but this is using a negative look-ahead assertion in regex.
+4108980	4112080	So, what this is doing is it's matching whitespace up to,
+4112080	4115980	but not including the last whitespace character.
+4115980	4119380	Why is this important? This is pretty subtle, I think.
+4119380	4123380	So, you see how the whitespace is always included at the beginning of the word.
+4123380	4127280	So, space R, space U, et cetera.
+4127280	4130480	Suppose we have a lot of spaces here.
+4130480	4133680	What's going to happen here is that these spaces up to
+4133680	4137980	and not including the last character will get caught by this.
+4137980	4141480	And what that will do is it will separate out the spaces up to,
+4141480	4143280	but not including the last character,
+4143280	4148580	so that the last character can come here and join with the space U.
+4148580	4152580	And the reason that's nice is because space U is the common token.
+4152580	4156480	So, if I didn't have these extra spaces here, we just have space U.
+4156480	4160680	And if I add tokens, if I add spaces, we still have a space U,
+4160680	4163080	but now we have all this extra whitespace.
+4163080	4167780	So, basically, the GPT-2 tokenizer really likes to have space letters or numbers,
+4167780	4170280	and it prepends these spaces.
+4170280	4172980	And this is just something that it is consistent about.
+4172980	4174380	So, that's what that is for.
+4174380	4178380	And then, finally, we have all the last fallback is whitespace.
+4178580	4185980	So, that would be just if that doesn't get caught,
+4185980	4189980	then this thing will catch any trailing spaces and so on.
+4189980	4192680	I wanted to show one more real-world example here.
+4192680	4195280	So, if we have this string, which is a piece of Python code,
+4195280	4199480	and then we try to split it up, then this is the kind of output we get.
+4199480	4201480	So, you'll notice that the list has many elements here,
+4201480	4208480	and that's because we are splitting up fairly often every time sort of a category changes.
+4208480	4211880	So, there will never be any mergers within these elements.
+4211880	4214780	And that's what you are seeing here.
+4214780	4218980	Now, you might think that in order to train the tokenizer,
+4218980	4223180	OpenAI has used this to split up text into chunks
+4223180	4226780	and then run just a BP algorithm within all the chunks.
+4226780	4228580	But that is not exactly what happened.
+4228580	4230380	And the reason is the following.
+4230380	4233280	Notice that we have the spaces here.
+4233280	4236380	Those spaces end up being entire elements,
+4238480	4240880	and they end up being merged by OpenAI.
+4240880	4246880	And the way you can tell is that if you copy-paste the exact same chunk here into a tick tokenizer,
+4246880	4251880	you see that all the spaces are kept independent, and they are all token 220.
+4251880	4257880	So, I think OpenAI at some point enforced some rule that these spaces would never be merged.
+4257880	4265880	And so, there are some additional rules on top of just chunking and BPE that OpenAI is not clear about.
+4265880	4267880	Now, the training code for the GPT-2 tokenizer was never released.
+4267880	4268380	Now, the training code for the GPT-2 tokenizer was never released.
+4268380	4272180	So, all we have is the code that I've already shown you.
+4272180	4277180	But this code here that they've released is only the inference code for the tokens.
+4277180	4278480	So, this is not the training code.
+4278480	4281480	You can't give it a piece of text and train the tokenizer.
+4281480	4286180	This is just the inference code which takes the merges that we have up above
+4286180	4289180	and applies them to a new piece of text.
+4289180	4292880	And so, we don't know exactly how OpenAI trained the tokenizer,
+4292880	4297780	but it wasn't as simple as chunk it up and BPE it, whatever it was.
+4297780	4301780	Next, I wanted to introduce you to the tiktokin library from OpenAI,
+4301780	4305780	which is the official library for tokenization from OpenAI.
+4305780	4313780	So, this is tiktokin, pip install tiktokin, and then you can do the tokenization inference.
+4313780	4315780	This is, again, not training code.
+4315780	4317780	This is only inference code for tokenization.
+4317780	4320780	I wanted to show you how you would use it.
+4320780	4321780	Quite simple.
+4321780	4325780	And running this just gives us the GPT-2 tokens or the GPT-4 tokens.
+4325780	4326780	So, this is the tokenizer you're using.
+4327780	4329780	This is the tokenizer you're using for GPT-4.
+4329780	4333780	And so, in particular, we see that the whitespace in GPT-2 remains unmerged,
+4333780	4338780	but in GPT-4, these whitespaces merge, as we also saw in this one,
+4338780	4346780	where here they're all unmerged, but if we go down to GPT-4, they become merged.
+4346780	4354780	Now, in the GPT-4 tokenizer, they changed the regular expression that they use to chunk up text.
+4354780	4357780	So, the way to see this is that if you come to the tiktokin library,
+4357780	4363780	and then you go to this file, tiktokin.ext.openai.public,
+4363780	4368780	this is where sort of like the definition of all these different tokenizers that OpenAI maintains is.
+4368780	4373780	And so, necessarily to do the inference, they had to publish some of the details about the strings.
+4373780	4376780	So, this is the string that we already saw for GPT-2.
+4376780	4381780	It is slightly different, but it is actually equivalent to what we discussed here.
+4381780	4385780	So, this pattern that we discussed is equivalent to this pattern.
+4385780	4387780	This one just executes a little bit faster.
+4387780	4391780	So, here you see a little bit of a slightly different definition, but otherwise it's the same.
+4391780	4394780	We're going to go into special tokens in a bit.
+4394780	4399780	And then if you scroll down to CL100K, this is the GPT-4 tokenizer,
+4399780	4402780	you see that the pattern has changed.
+4402780	4407780	And this is kind of like the major change in addition to a bunch of other special tokens,
+4407780	4409780	which we'll go into a bit again.
+4409780	4413780	Now, I'm not going to actually go into the full detail of the pattern change,
+4413780	4415780	because honestly, this isn't mind-numbing.
+4415780	4417780	I would just advise that you pull out your GPT-4 tokenizer,
+4417780	4421780	pull out ChatGPT and the regex documentation, and just step through it.
+4421780	4426780	But really, the major changes are, number one, you see this I here?
+4426780	4432780	That means that the case sensitivity, this is case insensitive match.
+4432780	4437780	And so, the comment that we saw earlier on, oh, we should have used re.uppercase,
+4437780	4445780	basically, we're now going to be matching these apostrophe s, apostrophe d, apostrophe m, etc.
+4445780	4447780	We're going to be matching them both in lowercase.
+4447780	4448780	And in uppercase.
+4448780	4450780	So, that's fixed.
+4450780	4452780	There's a bunch of different, like, handling of the white space
+4452780	4454780	that I'm not going to go into the full details of.
+4454780	4459780	And then, one more thing here is you will notice that when they match the numbers,
+4459780	4462780	they only match one to three numbers.
+4462780	4469780	So, they will never merge numbers that are in more than three digits.
+4469780	4473780	Only up to three digits of numbers will ever be merged.
+4473780	4475780	And that's one change that they made as well,
+4475780	4477780	to prevent tokens,
+4477780	4480780	that are very, very long number sequences.
+4480780	4483780	But again, we don't really know why they do any of this stuff
+4483780	4485780	because none of this is documented.
+4485780	4487780	And it's just, we just get the pattern.
+4487780	4490780	So, yeah, it is what it is.
+4490780	4493780	But those are some of the changes that GPT-4 has made.
+4493780	4498780	And of course, the vocabulary size went from roughly 50k to roughly 100k.
+4498780	4500780	The next thing I would like to do very briefly
+4500780	4505780	is to take you through the GPT-2 encoder.py that OpenAI has released.
+4505780	4506780	This is the file.
+4506780	4508780	They already mentioned to you briefly.
+4508780	4511780	Now, this file is fairly short
+4511780	4514780	and should be relatively understandable to you at this point.
+4514780	4517780	Starting at the bottom here,
+4517780	4520780	they are loading two files,
+4520780	4522780	encoder.json and vocab.bpe.
+4522780	4524780	And they do some light processing on it
+4524780	4527780	and then they call this encoder object, which is the tokenizer.
+4527780	4530780	Now, if you'd like to inspect these two files,
+4530780	4533780	which together constitute their saved tokenizer,
+4533780	4535780	then you can do that with a piece of code like this.
+4536780	4539780	This is where you can download these two files
+4539780	4541780	and you can inspect them if you'd like.
+4541780	4543780	And what you will find is that this encoder,
+4543780	4545780	as they call it in their code,
+4545780	4547780	is exactly equivalent to our vocab.
+4547780	4552780	So remember here where we have this vocab object,
+4552780	4554780	which allowed us to decode very efficiently
+4554780	4560780	and basically it took us from the integer to the bytes for that integer.
+4560780	4564780	So our vocab is exactly their encoder.
+4564780	4566780	And then their vocab.bpe,
+4566780	4568780	confusingly,
+4568780	4570780	is actually our merges.
+4570780	4572780	So their bpe merges,
+4572780	4575780	which is based on the data inside vocab.bpe,
+4575780	4578780	ends up being equivalent to our merges.
+4578780	4582780	So basically they are saving and loading
+4582780	4585780	the two variables that for us are also critical,
+4585780	4588780	the merges variable and the vocab variable.
+4588780	4590780	Using just these two variables,
+4590780	4592780	you can represent a tokenizer
+4592780	4594780	and you can both do encoding and decoding
+4594780	4596780	once you've trained this tokenizer.
+4596780	4600780	Now the only thing that is actually slightly confusing
+4600780	4602780	inside what OpenAI does here
+4602780	4605780	is that in addition to this encoder and the decoder,
+4605780	4607780	they also have something called a byte encoder
+4607780	4609780	and a byte decoder.
+4609780	4611780	And this is actually, unfortunately,
+4611780	4615780	just kind of a spurious implementation detail.
+4615780	4617780	It isn't actually deep or interesting in any way,
+4617780	4619780	so I'm going to skip the discussion of it.
+4619780	4620780	But what OpenAI does here,
+4620780	4622780	for reasons that I don't fully understand,
+4622780	4624780	is that not only have they this tokenizer,
+4624780	4626780	which can encode and decode,
+4626780	4629780	but they have a whole separate layer here in addition
+4629780	4631780	that is used serially with the tokenizer.
+4631780	4635780	And so you first do byte encode and then encode,
+4635780	4638780	and then you do decode and then byte decode.
+4638780	4639780	So that's the loop,
+4639780	4642780	and they are just stacked serial on top of each other.
+4642780	4644780	And it's not that interesting, so I won't cover it,
+4644780	4646780	and you can step through it if you'd like.
+4646780	4647780	Otherwise, this file,
+4647780	4650780	if you ignore the byte encoder and the byte decoder,
+4650780	4652780	will be algorithmically very familiar with you.
+4652780	4654780	And the meat of it here is the,
+4654780	4656780	what they call BPE function,
+4656780	4659780	and you should recognize this loop here,
+4659780	4661780	which is very similar to our own while loop,
+4661780	4664780	where they're trying to identify the bigram,
+4664780	4665780	a pair,
+4665780	4667780	that they should be merging next.
+4667780	4669780	And then here, just like we had,
+4669780	4671780	they have a for loop trying to merge this pair.
+4671780	4673780	So they will go over all of the sequence
+4673780	4676780	and they will merge the pair whenever they find it.
+4676780	4678780	And they keep repeating that
+4678780	4681780	until they run out of possible merges in the text.
+4681780	4683780	So that's the meat of this file,
+4683780	4685780	and there's an encode and decode function,
+4685780	4687780	just like we have implemented it.
+4687780	4688780	So long story short,
+4688780	4690780	what I want you to take away at this point is that,
+4690780	4692780	unfortunately, it's a little bit of a messy code that they have,
+4692780	4694780	but algorithmically it is identical
+4694780	4696780	to what we've built up above.
+4696780	4698780	And what we've built up above, if you understand it,
+4698780	4700780	is algorithmically what is necessary
+4700780	4703780	to actually build a BPE tokenizer,
+4703780	4706780	train it, and then both encode and decode.
+4706780	4707780	The next topic I would like to turn to
+4707780	4709780	is that of special tokens.
+4709780	4711780	So in addition to tokens that are coming from,
+4711780	4714780	you know, raw bytes and the BPE merges,
+4714780	4717780	we can insert all kinds of tokens that we are going to use
+4717780	4719780	to delimit different parts of the data
+4719780	4721780	or introduce to create a special structure
+4721780	4724780	of the token streams.
+4724780	4727780	So if you look at this encoder object
+4727780	4730780	from OpenAI's GPT-2 right here,
+4730780	4732780	we mentioned this is very similar to our vocab.
+4732780	4739780	You'll notice that the length of this is 50,257.
+4739780	4741780	As I mentioned, it's mapping,
+4741780	4743780	and it's inverted from the mapping of our vocab.
+4743780	4746780	Our vocab goes from integer to string,
+4746780	4750780	and they go the other way around for no amazing reason.
+4750780	4752780	But the thing to note here is that
+4752780	4755780	the mapping table here is 50,257.
+4755780	4757780	Where does that number come from?
+4757780	4759780	Where are the tokens?
+4759780	4764780	As I mentioned, there are 256 raw byte tokens.
+4764780	4768780	And then OpenAI actually did 50,000 merges.
+4768780	4771780	So those become the other tokens.
+4771780	4773780	But this would have been 50,257.
+4773780	4776780	So what is the 57th token?
+4776780	4780780	And there is basically one special token.
+4780780	4782780	And that one special token,
+4782780	4785780	you can see, is called end of text.
+4785780	4787780	So this is a special token,
+4787780	4789780	and it's the very last token.
+4789780	4792780	And this token is used to delimit documents
+4792780	4794780	in the training set.
+4794780	4796780	So when we're creating the training data,
+4796780	4797780	we have all these documents,
+4797780	4798780	and we tokenize them,
+4798780	4800780	and we get a stream of tokens.
+4800780	4802780	Those tokens only range from 0
+4802780	4805780	to 50,256.
+4805780	4807780	And then in between those documents,
+4807780	4810780	we put special end of text token.
+4810780	4813780	And we insert that token in between documents.
+4813780	4817780	And we are using this as a signal to the language model
+4817780	4819780	that the document has ended,
+4819780	4821780	and what follows is going to be unrelated
+4821780	4823780	to the document previously.
+4823780	4826780	That said, the language model has to learn this from data.
+4826780	4829780	It needs to learn that this token usually means
+4829780	4831780	that it should wipe its sort of memory
+4831780	4832780	of what came before,
+4832780	4834780	and what came before this token
+4834780	4836780	is not actually informative to what comes next.
+4836780	4838780	But we are expecting the language model
+4838780	4839780	to just like learn this,
+4839780	4841780	but we're giving it the special sort of delimiter
+4841780	4843780	of these documents.
+4843780	4845780	We can go here to tiktokenizer,
+4845780	4848780	and this is the GPT to tokenizer,
+4848780	4850780	our code that we've been playing with before.
+4850780	4851780	So we can add here, right?
+4851780	4853780	Hello world, how are you?
+4853780	4855780	And we're getting different tokens.
+4855780	4857780	But now you can see what happens
+4857780	4859780	if I put end of text.
+4859780	4860780	You see how,
+4860780	4862780	until I finished it,
+4862780	4864780	these are all different tokens.
+4864780	4866780	End of text,
+4866780	4868780	still tokens,
+4868780	4869780	and now when I finish it,
+4869780	4873780	suddenly we get token 50,256.
+4873780	4876780	And the reason this works is because
+4876780	4879780	this didn't actually go through the BPE merges.
+4879780	4883780	Instead, the code that actually outputs the tokens
+4883780	4885780	has special case instructions
+4885780	4888780	for handling special tokens.
+4888780	4890780	We did not see these special instructions
+4890780	4893780	for handling special tokens in the encoder.py.
+4893780	4895780	It's absent there.
+4895780	4897780	But if you go to tiktoken library,
+4897780	4899780	which is implemented in Rust,
+4899780	4901780	you will find all kinds of special case handling
+4901780	4903780	for these special tokens
+4903780	4905780	that you can register, create,
+4905780	4907780	add to the vocabulary,
+4907780	4908780	and then it looks for them.
+4908780	4911780	And whenever it sees these special tokens like this,
+4911780	4914780	it will actually come in and swap in that special token.
+4914780	4917780	So these things are outside of the typical algorithm
+4917780	4919780	of byte pairing coding.
+4919780	4922780	So these special tokens are used pervasively,
+4922780	4925780	not just in basically base language modeling
+4925780	4927780	of predicting the next token in the sequence,
+4927780	4929780	but especially when it gets to later
+4929780	4930780	to the fine-tuning stage
+4930780	4933780	and all of the chat GPT sort of aspects of it,
+4933780	4935780	because we don't just want to delimit documents,
+4935780	4937780	we want to delimit entire conversations
+4937780	4939780	between an assistant and a user.
+4939780	4942780	So if I refresh this tiktokenizer page,
+4942780	4944780	the default example that they have here
+4944780	4948780	is using not sort of base model encoders,
+4948780	4952780	but fine-tuned model sort of tokenizers.
+4952780	4955780	So for example, using the GPT 3.5 Turbo scheme,
+4955780	4958780	these here are all special tokens,
+4958780	4961780	IAM start, IAM end, et cetera.
+4961780	4964780	This is short for imaginary model log
+4964780	4966780	underscore start, by the way.
+4966780	4969780	But you can see here that there's a sort of start
+4969780	4971780	and end of every single message,
+4971780	4973780	and there can be many other tokens,
+4973780	4977780	lots of tokens in use to delimit these conversations
+4977780	4981780	and kind of keep track of the flow of the messages here.
+4981780	4984780	Now we can go back to the tiktoken library,
+4984780	4986780	and here when you scroll to the bottom,
+4986780	4989780	they talk about how you can extend tiktoken,
+4989780	4992780	and you can create, basically you can fork
+4992780	4996780	the CL100K base tokenizer used in GPT-4,
+4996780	4998780	and for example, you can extend it
+4998780	4999780	by adding more special tokens,
+4999780	5000780	and these are totally up to you.
+5000780	5002780	You can come up with any arbitrary tokens
+5002780	5005780	and add them with the new ID afterwards,
+5005780	5007780	and the tiktoken library will correct
+5007780	5009780	or directly swap them out
+5009780	5012780	when it sees this in the strings.
+5012780	5014780	Now we can also go back to this file,
+5014780	5016780	which we looked at previously,
+5016780	5019780	and I mentioned that the GPT-2 in tiktoken,
+5019780	5021780	opening in public.py,
+5021780	5023780	we have the vocabulary,
+5023780	5025780	we have the pattern for splitting,
+5025780	5026780	and then here we are registering
+5026780	5028780	the single special token in GPT-2,
+5028780	5030780	which was the end of text token,
+5030780	5032780	and we saw that it has this ID.
+5032780	5035780	In GPT-4, when they defined this here,
+5035780	5037780	you see that the pattern has changed
+5037780	5038780	as we've discussed,
+5038780	5040780	but also the special tokens have changed
+5040780	5041780	in this tokenizer.
+5041780	5043780	So we of course have the end of text,
+5043780	5044780	just like in GPT-2,
+5044780	5046780	but we also see three,
+5046780	5048780	sorry, four additional tokens here,
+5048780	5050780	thim prefix, middle, and suffix.
+5050780	5051780	What is thim?
+5051780	5054780	Thim is short for fill in the middle,
+5054780	5056780	and if you'd like to learn more about this idea,
+5056780	5059780	it comes from this paper,
+5059780	5061780	and I'm not going to go into detail in this video,
+5061780	5062780	it's beyond this video,
+5062780	5064780	and then there's one additional
+5064780	5066780	sort of token here.
+5066780	5068780	So that's that encoding as well.
+5068780	5070780	So it's very common, basically,
+5070780	5072780	to train a language model,
+5072780	5074780	and then if you'd like,
+5074780	5076780	you can add special tokens.
+5076780	5078780	Now, when you add special tokens,
+5078780	5080780	you of course have to do some model surgery
+5080780	5082780	to the transformer
+5082780	5084780	and all the parameters involved in that transformer,
+5084780	5086780	because you are basically adding an integer,
+5086780	5087780	and you want to make sure that,
+5087780	5089780	for example, your embedding matrix
+5089780	5091780	for the vocabulary tokens
+5091780	5093780	has to be extended by adding a row,
+5093780	5095780	and typically this row would be initialized
+5095780	5097780	with small random numbers or something like that,
+5097780	5099780	because we need to have a vector
+5099780	5101780	that now stands for that token.
+5101780	5102780	In addition to that,
+5102780	5104780	you have to go to the final layer of the transformer,
+5104780	5106780	and you have to make sure that that projection
+5106780	5108780	at the very end into the classifier
+5108780	5110780	is extended by one as well.
+5110780	5112780	So basically there's some model surgery involved
+5112780	5115780	that you have to couple with the tokenization changes
+5115780	5118780	if you are going to add special tokens.
+5118780	5120780	But this is a very common operation that people do,
+5120780	5122780	especially if they'd like to fine-tune the model,
+5122780	5124780	for example, taking it from a base model
+5124780	5128780	to a chat model like ChatGPT.
+5128780	5129780	Okay, so at this point,
+5129780	5130780	you should have everything you need
+5130780	5132780	in order to build your own GPT-4 tokenizer.
+5132780	5134780	Now, in the process of developing this lecture,
+5134780	5135780	I've done that,
+5135780	5139780	and I've published the code under this repository minBPE.
+5139780	5142780	So minBPE looks like this right now as I'm recording,
+5142780	5145780	but the minBPE repository will probably change quite a bit
+5145780	5149780	because I intend to continue working on it.
+5149780	5151780	In addition to the minBPE repository,
+5151780	5153780	I've published this exercise progression
+5153780	5154780	that you can follow.
+5154780	5156780	So if you go to exercise.md here,
+5156780	5160780	this is sort of me breaking up the task ahead of you
+5160780	5163780	into four steps that sort of build up
+5163780	5165780	to what can be a GPT-4 tokenizer.
+5165780	5168780	And so feel free to follow these steps exactly
+5168780	5170780	and follow a little bit of the guidance
+5170780	5171780	that I've laid out here.
+5171780	5173780	And anytime you feel stuck,
+5173780	5176780	just reference the minBPE repository here.
+5176780	5178780	So either the tests could be useful
+5178780	5180780	or the minBPE repository itself.
+5180780	5182780	I try to keep the code fairly clean
+5182780	5184780	and understandable.
+5184780	5189780	And so feel free to reference it whenever you get stuck.
+5189780	5191780	In addition to that, basically,
+5191780	5193780	once you write it,
+5193780	5196780	you should be able to reproduce this behavior from Tiktoken.
+5196780	5198780	So getting the GPT-4 tokenizer,
+5198780	5200780	you can encode this string
+5200780	5202780	and you should get these tokens.
+5202780	5203780	And then you can encode and decode
+5203780	5205780	the exact same string to recover it.
+5205780	5206780	And in addition to all that,
+5206780	5209780	you should be able to implement your own train function,
+5209780	5211780	which Tiktoken library does not provide.
+5211780	5213780	It's, again, only inference code.
+5213780	5215780	But you could write your own train.
+5215780	5217780	minBPE does it as well.
+5217780	5221780	And that will allow you to train your own token vocabularies.
+5221780	5223780	So here's some of the code inside minBPE,
+5223780	5226780	minBPE shows the token vocabularies
+5226780	5228780	that you might obtain.
+5228780	5230780	So on the left here,
+5230780	5232780	we have the GPT-4 merges.
+5232780	5236780	So the first 256 are raw individual bytes.
+5236780	5238780	And then here I am visualizing the merges
+5238780	5240780	that GPT-4 performed during its training.
+5240780	5243780	So the very first merge that GPT-4 did
+5243780	5246780	was merge two spaces into a single token
+5246780	5248780	for, you know, two spaces.
+5248780	5250780	And that is the token 256.
+5250780	5252780	And so this is the order in which things merged
+5252780	5253780	during GPT-4 training.
+5253780	5255780	And this is the merge order
+5255780	5258780	that we obtain in minBPE
+5258780	5260780	by training a tokenizer.
+5260780	5261780	And in this case, I trained it
+5261780	5263780	on a Wikipedia page of Taylor Swift.
+5263780	5265780	Not because I'm a Swifty,
+5265780	5267780	but because that is one of the longest
+5267780	5269780	Wikipedia pages apparently that's available.
+5269780	5271780	But she is pretty cool.
+5271780	5275780	And what was I going to say?
+5275780	5278780	Yeah, so you can compare these two vocabularies.
+5278780	5282780	And so as an example,
+5282780	5285780	here GPT-4 merged IN to become IN.
+5285780	5287780	And we've done the exact same thing
+5287780	5289780	on this token, 259.
+5289780	5291780	Here, space T becomes space T.
+5291780	5294780	And that happened for us a little bit later as well.
+5294780	5296780	So the difference here is, again,
+5296780	5297780	to my understanding,
+5297780	5299780	only a difference of the training set.
+5299780	5301780	As an example, because I see a lot of white space,
+5301780	5303780	I expect that GPT-4 probably had a lot of Python code
+5303780	5305780	in its training set, I'm not sure,
+5305780	5307780	for the tokenizer.
+5307780	5309780	And here we see much less of that,
+5309780	5312780	of course, in the Wikipedia page.
+5312780	5314780	So roughly speaking, they look the same.
+5314780	5315780	And they look the same because they're
+5315780	5316780	running the same algorithm.
+5316780	5318780	And when you train your own,
+5318780	5320780	you're probably going to get something similar
+5320780	5321780	depending on what you train it on.
+5321780	5323780	Okay, so we are now going to move on
+5323780	5324780	from TickToken
+5324780	5326780	and the way that OpenAI tokenizes its strings.
+5326780	5328780	And we're going to discuss one more
+5328780	5329780	very commonly used library
+5329780	5331780	for working with tokenization in LLMs,
+5331780	5333780	and that is SentencePiece.
+5333780	5336780	So SentencePiece is very commonly used
+5336780	5339780	in language models because unlike TickToken,
+5339780	5341780	it can do both training and inference
+5341780	5343780	and is quite efficient at both.
+5343780	5345780	It supports a number of algorithms
+5345780	5347780	for training vocabularies,
+5347780	5349780	but one of them is the byte pairing coding algorithm
+5349780	5350780	that we've been looking at.
+5350780	5352780	So it supports it.
+5352780	5354780	Now, SentencePiece is used both by Lama
+5354780	5357780	and Mistral series and many other models as well.
+5357780	5361780	It is on GitHub under Google slash SentencePiece.
+5361780	5363780	And the big difference with SentencePiece,
+5363780	5365780	and we're going to look at example
+5365780	5368780	because this is kind of hard and subtle to explain,
+5368780	5370780	is that they think different
+5370780	5373780	about the order of operations here.
+5373780	5375780	So in the case of TickToken,
+5375780	5379780	we first take our code points in a string.
+5379780	5381780	We encode them using UTF-82 bytes
+5381780	5383780	and then we're merging bytes.
+5383780	5385780	It's fairly straightforward.
+5385780	5386780	For SentencePiece,
+5386780	5388780	it works directly on the level
+5388780	5390780	of the code points themselves.
+5390780	5392780	So it looks at whatever code points
+5392780	5394780	are available in your training set
+5394780	5396780	and then it starts merging those code points.
+5396780	5401780	And the BPE is running on the level of code points.
+5401780	5404780	And if you happen to run out of code points,
+5404780	5406780	so there are maybe some rare code points
+5406780	5407780	that just don't come up too often
+5407780	5408780	and the rarity is determined
+5408780	5411780	by this character coverage hyperparameter,
+5411780	5414780	then these code points will either get maps
+5414780	5416780	to a special unknown token,
+5416780	5417780	like Ankh,
+5417780	5420780	or if you have the byte fallback option turned on,
+5420780	5423780	then that will take those rare code points,
+5423780	5425780	it will encode them using UTF-8,
+5425780	5427780	and then the individual bytes of that encoding
+5427780	5429780	will be translated into tokens.
+5429780	5431780	And there are these special byte tokens
+5431780	5433780	that basically get added to the vocabulary.
+5433780	5437780	So it uses BPE on the code points
+5437780	5439780	and then it falls back to bytes
+5439780	5442780	for rare code points.
+5442780	5444780	And so that's kind of like the difference.
+5444780	5445780	Personally, I find that TickToken
+5445780	5447780	is significantly cleaner,
+5447780	5448780	but it's kind of like a subtle
+5448780	5449780	but pretty major difference
+5449780	5451780	between the way they approach tokenization.
+5451780	5452780	Let's work with a concrete example
+5452780	5454780	because otherwise this is kind of hard
+5454780	5457780	to get your head around.
+5457780	5459780	So let's work with a concrete example.
+5459780	5462780	This is how we can import sentence piece.
+5462780	5464780	And then here we're going to take,
+5464780	5466780	I think I took like the description of sentence piece
+5466780	5468780	and I just created like a little toy data set.
+5468780	5469780	It really likes to have a file.
+5469780	5473780	So I created a toy.txt file with this content.
+5473780	5475780	Now, what's kind of a little bit crazy
+5475780	5476780	about sentence piece
+5476780	5479780	is that there's a ton of options and configurations.
+5479780	5480780	And the reason this is so
+5480780	5482780	is because sentence piece has been around,
+5482780	5483780	I think for a while,
+5483780	5484780	and it really tries to handle
+5484780	5486780	a large diversity of things.
+5486780	5488780	And because it's been around,
+5488780	5490780	I think it has quite a bit of accumulated
+5490780	5492780	historical baggage as well.
+5492780	5493780	And so in particular,
+5493780	5496780	there's like a ton of configuration arguments.
+5496780	5498780	This is not even all of it.
+5498780	5502780	You can go to here to see all the training options.
+5502780	5505780	And there's also quite useful documentation
+5505780	5508780	like the raw protobuf that is used
+5508780	5512780	to represent the trainer spec and so on.
+5512780	5514780	Many of these options are irrelevant to us.
+5514780	5516780	So maybe to point out one example,
+5516780	5518780	dash dash shrinking factor.
+5518780	5520780	This shrinking factor is not used
+5520780	5522780	in the byte pairing coding algorithm.
+5522780	5525780	So this is just an argument that is irrelevant to us.
+5525780	5530780	It applies to a different training algorithm.
+5530780	5531780	Now, what I tried to do here
+5531780	5533780	is I tried to set up sentence piece
+5533780	5535780	in a way that is very, very similar.
+5535780	5538780	So I can tell to maybe identical, hopefully,
+5538780	5541780	to the way that Lama2 was trained.
+5541780	5545780	So the way they trained their own tokenizer.
+5545780	5547780	And the way I did this was basically
+5547780	5549780	you can take the tokenizer.model file
+5549780	5550780	that Meta released,
+5550780	5554780	and you can open it using the protobuf
+5554780	5557780	sort of file that you can generate.
+5557780	5559780	And then you can inspect all the options.
+5559780	5561780	And I tried to copy over all the options
+5561780	5562780	that looked relevant.
+5562780	5564780	So here we set up the input.
+5564780	5566780	This is a raw text in this file.
+5566780	5567780	Here's going to be the output.
+5567780	5572780	So it's going to be protoc400.model and .vocap.
+5572780	5574780	We're saying that we're going to use the BP algorithm,
+5574780	5576780	and we want a vocab size of 400.
+5576780	5578780	And there's a ton of configurations here
+5578780	5584780	for basically preprocessing
+5584780	5586780	and normalization rules, as they're called.
+5586780	5589780	Normalization used to be very prevalent,
+5589780	5592780	I would say, before LLMs in natural language processing.
+5592780	5593780	So in machine translation
+5593780	5595780	and text classification and so on,
+5595780	5597780	you want to normalize and simplify the text,
+5597780	5598780	and you want to turn it all lowercase,
+5598780	5601780	and you want to remove all double white space, etc.
+5601780	5602780	And in language models,
+5602780	5604780	we prefer not to do any of it,
+5604780	5605780	or at least that is my preference
+5605780	5606780	as a deep learning person.
+5606780	5608780	You want to not touch your data.
+5608780	5609780	You want to keep the raw data
+5609780	5613780	as much as possible in a raw form.
+5613780	5614780	So you're basically trying to turn off
+5614780	5617780	a lot of this if you can.
+5617780	5618780	The other thing that sentence piece does
+5618780	5621780	is that it has this concept of sentences.
+5621780	5623780	So sentence piece,
+5623780	5624780	it's back,
+5624780	5625780	it kind of like was developed,
+5625780	5626780	I think, early in the days
+5626780	5629780	where there was an idea
+5629780	5631780	that you're training a tokenizer
+5631780	5633780	on a bunch of independent sentences.
+5633780	5634780	So it has a lot of like
+5634780	5636780	how many sentences you're going to train on,
+5636780	5641780	what is the maximum sentence length,
+5641780	5642780	shuffling sentences.
+5642780	5643780	And so for it,
+5643780	5644780	sentences are kind of like
+5644780	5645780	the individual training examples.
+5645780	5647780	But again, in the context of LLMs,
+5647780	5649780	I find that this is like a very spurious
+5649780	5650780	and weird distinction.
+5650780	5652780	Like sentences are
+5652780	5654780	just like don't touch the raw data.
+5654780	5655780	Sentences happen to exist.
+5655780	5657780	But in the raw data sets,
+5657780	5659780	there are a lot of like in-betweens,
+5659780	5660780	like what exactly is a sentence?
+5660780	5662780	What isn't a sentence?
+5662780	5664780	And so I think like it's really hard to define
+5664780	5666780	what an actual sentence is
+5666780	5668780	if you really like dig into it.
+5668780	5670780	And there could be different concepts of it
+5670780	5671780	in different languages or something like that.
+5671780	5673780	So why even introduce the concept?
+5673780	5675780	It doesn't honestly make sense to me.
+5675780	5677780	I would just prefer to treat a file
+5677780	5680780	as a giant stream of bytes.
+5680780	5681780	It has a lot of treatment around
+5681780	5683780	the rare word characters.
+5683780	5684780	And when I say word,
+5684780	5685780	I mean code points.
+5685780	5687780	We're going to come back to this in a second.
+5687780	5688780	And it has a lot of other rules
+5688780	5692780	for basically splitting digits,
+5692780	5694780	splitting white space and numbers
+5694780	5695780	and how you deal with that.
+5695780	5698780	So these are some kind of like merge rules.
+5698780	5699780	So I think this is a little bit equivalent
+5699780	5702780	to TikToken using the regular expression
+5702780	5704780	to split up categories.
+5704780	5707780	There's like kind of equivalence of it
+5707780	5709780	if you squint at it in sentence piece
+5709780	5710780	where you can also, for example,
+5710780	5716780	split up the digits and so on.
+5716780	5717780	There's a few more things here
+5717780	5718780	that I'll come back to in a bit.
+5718780	5719780	And then there are some special tokens
+5719780	5720780	that you can indicate.
+5720780	5723780	And it hardcodes the UNK token,
+5723780	5724780	the beginning of sentence,
+5724780	5725780	end of sentence,
+5725780	5727780	and a pad token.
+5727780	5729780	And the UNK token must exist
+5729780	5731780	from my understanding.
+5731780	5733780	And then some systems things.
+5733780	5734780	So we can train.
+5734780	5736780	And when I press train,
+5736780	5738780	it's going to create this file
+5738780	5739780	talk400.model
+5739780	5741780	and talk400.vocab.
+5741780	5743780	I can then load the model file
+5743780	5746780	and I can inspect the vocabulary of it.
+5746780	5749780	And so we trained vocab size 400
+5749780	5752780	on this text here.
+5752780	5754780	And these are the individual pieces,
+5754780	5755780	the individual tokens
+5755780	5757780	that sentence piece will create.
+5757780	5758780	So in the beginning,
+5758780	5760780	we see that we have the UNK token
+5760780	5762780	with the ID 0.
+5762780	5764780	Then we have the beginning of sequence,
+5764780	5766780	end of sequence, 1 and 2.
+5766780	5768780	And then we said that the pad ID
+5768780	5769780	is negative 1.
+5769780	5771780	So we chose not to use it.
+5771780	5773780	So there's no pad ID here.
+5773780	5777780	Then these are individual byte tokens.
+5777780	5779780	So here we saw that byte fallback
+5779780	5781780	in Llama was turned on.
+5781780	5782780	So it's true.
+5782780	5784780	So what follows are going to be
+5784780	5787780	the 256 byte tokens.
+5787780	5792780	And these are their IDs.
+5792780	5794780	And then at the bottom,
+5794780	5795780	after the byte tokens,
+5795780	5798780	come the merges.
+5798780	5801780	And these are the parent nodes in the merges.
+5801780	5802780	So we're not seeing the children.
+5802780	5805780	We're just seeing the parents and their ID.
+5805780	5807780	And then after the merges
+5807780	5811780	comes eventually the individual tokens
+5811780	5812780	and their IDs.
+5812780	5814780	And so these are the individual tokens.
+5814780	5817780	So these are the individual code point tokens,
+5817780	5818780	if you will,
+5818780	5819780	and they come at the end.
+5819780	5820780	So that is the ordering
+5820780	5821780	with which sentence piece
+5821780	5823780	sort of like represents its vocabularies.
+5823780	5825780	It starts with special tokens,
+5825780	5826780	then the byte tokens,
+5826780	5827780	then the merge tokens,
+5827780	5830780	and then the individual code point tokens.
+5830780	5833780	And all these raw code point tokens
+5833780	5834780	are the ones that it encountered
+5834780	5836780	in the training set.
+5836780	5838780	So those individual code points
+5838780	5841780	are all the entire set of code points
+5841780	5844780	that occurred here.
+5844780	5846780	So those all get put in there.
+5846780	5848780	And then those are extremely rare
+5848780	5850780	as determined by character coverage.
+5850780	5851780	So if a code point occurred
+5851780	5852780	only a single time
+5852780	5854780	out of like a million sentences
+5854780	5855780	or something like that,
+5855780	5857780	then it would be ignored.
+5857780	5861780	And it would not be added to our vocabulary.
+5861780	5862780	Once we have a vocabulary,
+5862780	5864780	we can encode into IDs
+5864780	5867780	and we can sort of get a list.
+5867780	5868780	And then here,
+5868780	5872780	I am also decoding the individual tokens
+5872780	5874780	back into little pieces,
+5874780	5875780	as they call it.
+5875780	5878780	So let's take a look at what happened here.
+5878780	5879780	Hello, space,
+5879780	5881780	Annyeonghaseyo.
+5881780	5884780	So these are the token IDs we got back.
+5884780	5886780	And when we look here,
+5886780	5887780	a few things
+5887780	5890780	sort of jump to mind.
+5890780	5891780	Number one,
+5891780	5893780	take a look at these characters.
+5893780	5894780	The Korean characters, of course,
+5894780	5896780	were not part of the training set.
+5896780	5898780	So sentence piece is encountering code points
+5898780	5901780	that it has not seen during training time.
+5901780	5903780	And those code points do not have
+5903780	5905780	a token associated with them.
+5905780	5907780	So suddenly these are unk tokens,
+5907780	5909780	unknown tokens.
+5909780	5911780	But because byte fallback is true,
+5911780	5912780	instead,
+5912780	5915780	sentence piece falls back to bytes.
+5915780	5916780	And so it takes this,
+5916780	5918780	it encodes it with UTF-8,
+5918780	5921780	and then it uses these tokens
+5921780	5923780	to represent those bytes.
+5923780	5926780	And that's what we are getting sort of here.
+5926780	5929780	This is the UTF-8 encoding,
+5929780	5931780	and it is shifted by three
+5931780	5935780	because of these special tokens here
+5935780	5937780	that have IDs earlier on.
+5937780	5939780	So that's what happened here.
+5939780	5941780	Now, one more thing that,
+5941780	5943780	well, first before I go on,
+5943780	5945780	with respect to the byte fallback,
+5945780	5948780	let me remove byte fallback.
+5948780	5949780	If this is false,
+5949780	5950780	what's going to happen?
+5950780	5952780	Let's retrain.
+5952780	5953780	So the first thing that happened is
+5953780	5956780	all of the byte tokens disappeared, right?
+5956780	5957780	And now we just have the merges,
+5957780	5959780	and we have a lot more merges now
+5959780	5960780	because we have a lot more space
+5960780	5962780	because we're not taking up space
+5962780	5965780	in the vocab size with all the bytes.
+5965780	5968780	And now if we encode this,
+5968780	5970780	we get a zero.
+5970780	5972780	So this entire string here,
+5972780	5974780	suddenly there's no byte fallback.
+5974780	5976780	So this is unknown,
+5976780	5978780	and unknown is unk.
+5978780	5980780	And so this is zero
+5980780	5983780	because the unk token is token zero.
+5983780	5984780	And you have to keep in mind
+5984780	5987780	that this would feed into your language model.
+5987780	5988780	So what is the language model supposed to do
+5988780	5990780	when all kinds of different things
+5990780	5992780	that are unrecognized because they're rare
+5992780	5994780	just end up mapping into unk?
+5994780	5996780	It's not exactly the property that you want.
+5996780	5998780	So that's why I think Lama correctly
+5998780	6001780	used byte fallback true
+6001780	6003780	because we definitely want to feed these
+6003780	6005780	unknown or rare code points
+6005780	6007780	into the model in some manner.
+6007780	6010780	The next thing I want to show you is the following.
+6010780	6012780	Notice here when we are decoding
+6012780	6014780	all the individual tokens.
+6014780	6017780	You see how spaces, space here,
+6017780	6020780	ends up being this bold underline.
+6020780	6021780	I'm not 100% sure, by the way,
+6021780	6023780	why sentence piece switches white space
+6023780	6026780	into these bold underscore characters.
+6026780	6027780	Maybe it's for visualization.
+6027780	6030780	I'm not 100% sure why that happens.
+6030780	6031780	But notice this.
+6031780	6034780	Why do we have an extra space
+6034780	6038780	in the front of hello?
+6038780	6040780	Where is this coming from?
+6040780	6045780	Well, it's coming from this option here.
+6045780	6047780	Add dummy prefix is true.
+6047780	6050780	And when you go to the documentation,
+6050780	6052780	add dummy white space at the beginning of text
+6052780	6054780	in order to treat world in world
+6054780	6056780	and hello world in the exact same way.
+6056780	6059780	So what this is trying to do is the following.
+6059780	6061780	If we go back to our tick tokenizer,
+6061780	6065780	world as a token by itself
+6065780	6069780	has a different ID than space world.
+6069780	6071780	So we have this is 1917,
+6071780	6073780	but this is 14, etc.
+6073780	6075780	So these are two different tokens
+6075780	6076780	for the language model.
+6076780	6078780	And the language model has to learn from data
+6078780	6079780	that they are actually kind of like
+6079780	6080780	a very similar concept.
+6080780	6083780	So to the language model in the tick token world,
+6083780	6086780	basically words in the beginning of sentences
+6086780	6088780	and words in the middle of sentences
+6088780	6090780	actually look completely different.
+6090780	6093780	And it has learned that they are roughly the same.
+6093780	6095780	So this add dummy prefix
+6095780	6097780	is trying to fight that a little bit.
+6097780	6099780	And the way that works is that
+6099780	6103780	it basically adds a dummy prefix.
+6103780	6107780	So as a part of preprocessing,
+6107780	6110780	it will take the string and it will add a space.
+6110780	6112780	It will do this.
+6112780	6114780	And that's done in an effort
+6114780	6116780	to make this world and that world the same.
+6116780	6118780	They will both be space world.
+6118780	6120780	So that's one other
+6120780	6123780	kind of preprocessing option that is turned on.
+6123780	6126780	And Lama2 also uses this option.
+6126780	6128780	And that's I think everything that I want to say
+6128780	6129780	for my preview of sentence piece
+6129780	6131780	and how it is different.
+6131780	6133780	Maybe here what I've done is
+6133780	6137780	I just put in the raw protocol buffer
+6137780	6140780	representation basically of the tokenizer
+6140780	6142780	that Lama2 trained.
+6142780	6144780	So feel free to sort of step through this.
+6144780	6146780	And if you would like your tokenization
+6146780	6149780	to look identical to that of the meta Lama2,
+6149780	6151780	then you would be copy pasting these settings
+6151780	6153780	as I've tried to do up above.
+6153780	6156780	And yeah, I think that's it for this section.
+6156780	6158780	I think my summary for sentence piece
+6158780	6160780	from all this is number one,
+6160780	6162780	I think that there's a lot of historical baggage
+6162780	6163780	in sentence piece.
+6163780	6166780	A lot of concepts that I think are slightly confusing
+6166780	6168780	and I think potentially contain foot guns
+6168780	6170780	like this concept of a sentence
+6170780	6172780	and its maximum length and stuff like that.
+6172780	6176780	Otherwise, it is fairly commonly used in the industry
+6176780	6178780	because it is efficient and can do both training and training.
+6178780	6180780	and can do both training and inference.
+6180780	6181780	It has a few quirks.
+6181780	6182780	Like for example,
+6182780	6183780	unktoken must exist
+6183780	6185780	and the way the byte fallbacks are done and so on
+6185780	6187780	I don't find particularly elegant.
+6187780	6188780	And unfortunately, I have to say
+6188780	6189780	it's not very well documented.
+6189780	6193780	So it took me a lot of time working with this myself
+6193780	6195780	and just visualizing things
+6195780	6197780	and try to really understand what is happening here
+6197780	6199780	because the documentation unfortunately
+6199780	6201780	is in my opinion not super amazing.
+6201780	6203780	But it is a very nice repo
+6203780	6205780	that is available to you
+6205780	6207780	if you'd like to train your own tokenizer right now.
+6207780	6208780	Okay.
+6208780	6209780	I'll switch gears again
+6209780	6211780	as we're starting to slowly wrap up here.
+6211780	6213780	I want to revisit this issue in a bit more detail
+6213780	6215780	of how we should set the vocab size
+6215780	6217780	and what are some of the considerations around it.
+6217780	6219780	So for this,
+6219780	6221780	I'd like to go back to the model architecture
+6221780	6223780	that we developed in the last video
+6223780	6225780	when we built the GPT from scratch.
+6225780	6228780	So this here was the file that we built in the previous video
+6228780	6230780	and we defined the transformer model
+6230780	6232780	and let's specifically look at vocab size
+6232780	6234780	and where it appears in this file.
+6234780	6236780	So here we define the vocab size.
+6236780	6237780	At this time,
+6237780	6239780	it was 65 or something like that,
+6239780	6240780	extremely small number.
+6240780	6242780	So this will grow much larger.
+6242780	6244780	You'll see that vocab size doesn't come up too much
+6244780	6245780	in most of these layers.
+6245780	6247780	The only place that it comes up to
+6247780	6250780	is in exactly these two places here.
+6250780	6252780	So when we define the language model,
+6252780	6254780	there's the token embedding table
+6254780	6256780	which is this two-dimensional array
+6256780	6259780	where the vocab size is basically the number of rows
+6259780	6262780	and each vocabulary element,
+6262780	6264780	each token has a vector
+6264780	6266780	that we're going to train using backpropagation.
+6266780	6268780	That vector is of size and embed,
+6268780	6270780	which is number of channels in the transformer.
+6270780	6271780	And basically,
+6271780	6272780	as vocab size increases,
+6272780	6273780	this embedding table,
+6273780	6274780	as I mentioned earlier,
+6274780	6275780	is going to also grow.
+6275780	6277780	We're going to be adding rows.
+6277780	6278780	In addition to that,
+6278780	6280780	at the end of the transformer,
+6280780	6281780	there's this LM head layer,
+6281780	6283780	which is a linear layer.
+6283780	6285780	And you'll notice that that layer is used
+6285780	6287780	at the very end to produce the logits,
+6287780	6289780	which become the probabilities
+6289780	6290780	for the next token in a sequence.
+6290780	6291780	And so intuitively,
+6291780	6293780	we're trying to produce a probability
+6293780	6295780	for every single token
+6295780	6296780	that might come next
+6296780	6299780	at every point in time of that transformer.
+6299780	6301780	And if we have more and more tokens,
+6301780	6303780	we need to produce more and more probabilities.
+6303780	6304780	So every single token
+6304780	6306780	is going to introduce an additional dot product
+6306780	6309780	that we have to do here in this linear layer
+6309780	6311780	for this final layer in the transformer.
+6311780	6314780	So why can't vocab size be infinite?
+6314780	6315780	Why can't we grow to infinity?
+6315780	6316780	Well, number one,
+6316780	6319780	your token embedding table is going to grow.
+6319780	6322780	Your linear layer is going to grow.
+6322780	6324780	So we're going to be doing a lot more computation here
+6324780	6325780	because this LM head layer
+6325780	6327780	will become more competitionally expensive.
+6327780	6329780	Number two, because we have more parameters,
+6329780	6331780	we could be worried that we are going to be
+6331780	6334780	under-training some of these parameters.
+6334780	6336780	So intuitively,
+6336780	6337780	if you have a very large vocabulary size,
+6337780	6339780	say we have a million tokens,
+6339780	6341780	then every one of these tokens
+6341780	6343780	is going to come up more and more rarely
+6343780	6344780	in the training data
+6344780	6345780	because there's a lot more other tokens
+6345780	6346780	all over the place.
+6346780	6349780	And so we're going to be seeing fewer and fewer examples
+6349780	6351780	for each individual token.
+6351780	6353780	And you might be worried that basically
+6353780	6354780	the vectorization
+6354780	6355780	of the vectors associated with every token
+6355780	6357780	will be under-trained as a result
+6357780	6359780	because they just don't come up too often
+6359780	6361780	and they don't participate in the forward-backward pass.
+6361780	6362780	In addition to that,
+6362780	6364780	as your vocab size grows,
+6364780	6367780	you're going to start shrinking your sequences a lot, right?
+6367780	6368780	And that's really nice because
+6368780	6370780	that means that we're going to be attending
+6370780	6371780	to more and more text.
+6371780	6372780	So that's nice.
+6372780	6373780	But also you might be worrying
+6373780	6375780	that too large of chunks
+6375780	6377780	are being squished into single tokens.
+6377780	6379780	And so the model just doesn't have
+6379780	6381780	as much sort of time to think
+6381780	6383780	per sort of
+6383780	6385780	some number of characters in a text,
+6385780	6387780	or you can think about it that way, right?
+6387780	6389780	So basically we're squishing too much information
+6389780	6390780	into a single token
+6390780	6392780	and then the forward pass of the transformer
+6392780	6393780	is not enough to actually process
+6393780	6395780	that information appropriately.
+6395780	6396780	And so these are some of the considerations
+6396780	6397780	you're thinking about
+6397780	6399780	when you're designing the vocab size.
+6399780	6400780	As I mentioned, this is mostly
+6400780	6401780	an empirical hyperparameter.
+6401780	6402780	And it seems like
+6402780	6404780	in state-of-the-art architectures today,
+6404780	6406780	this is usually in the high 10,000s
+6406780	6408780	or somewhere around 100,000 today.
+6408780	6409780	And the next consideration
+6409780	6411780	I want to briefly talk about is
+6411780	6413780	what if we want to take a pre-trained model
+6413780	6415780	and we want to extend the vocab size?
+6415780	6417780	And this is done fairly commonly actually.
+6417780	6418780	So for example,
+6418780	6420780	when you're doing fine-tuning for ChatGPT,
+6420780	6422780	a lot more new special tokens
+6422780	6424780	get introduced on top of the base model
+6424780	6426780	to maintain the metadata
+6426780	6429780	and all the structure of conversation objects
+6429780	6430780	between the user and the system.
+6430780	6432780	So that takes a lot of special tokens.
+6432780	6435780	You might also try to throw in more special tokens,
+6435780	6436780	for example, for using the browser
+6436780	6437780	or any other tool.
+6437780	6440780	And so it's very tempting to add a lot of tokens
+6440780	6442780	for all kinds of special functionality.
+6442780	6444780	So if you want to be adding a token,
+6444780	6445780	that's totally possible, right?
+6445780	6448780	All we have to do is we have to resize this embedding.
+6448780	6450780	So we have to add rows.
+6450780	6452780	We would initialize these parameters from scratch,
+6452780	6454780	which would be small random numbers.
+6454780	6456780	And then we have to extend the weight
+6456780	6458780	inside this linear.
+6458780	6460780	So we have to start making dot products
+6460780	6462780	with the associated parameters as well
+6462780	6464780	to basically calculate the probabilities
+6464780	6465780	for these new tokens.
+6465780	6468780	So both of these are just resizing operation.
+6468780	6470780	It's a very mild model surgery
+6470780	6471780	and can be done fairly easily.
+6471780	6473780	And it's quite common that basically
+6473780	6474780	you would freeze the base model.
+6474780	6476780	You introduce these new parameters
+6476780	6478780	and then you only train these new parameters
+6478780	6480780	to introduce new tokens into the architecture.
+6480780	6483780	And so you can freeze arbitrary parts of it
+6483780	6485780	or you can train arbitrary parts of it.
+6485780	6486780	And that's totally up to you.
+6486780	6488780	But basically minor surgery required
+6488780	6490780	if you'd like to introduce new tokens.
+6490780	6492780	And finally, I'd like to mention that actually
+6492780	6494780	there's an entire design space of applications
+6494780	6497780	in terms of introducing new tokens into a vocabulary
+6497780	6499780	that go way beyond just adding special tokens
+6499780	6500780	and special new functionality.
+6500780	6503780	So just to give you a sense of the design space,
+6503780	6505780	but this could be an entire video just by itself,
+6505780	6508780	this is a paper on learning to compress prompts
+6508780	6510780	with what they called GIST tokens.
+6510780	6512780	And the rough idea is,
+6512780	6514780	suppose that you're using language models
+6514780	6516780	in a setting that requires very long prompts.
+6516780	6518780	Well, these long prompts just slow everything down
+6518780	6519780	because you have to encode them
+6519780	6520780	and then you have to use them
+6520780	6522780	and then you're tending over them
+6522780	6525780	and it's just heavy to have very large prompts.
+6525780	6528780	So instead, what they do here in this paper
+6528780	6530780	is they introduce new functions
+6530780	6532780	and new tokens.
+6532780	6535780	And imagine basically having a few new tokens,
+6535780	6537780	you put them in a sequence,
+6537780	6540780	and then you train the model by distillation.
+6540780	6542780	So you are keeping the entire model frozen
+6542780	6544780	and you're only training the representations
+6544780	6546780	of the new tokens, their embeddings,
+6546780	6548780	and you're optimizing over the new tokens
+6548780	6550780	such that the behavior of the language model
+6550780	6554780	is identical to the model
+6554780	6557780	that has a very long prompt that works for you.
+6557780	6558780	And so it's a compression technique
+6558780	6560780	of compressing that very long prompt
+6560780	6562780	into those few new gist tokens.
+6562780	6564780	And so you can train this and then at test time
+6564780	6565780	you can discard your old prompt
+6565780	6567780	and just swap in those tokens
+6567780	6569780	and they sort of like stand in
+6569780	6570780	for that very long prompt
+6570780	6572780	and have an almost identical performance.
+6572780	6575780	And so this is one technique
+6575780	6578780	in a class of parameter-efficient fine-tuning techniques
+6578780	6580780	where most of the model is basically fixed
+6580780	6582780	and there's no training of the model weights,
+6582780	6584780	there's no training of LoRa or anything like that
+6584780	6585780	of new parameters.
+6585780	6587780	The parameters that you're training
+6587780	6589780	are now just the token embeddings.
+6589780	6591780	So that's just one example,
+6591780	6593780	but this could again be like an entire video,
+6593780	6594780	but just to give you a sense
+6594780	6595780	that there's a whole design space here
+6595780	6597780	that is potentially worth exploring in the future.
+6597780	6599780	The next thing I want to briefly address
+6599780	6601780	is that I think recently there's a lot of momentum
+6601780	6604780	in how you actually could construct transformers
+6604780	6605780	that can simultaneously process
+6605780	6607780	not just text as the input modality,
+6607780	6609780	but a lot of other modalities.
+6609780	6612780	So be it images, videos, audio, etc.
+6612780	6614780	And how do you feed in all these modalities
+6614780	6616780	and potentially predict these modalities
+6616780	6618780	from a transformer?
+6618780	6619780	Do you have to change the architecture
+6619780	6620780	in some fundamental way?
+6620780	6621780	And I think what a lot of people
+6621780	6622780	are starting to converge towards
+6622780	6624780	is that you're not changing the architecture,
+6624780	6625780	you stick with the transformer,
+6625780	6628780	you just kind of tokenize your input domains
+6628780	6629780	and then call it a day
+6629780	6630780	and pretend it's just text tokens
+6630780	6634780	and just do everything else in an identical manner.
+6634780	6635780	So here, for example,
+6635780	6637780	there was an early paper that has a nice graphic
+6637780	6638780	for how you can take an image
+6638780	6642780	and you can truncate it into integers.
+6642780	6644780	And these sometimes...
+6644780	6645780	So these would basically become
+6645780	6648780	the tokens of images, as an example.
+6648780	6651780	And these tokens can be hard tokens
+6651780	6653780	where you force them to be integers.
+6653780	6655780	They can also be soft tokens
+6655780	6658780	where you sort of don't require
+6658780	6660780	these to be discrete,
+6660780	6662780	but you do force these representations
+6662780	6663780	to go through bottlenecks,
+6663780	6665780	like in autoencoders.
+6665780	6667780	Also in this paper that came out from OpenAI,
+6667780	6670780	Sora, which I think really
+6670780	6672780	blew the mind of many people
+6672780	6673780	and inspired a lot of people
+6673780	6674780	in terms of what's possible,
+6674780	6675780	they have a graphic here
+6675780	6677780	and they talk briefly about how
+6677780	6679780	LLMs have text tokens,
+6679780	6681780	Sora has visual patches.
+6681780	6682780	So again, they came up with a way
+6682780	6685780	to truncate videos into basically tokens
+6685780	6687780	with their own vocabularies.
+6687780	6689780	And then you can either process discrete tokens,
+6689780	6690780	say, with autoregressive models
+6690780	6693780	or even soft tokens with diffusion models.
+6693780	6696780	And all of that is sort of
+6696780	6698780	being actively worked on, designed on,
+6698780	6699780	and it's beyond the scope of this video,
+6699780	6701780	but just something I wanted to mention briefly.
+6701780	6703780	Okay, now that we have gone quite deep
+6703780	6705780	into the tokenization algorithm
+6705780	6706780	and we understand a lot more
+6706780	6707780	about how it works,
+6707780	6708780	let's loop back around
+6708780	6709780	to the beginning of this video
+6709780	6711780	and go through some of these bullet points
+6711780	6713780	and really see why they happen.
+6713780	6714780	So first of all,
+6714780	6717780	why can't my LLM spell words very well
+6717780	6720780	or do other spell-related tasks?
+6720780	6722780	So fundamentally, this is because,
+6722780	6724780	as we saw, these characters
+6724780	6726780	are chunked up into tokens
+6726780	6727780	and some of these tokens
+6727780	6729780	are actually fairly long.
+6729780	6730780	So as an example,
+6730780	6732780	I went to the GPT-4 vocabulary
+6732780	6734780	and I looked at one of the longer tokens.
+6734780	6736780	So .defaultset
+6736780	6738780	turns out to be a single individual token.
+6738780	6739780	So that's a lot of characters
+6739780	6740780	for a single token.
+6740780	6742780	So my suspicion is that
+6742780	6743780	there's just too much crammed
+6743780	6744780	into this single token.
+6744780	6746780	And my suspicion was that
+6746780	6747780	the model should not be very good
+6747780	6750780	at tasks related to spelling
+6750780	6753780	of this single token.
+6753780	6754780	So I asked,
+6754780	6755780	how many letters L
+6755780	6758780	are there in the word .defaultstyle?
+6758780	6759780	And of course,
+6759780	6763780	my prompt is intentionally done that way.
+6763780	6764780	And you see how .defaultstyle
+6764780	6765780	will be a single token.
+6765780	6767780	So this is what the model sees.
+6767780	6768780	So my suspicion is that
+6768780	6769780	it wouldn't be very good at this.
+6769780	6771780	And indeed, it is not.
+6771780	6772780	It doesn't actually know
+6772780	6773780	how many Ls are in there.
+6773780	6774780	It thinks there are three
+6774780	6776780	and actually there are four,
+6776780	6778780	if I'm not getting this wrong myself.
+6778780	6780780	So that didn't go extremely well.
+6780780	6782780	Let's look at another
+6782780	6784780	kind of character-level task.
+6784780	6785780	So for example,
+6785780	6787780	here I asked GPT-4
+6787780	6790780	to reverse the string .defaultstyle
+6790780	6792780	and to try to use a code interpreter.
+6792780	6793780	And I stopped it
+6793780	6794780	and I said, just do it.
+6794780	6795780	Just try it.
+6795780	6797780	And it gave me jumble.
+6797780	6800780	So it doesn't actually really know
+6800780	6801780	how to reverse this string
+6801780	6803780	going from right to left.
+6803780	6805780	So it gave it wrong result.
+6805780	6808780	So again, like working with this working hypothesis
+6808780	6810780	that maybe this is due to the tokenization,
+6810780	6811780	I tried a different approach.
+6811780	6812780	I said, okay,
+6812780	6814780	let's reverse the exact same string,
+6814780	6816780	but take the following approach.
+6816780	6817780	Step one,
+6817780	6818780	just print out every single character
+6818780	6819780	separated by spaces.
+6819780	6820780	And then as a step two,
+6820780	6822780	reverse that list.
+6822780	6823780	And it again tried to use a tool,
+6823780	6824780	but when I said,
+6824780	6825780	I stopped it,
+6825780	6827780	it first produced all the characters
+6827780	6829780	and that was actually correct.
+6829780	6830780	And then it reversed them
+6830780	6831780	and that was correct
+6831780	6832780	once it had this.
+6832780	6834780	So somehow it can't reverse it directly.
+6834780	6836780	But when you go just first,
+6836780	6837780	you know,
+6837780	6838780	listing it out in order,
+6838780	6839780	it can do that somehow.
+6839780	6840780	And then it can,
+6840780	6842780	once it's broken up this way,
+6842780	6844780	this becomes all these individual characters.
+6844780	6846780	And so now this is much easier
+6846780	6848780	for it to see these individual tokens
+6848780	6850780	and reverse them and print them out.
+6850780	6853780	So that is kind of interesting.
+6853780	6855780	So let's continue now.
+6855780	6859780	Why are LLMs worse at non-English languages?
+6859780	6861780	And I briefly covered this already,
+6861780	6862780	but basically,
+6862780	6864780	it's not only that the language model
+6864780	6866780	sees less non-English data
+6866780	6868780	during training of the model parameters,
+6868780	6870780	but also the tokenizer
+6870780	6873780	is not sufficiently trained
+6873780	6875780	on non-English data.
+6875780	6876780	And so here, for example,
+6876780	6879780	hello, how are you is five tokens
+6879780	6881780	and its translation is 15 tokens.
+6881780	6882780	So this is a three times block
+6882780	6884780	and so, for example,
+6884780	6885780	is just hello,
+6885780	6886780	basically in Korean.
+6886780	6888780	And that ends up being three tokens.
+6888780	6889780	I'm actually kind of surprised by that
+6889780	6891780	because that is a very common phrase.
+6891780	6892780	There's just a typical greeting
+6892780	6893780	of like, hello.
+6893780	6894780	And that ends up being three tokens,
+6894780	6896780	whereas our hello is a single token.
+6896780	6897780	And so basically everything
+6897780	6899780	is a lot more bloated and diffuse.
+6899780	6900780	And this is, I think,
+6900780	6902780	partly the reason that the model works
+6902780	6904780	worse on other languages.
+6904780	6905780	Coming back,
+6905780	6908780	why is LLM bad at simple arithmetic?
+6908780	6909780	That has something to do
+6909780	6910780	with the fact that
+6910780	6911780	LLMs can be used
+6911780	6912780	in a lot of different ways.
+6912780	6913780	And that has to do
+6913780	6916780	with the tokenization of numbers.
+6916780	6918780	And so you'll notice that,
+6918780	6919780	for example,
+6919780	6921780	addition is very sort of like,
+6921780	6922780	there's an algorithm
+6922780	6923780	that is like character level
+6923780	6925780	for doing addition.
+6925780	6926780	So for example,
+6926780	6927780	here we would first add the ones
+6927780	6928780	and then the tens
+6928780	6929780	and then the hundreds.
+6929780	6930780	You have to refer
+6930780	6932780	to specific parts of these digits.
+6932780	6934780	But these numbers
+6934780	6936780	are represented completely arbitrarily
+6936780	6937780	based on whatever happened
+6937780	6938780	to merge or not merge
+6938780	6940780	during the tokenization process.
+6940780	6941780	There's an entire block
+6941780	6942780	of information
+6942780	6943780	that's been published
+6943780	6944780	about this that I think
+6944780	6945780	is quite good.
+6945780	6946780	Integer tokenization is insane.
+6946780	6947780	And this person basically
+6947780	6948780	systematically explores
+6948780	6949780	the tokenization of numbers
+6949780	6950780	in, I believe,
+6950780	6951780	this is GPT-2.
+6951780	6952780	And so they noticed
+6952780	6953780	that, for example,
+6953780	6956780	for four-digit numbers,
+6956780	6957780	you can take a look at
+6957780	6959780	whether it is a single token
+6959780	6961780	or whether it is two tokens
+6961780	6962780	that is a one-three
+6962780	6963780	or a two-two
+6963780	6964780	or a three-one combination.
+6964780	6965780	And so all the different numbers
+6965780	6967780	are all the different combinations.
+6967780	6968780	And you can imagine
+6968780	6970780	this is all completely arbitrarily so.
+6970780	6971780	And the model, unfortunately,
+6971780	6974780	sometimes sees a token
+6974780	6975780	for all four digits,
+6975780	6976780	sometimes for three,
+6976780	6977780	sometimes for two,
+6977780	6978780	sometimes for one.
+6978780	6981780	And it's in an arbitrary manner.
+6981780	6982780	And so this is definitely
+6982780	6984780	a headwind, if you will,
+6984780	6985780	for the language model.
+6985780	6986780	And it's kind of incredible
+6986780	6987780	that it can kind of do it
+6987780	6988780	and deal with it.
+6988780	6990780	But it's also kind of not ideal.
+6990780	6991780	And so that's why, for example,
+6991780	6992780	we saw that Meta,
+6992780	6993780	when they trained
+6993780	6994780	the LAMA2 algorithm
+6994780	6995780	and the sentence piece,
+6995780	6997780	they make sure to split up
+6997780	6999780	all the digits
+6999780	7002780	as an example for LAMA2.
+7002780	7004780	And this is partly to improve
+7004780	7005780	a simple arithmetic
+7005780	7007780	kind of performance.
+7007780	7008780	And finally,
+7008780	7009780	why is GPT-2
+7009780	7011780	not as good in Python?
+7011780	7012780	Again, this is partly
+7012780	7013780	a modeling issue
+7013780	7014780	in the architecture
+7014780	7015780	and the data set
+7015780	7016780	and the strength of the model,
+7016780	7018780	but it's also partly tokenization.
+7018780	7019780	Because as we saw here
+7019780	7021780	with the simple Python example,
+7021780	7023780	the encoding efficiency
+7023780	7024780	of the tokenizer
+7024780	7025780	for handling spaces in Python
+7025780	7026780	is terrible.
+7026780	7027780	And every single space
+7027780	7028780	is an individual token.
+7028780	7029780	And this dramatically
+7029780	7030780	reduces the context length
+7030780	7032780	that the model can attend across.
+7032780	7033780	So that's almost like
+7033780	7035780	a tokenization bug for GPT-2.
+7035780	7038780	And that was later fixed with GPT-4.
+7038780	7040780	Okay, so here's another fun one.
+7040780	7041780	My LLM abruptly halts
+7041780	7044780	when it sees the string end of text.
+7044780	7047780	So here's a very strange behavior.
+7047780	7048780	Print a string end of text
+7048780	7050780	is what I told GPT-4.
+7050780	7051780	And it says,
+7051780	7053780	could you please specify the string?
+7053780	7054780	And I'm telling it,
+7054780	7055780	give me end of text.
+7055780	7057780	And it seems like there's an issue.
+7057780	7059780	It's not seeing end of text.
+7059780	7060780	And then I give it,
+7060780	7062780	end of text is the string.
+7062780	7063780	And then here's the string.
+7063780	7065780	And then it just doesn't print it.
+7065780	7066780	So obviously something is breaking here
+7066780	7067780	with respect to the handling
+7067780	7068780	of the special token.
+7068780	7069780	And I didn't actually know
+7069780	7070780	what OpenAI is doing
+7070780	7072780	under the hood here
+7072780	7074780	and whether they are potentially parsing this
+7074780	7078780	as an actual token
+7078780	7082780	instead of this just being end of text
+7082780	7084780	as like individual sort of pieces of it
+7084780	7087780	without the special token handling logic.
+7087780	7088780	And so it might be
+7088780	7089780	that someone,
+7089780	7091780	when they're calling dot encode,
+7091780	7093780	they are passing in the allowed special
+7093780	7095780	and they are allowing end of text
+7095780	7098780	as a special character in the user prompt.
+7098780	7099780	But the user prompt,
+7099780	7100780	of course,
+7100780	7102780	is a sort of attacker controlled text.
+7102780	7105780	So you would hope that they don't really parse
+7105780	7106780	or use special tokens
+7106780	7107780	or, you know,
+7107780	7109780	from that kind of input.
+7109780	7110780	But it appears that there's something
+7110780	7111780	definitely going wrong here.
+7111780	7113780	And so your knowledge
+7113780	7115780	of these special tokens
+7115780	7117780	ends up being an attack surface potentially.
+7117780	7120780	And so if you'd like to confuse LLMs,
+7120780	7123780	then just try to give them some special tokens
+7123780	7125780	and see if you're breaking something by chance.
+7125780	7128780	Okay, so this next one is a really fun one.
+7128780	7131780	The trailing whitespace issue.
+7131780	7133780	So if you come to Playground
+7133780	7137780	and we come here to GPT 3.5 Turbo instruct.
+7137780	7138780	So this is not a chat model.
+7138780	7140780	This is a completion model.
+7140780	7141780	So think of it more like
+7141780	7143780	it's a lot more closer to a base model.
+7143780	7145780	It does completion.
+7145780	7147780	It will continue the token sequence.
+7147780	7149780	So here's a tagline for ice cream shop
+7149780	7151780	and we want to continue the sequence.
+7151780	7153780	And so we can submit
+7153780	7154780	and get a bunch of tokens.
+7154780	7156780	Okay, no problem.
+7156780	7158780	But now suppose I do this,
+7158780	7161780	but instead of pressing submit here,
+7161780	7164780	I do here's a tagline for ice cream shop space.
+7164780	7166780	So I have a space here
+7166780	7168780	before I click submit.
+7168780	7170780	We get a warning.
+7170780	7172780	Your text ends in the trailing space,
+7172780	7173780	which causes the worst performance
+7173780	7176780	due to how API splits text into tokens.
+7176780	7177780	So what's happening here?
+7177780	7180780	It still gave us a sort of completion here,
+7180780	7183780	but let's take a look at what's happening.
+7183780	7185780	So here's a tagline for an ice cream shop.
+7185780	7188780	And then what does this look like
+7188780	7189780	in the actual training data?
+7189780	7191780	Suppose you found the completion
+7191780	7192780	in the training documents
+7192780	7193780	somewhere on the internet
+7193780	7195780	and the LLM trained on this data.
+7195780	7197780	So maybe it's something like,
+7197780	7199780	oh yeah, maybe that's the tagline.
+7199780	7200780	That's a terrible tagline.
+7200780	7203780	But notice here that when I create O,
+7203780	7206780	you see that because there's the space characters
+7206780	7208780	the space character is always a prefix
+7208780	7210780	to these tokens in GPT.
+7210780	7212780	So it's not an O token.
+7212780	7213780	It's a space O token.
+7213780	7215780	The space is part of the O
+7215780	7218780	and together they are token 8840.
+7218780	7220780	That's space O.
+7220780	7222780	So what's happening here is that
+7222780	7224780	when I just have it like this
+7224780	7227780	and I let it complete the next token,
+7227780	7230780	it can sample the space O token.
+7230780	7233780	But instead, if I have this and I add my space,
+7233780	7235780	then what I'm doing here when I encode this string,
+7235780	7237780	is I have basically,
+7237780	7239780	here's the tagline for an ice cream shop
+7239780	7243780	and this space at the very end becomes a token 220.
+7243780	7246780	And so we've added token 220
+7246780	7249780	and this token otherwise would be part of the tagline
+7249780	7251780	because if there actually is a tagline here,
+7251780	7254780	so space O is the token.
+7254780	7257780	And so this is suddenly out of distribution for the model
+7257780	7260780	because this space is part of the next token,
+7260780	7262780	but we're putting it here like this
+7262780	7265780	and the model has seen very, very little
+7265780	7269780	data of actual space by itself.
+7269780	7271780	And we're asking it to complete the sequence,
+7271780	7272780	like add in more tokens.
+7272780	7275780	But the problem is that we've sort of begun the first token
+7275780	7277780	and now it's been split up
+7277780	7279780	and now we're out of distribution
+7279780	7281780	and now arbitrary bad things happen.
+7281780	7283780	And it's just a very rare example
+7283780	7285780	for it to see something like that.
+7285780	7287780	And that's why we get the warning.
+7287780	7290780	So the fundamental issue here is of course that
+7290780	7293780	the LLM is on top of these tokens
+7293780	7294780	and these tokens are text chunks.
+7294780	7297780	They're not characters in a way you and I would think of them.
+7297780	7300780	These are the atoms of what the LLM is seeing
+7300780	7302780	and there's a bunch of weird stuff that comes out of it.
+7302780	7306780	Let's go back to our default cell style.
+7306780	7309780	I bet you that the model has never in its training set
+7309780	7314780	seen default cell star without LE in there.
+7314780	7316780	It's always seen this as a single group
+7316780	7320780	because this is some kind of a function in...
+7320780	7322780	I don't actually know what this is part of.
+7322780	7323780	This is some kind of API,
+7323780	7327780	but I bet you that it's never seen this combination of tokens
+7327780	7329780	in its training data
+7329780	7331780	or I think it would be extremely rare.
+7331780	7333780	So I took this and I copy pasted it here
+7333780	7336780	and I tried to complete from it
+7336780	7339780	and it immediately gave me a big error.
+7339780	7341780	And it said the model predicted a completion
+7341780	7343780	that begins with a stop sequence resulting in no output.
+7343780	7345780	Consider adjusting your prompt or stop sequences.
+7345780	7347780	So what happened here when I clicked submit
+7347780	7350780	is that immediately the model emitted
+7350780	7352780	and sort of like end of text token, I think,
+7352780	7353780	or something like that
+7353780	7356780	it basically predicted the stop sequence immediately.
+7356780	7358780	So it had no completion.
+7358780	7360780	And so this is why I'm getting a warning again
+7360780	7362780	because we're off the data distribution
+7362780	7365780	and the model is just predicting
+7365780	7367780	just totally arbitrary things.
+7367780	7369780	It's just really confused basically.
+7369780	7370780	This is giving it brain damage.
+7370780	7371780	It's never seen this before.
+7371780	7372780	It's shocked.
+7372780	7374780	And it's predicting end of text or something.
+7374780	7376780	I tried it again here
+7376780	7378780	and in this case it completed it.
+7378780	7379780	But then for some reason
+7379780	7382780	this request may violate our usage policies.
+7382780	7384780	This was flagged.
+7384780	7386780	Basically something just like goes wrong
+7386780	7387780	and there's something like jank.
+7387780	7388780	You can just feel the jank
+7388780	7390780	because the model is like extremely unhappy
+7390780	7391780	with just this
+7391780	7392780	and it doesn't know how to complete it
+7392780	7394780	because it's never occurred in a training set.
+7394780	7397780	In a training set it always appears like this
+7397780	7399780	and becomes a single token.
+7399780	7401780	So these kinds of issues where tokens are
+7401780	7404780	either you sort of like complete the first character
+7404780	7405780	of the next token
+7405780	7406780	or you are sort of
+7406780	7407780	you have long tokens
+7407780	7410780	that you then have just some of the characters off.
+7410780	7411780	All of these are kind of like
+7411780	7414780	issues with partial tokens
+7414780	7416780	is how I would describe it.
+7416780	7420780	And if you actually dig into the TokToken repository
+7420780	7421780	go to the Rust code
+7421780	7424780	and search for unstable
+7424780	7426780	and you'll see in code
+7426780	7427780	unstable native
+7427780	7428780	unstable tokens
+7428780	7430780	and a lot of like special case handling.
+7430780	7432780	None of this stuff about unstable tokens
+7432780	7434780	is documented anywhere
+7434780	7435780	but there's a ton of code
+7435780	7437780	dealing with unstable tokens
+7437780	7439780	and unstable tokens is exactly
+7439780	7441780	kind of like what I'm describing here.
+7441780	7444780	What you would like out of a completion API
+7444780	7445780	is something a lot more fancy.
+7445780	7447780	Like if we're putting in default cell star
+7447780	7449780	if we're asking for the next token sequence
+7449780	7451780	we're not actually trying to append the next token
+7451780	7453780	exactly after this list.
+7453780	7455780	We're actually trying to append
+7455780	7458780	we're trying to consider lots of tokens
+7458780	7460780	that if we were
+7460780	7461780	I guess like
+7461780	7463780	we're trying to search over characters
+7463780	7465780	that if we retokenized
+7465780	7467780	would be of high probability
+7467780	7469780	if that makes sense.
+7469780	7470780	So that we can actually add
+7470780	7472780	a single individual character
+7472780	7475780	instead of just like adding the next full token
+7475780	7478780	that comes after this partial token list.
+7478780	7480780	So this is very tricky to describe
+7480780	7482780	and I invite you to maybe like look through this.
+7482780	7483780	It ends up being extremely gnarly
+7483780	7485780	and hairy kind of topic
+7485780	7487780	and it comes from tokenization fundamentally.
+7487780	7490780	So maybe I can even spend an entire video
+7490780	7491780	talking about unstable tokens
+7491780	7492780	sometime in the future.
+7492780	7494780	Okay and I'm really saving the best for last.
+7494780	7496780	My favorite one by far
+7496780	7498780	is this solid gold Magikarp.
+7498780	7500780	It was just
+7500780	7502780	okay so this comes from this blog post
+7502780	7503780	solid gold Magikarp
+7503780	7505780	and this is
+7505780	7507780	internet famous now
+7507780	7509780	for those of us in LLMs.
+7509780	7511780	And basically I would advise you to
+7511780	7513780	read this blog post in full.
+7513780	7515780	But basically what this person was doing is
+7515780	7518780	this person went to the
+7518780	7520780	token embedding stable
+7520780	7522780	and clustered the tokens
+7522780	7524780	based on their embedding representation.
+7524780	7527780	And this person noticed that there's a cluster
+7527780	7529780	of tokens that look really strange.
+7529780	7531780	So there's a cluster here
+7531780	7532780	at rot
+7532780	7533780	East stream fame
+7533780	7534780	solid gold Magikarp
+7534780	7535780	sign up message
+7535780	7537780	like really weird tokens in
+7537780	7540780	basically in this embedding cluster.
+7540780	7542780	And so what are these tokens
+7542780	7543780	and where do they even come from?
+7543780	7544780	Like what is solid gold Magikarp?
+7544780	7545780	It makes no sense.
+7545780	7549780	And then they found a bunch of these tokens
+7549780	7551780	and then they noticed that actually
+7551780	7552780	the plot thickens here
+7552780	7555780	because if you ask the model about these tokens
+7555780	7558780	like you ask it some very benign question
+7558780	7560780	like please can you repeat back to me
+7560780	7562780	the strength sold gold Magikarp
+7562780	7564780	then you get a variety of basically
+7564780	7566780	totally broken LLM behavior.
+7566780	7568780	So either you get evasion.
+7568780	7570780	So I'm sorry, I can't hear you
+7570780	7573780	or you get a bunch of hallucinations as a response.
+7573780	7575780	You can even get back like insults.
+7575780	7578780	So you ask it about streamer bot
+7578780	7579780	and it tells them
+7579780	7582780	and the model actually just calls you names
+7582780	7584780	or it kind of comes up with like weird humor
+7584780	7586780	like you're actually breaking the model
+7586780	7587780	by asking about these
+7587780	7589780	very simple strings like at Roth
+7589780	7591780	and solid gold Magikarp.
+7591780	7592780	So like what the hell is happening?
+7592780	7595780	And there's a variety of here documented behaviors.
+7595780	7597780	There's a bunch of tokens
+7597780	7598780	not just solid gold Magikarp
+7598780	7600780	that have that kind of a behavior.
+7600780	7603780	And so basically there's a bunch of like trigger words.
+7603780	7605780	And if you ask the model about these trigger words
+7605780	7607780	or you just include them in your prompt
+7607780	7608780	the model goes haywire
+7608780	7611780	and has all kinds of really strange behaviors
+7611780	7613780	including sort of ones that violate
+7613780	7615780	typical safety guidelines
+7615780	7616780	and the alignment of the model
+7616780	7617780	like in this case
+7617780	7618780	it's swearing back at you.
+7618780	7620780	So what is happening here
+7620780	7622780	and how can this possibly be true?
+7622780	7625780	Well, this again comes down to tokenization.
+7625780	7626780	So what's happening here
+7626780	7627780	is that solid gold Magikarp
+7627780	7629780	if you actually dig into it
+7629780	7630780	is a Reddit user.
+7630780	7633780	So there's a u slash solid gold Magikarp
+7633780	7635780	and probably what happened here
+7635780	7637780	even though I don't know that this has been
+7637780	7639780	like really definitively explored
+7639780	7641780	but what is thought to have happened
+7641780	7644780	is that the tokenization data set
+7644780	7647780	was very different from the training data set
+7647780	7649780	for the actual language model.
+7649780	7650780	So in the tokenization data set
+7650780	7652780	there was a ton of Reddit data potentially
+7652780	7655780	where the user solid gold Magikarp
+7655780	7656780	was mentioned in the text.
+7656780	7658780	Because solid gold Magikarp
+7658780	7661780	was a very common sort of person
+7661780	7662780	who would post a lot
+7662780	7664780	this would be a string that occurs many times
+7664780	7666780	in a tokenization data set.
+7666780	7668780	Because it occurs many times
+7668780	7669780	in the tokenization data set
+7669780	7671780	these tokens would end up getting merged
+7671780	7672780	to a single individual token
+7672780	7674780	for that single Reddit user
+7674780	7675780	solid gold Magikarp.
+7675780	7677780	So they would have a dedicated token
+7677780	7678780	in a vocabulary of
+7678780	7680780	was it 50,000 tokens in GPT-2
+7680780	7683780	that is devoted to that Reddit user.
+7683780	7684780	And then what happens is
+7684780	7687780	the tokenization data set has those strings
+7687780	7690780	but then later when you train the model
+7690780	7692780	the language model itself
+7692780	7695780	this data from Reddit was not present.
+7695780	7696780	And so therefore
+7696780	7699780	in the entire training set for the language model
+7699780	7701780	solid gold Magikarp never occurs.
+7701780	7704780	That token never appears in the training set
+7704780	7706780	for the actual language model later.
+7706780	7709780	So this token never gets activated
+7709780	7710780	it's initialized at random
+7710780	7712780	in the beginning of optimization
+7712780	7713780	then you have forward-backward passes
+7713780	7714780	and updates to the model
+7714780	7716780	and this token is just never updated
+7716780	7717780	in the embedding table.
+7717780	7719780	That row vector never gets sampled
+7719780	7720780	it never gets used
+7720780	7721780	so it never gets trained
+7721780	7722780	and it's completely untrained.
+7722780	7724780	It's kind of like unallocated memory
+7724780	7726780	in a typical binary program
+7726780	7728780	written in C or something like that.
+7728780	7729780	So it's unallocated memory
+7729780	7730780	and then at test time
+7730780	7732780	if you evoke this token
+7732780	7733780	then you're basically
+7733780	7735780	plucking out a row of the embedding table
+7735780	7736780	that is completely untrained
+7736780	7738780	and that feeds into a transformer
+7738780	7740780	and creates undefined behavior.
+7740780	7741780	And that's what we're seeing here
+7741780	7742780	it's completely undefined
+7742780	7745780	never before seen in a training behavior.
+7745780	7747780	And so any of these kind of like weird tokens
+7747780	7748780	would evoke this behavior
+7748780	7750780	because fundamentally the model
+7750780	7753780	is out of sample
+7753780	7755780	out of distribution.
+7755780	7756780	Okay and the very last thing
+7756780	7758780	I wanted to just briefly mention and point out
+7758780	7759780	although I think a lot of people
+7759780	7760780	are quite aware of this
+7760780	7762780	is that different kinds of formats
+7762780	7763780	and different representations
+7763780	7764780	and different languages
+7764780	7765780	and so on
+7765780	7766780	might be more or less efficient
+7766780	7768780	with GPT tokenizers
+7768780	7770780	or any tokenizers for any other LLM
+7770780	7771780	for that matter.
+7771780	7772780	So for example JSON
+7772780	7774780	is actually really dense in tokens
+7774780	7777780	and YAML is a lot more efficient in tokens.
+7777780	7780780	So for example these are the same
+7780780	7782780	in JSON and in YAML.
+7782780	7784780	The JSON is 116
+7784780	7786780	and the YAML is 99.
+7786780	7788780	So quite a bit of an improvement.
+7788780	7791780	And so in the token economy
+7791780	7793780	where we are paying per token
+7793780	7794780	in many ways
+7794780	7795780	and you are paying in the context length
+7795780	7797780	and you're paying in dollar amount
+7797780	7799780	for the cost of processing
+7799780	7800780	all this kind of structured data
+7800780	7802780	when you have to.
+7802780	7804780	So prefer to use YAMLs over JSONs
+7804780	7805780	and in general
+7805780	7806780	kind of like the tokenization density
+7806780	7808780	is something that you have to
+7808780	7809780	sort of care about
+7809780	7811780	and worry about at all times
+7811780	7813780	and try to find efficient encoding schemes
+7813780	7814780	and spend a lot of time
+7814780	7815780	in tick tokenizer
+7815780	7817780	and measure the different token efficiencies
+7817780	7818780	of different formats and settings
+7818780	7819780	and so on.
+7819780	7820780	Okay so that concludes
+7820780	7823780	my fairly long video on tokenization.
+7823780	7825780	I know it's dry.
+7825780	7826780	I know it's annoying.
+7826780	7827780	I know it's irritating.
+7827780	7829780	I personally really dislike the stage.
+7829780	7831780	What I do have to say at this point
+7831780	7833780	is don't brush it off.
+7833780	7834780	There's a lot of foot guns,
+7834780	7835780	sharp edges here,
+7835780	7836780	security issues,
+7836780	7838780	AI safety issues
+7838780	7840780	as we saw plugging in unallocated memory
+7840780	7842780	into language models.
+7842780	7845780	So it's worth understanding this stage.
+7845780	7847780	That said I will say that
+7847780	7849780	eternal glory goes to anyone
+7849780	7850780	who can get rid of it.
+7850780	7852780	I showed you one possible paper
+7852780	7854780	that tried to do that
+7854780	7855780	and I think I hope
+7855780	7857780	a lot more can follow over time.
+7857780	7858780	And my final recommendations
+7858780	7860780	for the application right now are
+7860780	7862780	if you can reuse the GPT-4 tokens
+7862780	7863780	and the vocabulary
+7863780	7864780	in your application
+7864780	7865780	then that's something you should consider
+7865780	7866780	and just use tick token
+7866780	7868780	because it is very efficient
+7868780	7870780	and nice library for inference
+7870780	7871780	for BPE.
+7871780	7873780	I also really like the byte level BPE
+7873780	7876780	that tick token and OpenAI uses.
+7876780	7877780	If you for some reason
+7877780	7879780	want to train your own vocabulary
+7879780	7881780	from scratch
+7881780	7885780	then I would use the BPE with sentence piece.
+7885780	7886780	Oops.
+7886780	7887780	As I mentioned
+7887780	7888780	I'm not a huge fan of sentence piece.
+7888780	7892780	I don't like its byte fallback
+7892780	7894780	and I don't like that it's doing BPE
+7894780	7895780	on Unicode code points.
+7895780	7896780	I think it's
+7896780	7897780	it also has like a million settings
+7897780	7899780	and I think there's a lot of foot guns here
+7899780	7900780	and I think it's really easy
+7900780	7901780	to miscalibrate them
+7901780	7902780	and you end up cropping your sentences
+7902780	7904780	or something like that
+7904780	7905780	because of some type of parameter
+7905780	7907780	that you don't fully understand.
+7907780	7909780	So be very careful with the settings.
+7909780	7910780	Try to copy paste exactly
+7910780	7912780	maybe what Meta did
+7912780	7914780	or basically spend a lot of time
+7914780	7916780	looking at all the hyperparameters
+7916780	7917780	and go through the code of sentence piece
+7917780	7919780	and make sure that you have this correct.
+7919780	7922780	But even if you have all the settings correct
+7922780	7923780	I still think that the algorithm
+7923780	7924780	is kind of inferior
+7924780	7926780	to what's happening here.
+7926780	7928780	And maybe the best
+7928780	7930780	if you really need to train your vocabulary
+7930780	7931780	maybe the best thing is to just wait
+7931780	7933780	for minBPE to become as efficient
+7933780	7934780	as possible
+7934780	7936780	and that's something that
+7936780	7938780	maybe I hope to work on.
+7938780	7939780	And at some point
+7939780	7941780	maybe we can be training basically
+7941780	7942780	really what we want
+7942780	7943780	is we want tick token
+7943780	7944780	but training code
+7944780	7946780	and that is the ideal thing
+7946780	7948780	that currently does not exist.
+7948780	7951780	And minBPE is an implementation of it
+7951780	7953780	but currently it's in Python.
+7953780	7955780	So that's currently what I have to say
+7955780	7957780	for tokenization.
+7957780	7958780	There might be an advanced video
+7958780	7960780	that is even drier
+7960780	7961780	and even more detailed in the future.
+7961780	7962780	But for now I think
+7962780	7964780	we're going to leave things off here
+7964780	7966780	and I hope that was helpful.
+7966780	7967780	Bye.
+7969780	7975780	And they increased this context size
+7975780	7977780	from GPT-1 of 5.12
+7977780	7982780	to 1,024 in GPT-4.2.
+7982780	7985780	The next...
+7985780	7986780	Okay, next I would like us
+7986780	7987780	to briefly walk through
+7987780	7989780	the code from OpenAI
+7989780	7996780	on the GPT-2 encoder.py.
+7996780	7998780	I'm sorry, I'm going to sneeze.
+7998780	7999780	And then what's happening
+7999780	8002780	here is...
+8002780	8003780	This is a spurious layer
+8003780	8006780	that I will explain in a bit.
+8006780	8008780	What's happening here is...
