@@ -1,6 +1,8 @@
 # whisperzh
 🔥 📗 [Whisper](https://github.com/openai/whisper) transcripts of Andrej Karpathy's [Neural Networks: Zero to Hero course lectures](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ). 💎 💥
 
+<img src="buffdogedrej.png?raw=true" width="600"/>
+
 ## Transcripts
 
 | Project | Files | Lecture 
